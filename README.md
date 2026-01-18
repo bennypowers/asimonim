@@ -1,0 +1,166 @@
+# Asimonim
+
+![A vintage Israeli phone token (asimon), captured mid-drop as it falls into a payphone coin slot](./logo.png)
+A high-performance design tokens parser and validator, available as a CLI tool and Go library.
+
+> *Asimonim* (אֲסִימוֹנִים) (ahh-see-moh-NEEM) is Hebrew for "tokens".
+
+Design systems use [design tokens][dtcg] to store visual primitives like colors, spacing, and typography. Asimonim parses and validates token files defined by the Design Tokens Community Group (DTCG) specification, supporting both the current draft and the stable V2025_10 schema.
+
+## Features
+
+- **Multi-schema support**: Handles both Draft and V2025_10 DTCG schemas
+- **Automatic schema detection**: Duck-typing detection of schema version from file contents
+- **Alias resolution**: Resolve token references with cycle detection
+- **CSS output**: Generate CSS custom properties from tokens
+- **Search**: Find tokens by name, value, or type with regex support
+- **Validation**: Check files for schema compliance and circular references
+
+## Installation
+
+### From Source
+
+```bash
+go install bennypowers.dev/asimonim@latest
+```
+
+## Quick Start
+
+Validate your design token files:
+
+```bash
+# Validate token files
+asimonim validate tokens.json
+
+# List all tokens
+asimonim list tokens.json
+
+# Output as CSS custom properties
+asimonim list tokens.json --format css
+
+# Search for color tokens
+asimonim search "primary" tokens.json --type color
+```
+
+## CLI Reference
+
+### `asimonim validate`
+
+Validate design token files for correctness and schema compliance.
+
+```
+Usage:
+  asimonim validate [files...]
+
+Flags:
+  -s, --schema string    Force schema version (draft, v2025_10)
+      --strict           Fail on warnings
+      --quiet            Only output errors
+```
+
+**Examples:**
+
+```bash
+# Validate multiple files
+asimonim validate colors.json spacing.json typography.json
+
+# Force a specific schema version
+asimonim validate tokens.json --schema v2025_10
+
+# Quiet mode for CI
+asimonim validate tokens.json --quiet
+```
+
+### `asimonim list`
+
+List all tokens from design token files with optional filtering and formatting.
+
+```
+Usage:
+  asimonim list [files...]
+
+Flags:
+  -s, --schema string    Force schema version (draft, v2025_10)
+      --type string      Filter by token type
+      --resolved         Show resolved values (follow aliases)
+      --format string    Output format: table, json, css (default "table")
+      --css              Shorthand for --format css
+```
+
+**Examples:**
+
+```bash
+# List all tokens as a table
+asimonim list tokens.json
+
+# Output as JSON
+asimonim list tokens.json --format json
+
+# Generate CSS custom properties
+asimonim list tokens.json --format css
+
+# Show only color tokens with resolved values
+asimonim list tokens.json --type color --resolved
+```
+
+### `asimonim search`
+
+Search design tokens by name, value, or type.
+
+```
+Usage:
+  asimonim search <query> [files...]
+
+Flags:
+  -s, --schema string    Force schema version (draft, v2025_10)
+      --name             Search names only
+      --value            Search values only
+      --type string      Filter by token type
+      --regex            Treat query as a regular expression
+      --format string    Output format: table, json, names (default "table")
+```
+
+**Examples:**
+
+```bash
+# Search by name or value
+asimonim search "blue" tokens.json
+
+# Search names only with regex
+asimonim search "^color\." tokens.json --name --regex
+
+# Find all dimension tokens containing "spacing"
+asimonim search "spacing" tokens.json --type dimension
+
+# Output matching token names only
+asimonim search "primary" tokens.json --format names
+```
+
+### `asimonim version`
+
+Display version information.
+
+```
+Usage:
+  asimonim version
+
+Flags:
+      --format string    Output format: text, json (default "text")
+```
+
+## Schema Versions
+
+Asimonim supports multiple DTCG schema versions:
+
+| Version   | References          | Colors     | Features                    |
+| --------- | ------------------- | ---------- | --------------------------- |
+| Draft     | `{token.path}`      | Strings    | Group markers               |
+| V2025_10  | `$ref: "#/path"`    | Structured | `$extends`, `$root`         |
+
+Schema version is automatically detected from file contents, or can be forced with the `--schema` flag.
+
+## License
+
+GPLv3
+
+[dtcg]: https://design-tokens.github.io/community-group/format/
