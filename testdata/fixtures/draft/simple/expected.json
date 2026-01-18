@@ -1,0 +1,29 @@
+[
+  {
+    "name": "color-primary",
+    "value": "#FF6B35",
+    "type": "color",
+    "description": "Primary brand color"
+  },
+  {
+    "name": "color-secondary",
+    "value": "{color.primary}",
+    "type": "color",
+    "description": "Secondary color alias"
+  },
+  {
+    "name": "spacing-large",
+    "value": "16px",
+    "type": "dimension"
+  },
+  {
+    "name": "spacing-medium",
+    "value": "8px",
+    "type": "dimension"
+  },
+  {
+    "name": "spacing-small",
+    "value": "4px",
+    "type": "dimension"
+  }
+]
