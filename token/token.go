@@ -13,6 +13,25 @@ import (
 	"bennypowers.dev/asimonim/schema"
 )
 
+// DTCG token type constants.
+// See: https://design-tokens.github.io/community-group/format/#types
+const (
+	TypeColor       = "color"
+	TypeDimension   = "dimension"
+	TypeFontFamily  = "fontFamily"
+	TypeFontWeight  = "fontWeight"
+	TypeDuration    = "duration"
+	TypeCubicBezier = "cubicBezier"
+	TypeNumber      = "number"
+	TypeString      = "string"
+	TypeStrokeStyle = "strokeStyle"
+	TypeBorder      = "border"
+	TypeTransition  = "transition"
+	TypeShadow      = "shadow"
+	TypeGradient    = "gradient"
+	TypeTypography  = "typography"
+)
+
 // Token represents a design token following the DTCG specification.
 // See: https://design-tokens.github.io/community-group/format/
 type Token struct {

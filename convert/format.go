@@ -182,7 +182,7 @@ func formatSwift(tokens []*token.Token, opts Options) ([]byte, error) {
 
 	// Group tokens by type
 	groups := groupTokensByType(tokens)
-	typeOrder := []string{"color", "dimension", "fontFamily", "fontWeight", "duration", "cubicBezier", "number", "string"}
+	typeOrder := []string{token.TypeColor, token.TypeDimension, token.TypeFontFamily, token.TypeFontWeight, token.TypeDuration, token.TypeCubicBezier, token.TypeNumber, token.TypeString}
 
 	for _, tokenType := range typeOrder {
 		group, exists := groups[tokenType]
@@ -506,13 +506,13 @@ func escapeXML(s string) string {
 
 func getXMLType(tokenType string) string {
 	switch tokenType {
-	case "color":
+	case token.TypeColor:
 		return "color"
-	case "dimension":
+	case token.TypeDimension:
 		return "dimen"
-	case "number":
+	case token.TypeNumber:
 		return "integer"
-	case "string", "fontFamily":
+	case token.TypeString, token.TypeFontFamily:
 		return "string"
 	default:
 		return "string"
@@ -539,7 +539,7 @@ func toTypeScriptValue(value any) string {
 
 func toSwiftValue(tokenType string, value any) string {
 	switch tokenType {
-	case "color":
+	case token.TypeColor:
 		// Handle structured color objects (v2025_10 spec)
 		if colorObj, ok := value.(map[string]any); ok {
 			return structuredColorToSwift(colorObj)
@@ -553,7 +553,7 @@ func toSwiftValue(tokenType string, value any) string {
 			// Fallback to string if parsing fails
 			return fmt.Sprintf("%q", s)
 		}
-	case "dimension":
+	case token.TypeDimension:
 		if s, ok := value.(string); ok {
 			// Extract numeric value
 			s = strings.TrimSuffix(s, "px")
@@ -561,13 +561,13 @@ func toSwiftValue(tokenType string, value any) string {
 			s = strings.TrimSuffix(s, "em")
 			return fmt.Sprintf("CGFloat(%s)", s)
 		}
-	case "duration":
+	case token.TypeDuration:
 		if s, ok := value.(string); ok {
 			s = strings.TrimSuffix(s, "ms")
 			s = strings.TrimSuffix(s, "s")
 			return fmt.Sprintf("TimeInterval(%s)", s)
 		}
-	case "number", "fontWeight":
+	case token.TypeNumber, token.TypeFontWeight:
 		switch v := value.(type) {
 		case float64:
 			if v == float64(int(v)) {
@@ -585,11 +585,11 @@ func toSwiftValue(tokenType string, value any) string {
 
 func toSCSSValue(tokenType string, value any) string {
 	switch tokenType {
-	case "color":
+	case token.TypeColor:
 		return fmt.Sprintf("%v", value)
-	case "dimension":
+	case token.TypeDimension:
 		return fmt.Sprintf("%v", value)
-	case "number", "fontWeight":
+	case token.TypeNumber, token.TypeFontWeight:
 		switch v := value.(type) {
 		case float64:
 			if v == float64(int(v)) {
@@ -600,7 +600,7 @@ func toSCSSValue(tokenType string, value any) string {
 			return fmt.Sprintf("%d", v)
 		}
 		return fmt.Sprintf("%v", value)
-	case "fontFamily":
+	case token.TypeFontFamily:
 		if s, ok := value.(string); ok {
 			// Quote font family names
 			return fmt.Sprintf("%q", s)
@@ -624,9 +624,9 @@ func toSCSSValue(tokenType string, value any) string {
 func mapToTailwindKey(tokenType, pathFirst string) string {
 	// First try by token type
 	switch tokenType {
-	case "color":
+	case token.TypeColor:
 		return "colors"
-	case "dimension":
+	case token.TypeDimension:
 		// Map based on path prefix
 		switch pathFirst {
 		case "spacing", "space", "gap":
@@ -642,15 +642,15 @@ func mapToTailwindKey(tokenType, pathFirst string) string {
 		default:
 			return "spacing"
 		}
-	case "fontFamily":
+	case token.TypeFontFamily:
 		return "fontFamily"
-	case "fontWeight":
+	case token.TypeFontWeight:
 		return "fontWeight"
-	case "duration":
+	case token.TypeDuration:
 		return "transitionDuration"
-	case "cubicBezier":
+	case token.TypeCubicBezier:
 		return "transitionTimingFunction"
-	case "shadow":
+	case token.TypeShadow:
 		return "boxShadow"
 	}
 
