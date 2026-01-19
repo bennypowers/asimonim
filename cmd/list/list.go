@@ -82,6 +82,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 		opts := parser.Options{
 			SchemaVersion: version,
+			SkipPositions: true, // CLI doesn't need LSP position tracking
 		}
 		tokens, err := jsonParser.ParseFile(filesystem, file, opts)
 		if err != nil {

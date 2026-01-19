@@ -7,7 +7,9 @@ license that can be found in the LICENSE file.
 package parser
 
 import (
+	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"sort"
@@ -34,15 +36,19 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 	// Remove comments using jsonc
 	cleanJSON := jsonc.ToJSON(data)
 
-	// Parse JSON with yaml.v3 to get AST with position data
-	var root yaml.Node
-	if err := yaml.Unmarshal(cleanJSON, &root); err != nil {
+	// Parse with encoding/json (fast path)
+	var raw map[string]any
+	if err := json.Unmarshal(cleanJSON, &raw); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
+	// Extract tokens using the single extraction path
 	result := []*token.Token{}
-	if len(root.Content) > 0 {
-		if err := p.extractTokens(root.Content[0], []string{}, "", opts, &result); err != nil {
+	p.extractTokens(raw, []string{}, "", "", opts, &result)
+
+	// Optional second pass: add position tracking
+	if !opts.SkipPositions {
+		if err := p.addPositions(cleanJSON, result); err != nil {
 			return nil, err
 		}
 	}
@@ -50,95 +56,168 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 	return result, nil
 }
 
-// ParseFile parses a JSON token file and returns tokens.
-func (p *JSONParser) ParseFile(filesystem fs.FileSystem, path string, opts Options) ([]*token.Token, error) {
-	data, err := filesystem.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %w", path, err)
+// extractTokens recursively extracts tokens from a parsed map.
+// inheritedType is passed down from parent groups for $type inheritance.
+func (p *JSONParser) extractTokens(data map[string]any, jsonPath []string, path, inheritedType string, opts Options, result *[]*token.Token) {
+	// Check if this group has a $type that should be inherited by children
+	currentType := inheritedType
+	if groupType, ok := data["$type"].(string); ok {
+		currentType = groupType
 	}
 
-	tokens, err := p.Parse(data, opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse file %s: %w", path, err)
-	}
-
-	// Set FilePath on all tokens
-	for _, t := range tokens {
-		t.FilePath = path
-	}
-
-	return tokens, nil
-}
-
-// getNodeValue finds a child node by key in a mapping node.
-func getNodeValue(node *yaml.Node, key string) *yaml.Node {
-	if node.Kind != yaml.MappingNode {
-		return nil
-	}
-	for i := 0; i < len(node.Content); i += 2 {
-		if node.Content[i].Value == key {
-			return node.Content[i+1]
+	// Collect keys for sorting
+	keys := make([]string, 0, len(data))
+	for k := range data {
+		if strings.HasPrefix(k, "$") {
+			continue
 		}
+		keys = append(keys, k)
 	}
-	return nil
-}
 
-// extractPosition extracts line and character from AST node (yaml.v3 is 1-based, we use 0-based).
-func extractPosition(keyNode *yaml.Node) (line, character uint32, err error) {
-	if keyNode.Line > 0 {
-		lineVal := keyNode.Line - 1
-		if lineVal < 0 || lineVal > math.MaxUint32 {
-			return 0, 0, fmt.Errorf("position line %d exceeds uint32 limit", lineVal)
-		}
-		line = uint32(lineVal)
+	// Sort for deterministic order unless SkipSort is set
+	if !opts.SkipSort {
+		sort.Strings(keys)
 	}
-	if keyNode.Column > 0 {
-		colVal := keyNode.Column - 1
-		if colVal < 0 || colVal > math.MaxUint32 {
-			return 0, 0, fmt.Errorf("position column %d exceeds uint32 limit", colVal)
-		}
-		character = uint32(colVal)
-	}
-	return line, character, nil
-}
 
-// extractMetadata extracts DTCG metadata fields from value node.
-func extractMetadata(valueNode *yaml.Node, t *token.Token) {
-	if typeNode := getNodeValue(valueNode, "$type"); typeNode != nil {
-		t.Type = typeNode.Value
-	}
-	if descNode := getNodeValue(valueNode, "$description"); descNode != nil {
-		t.Description = descNode.Value
-	}
-	if deprecatedNode := getNodeValue(valueNode, "$deprecated"); deprecatedNode != nil {
-		if deprecatedNode.Kind == yaml.ScalarNode {
-			if deprecatedNode.Tag == "!!bool" {
-				t.Deprecated = deprecatedNode.Value == "true"
-			} else {
-				t.Deprecated = true
-				t.DeprecationMessage = deprecatedNode.Value
+	for _, key := range keys {
+		v := data[key]
+
+		// Skip non-map values
+		valueMap, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		// Check for token indicators
+		dollarValue, hasValue := valueMap["$value"]
+		dollarRef, hasRef := valueMap["$ref"]
+		hasRef = hasRef && opts.SchemaVersion != schema.Draft
+
+		// Check for root token / group markers
+		isRootToken := common.IsRootToken(key, opts.SchemaVersion, opts.GroupMarkers)
+		isTransparentMarker := p.isTransparent(key, valueMap, opts.GroupMarkers)
+		isMarker := slices.Contains(opts.GroupMarkers, key) && opts.SchemaVersion == schema.Draft
+
+		// Build paths
+		currentPath, newPath := buildPaths(jsonPath, path, key, isTransparentMarker || isRootToken)
+
+		// Extract token if has $value or $ref
+		if hasValue || hasRef {
+			t := p.createToken(key, path, valueMap, currentPath, opts, isRootToken, dollarValue, dollarRef, currentType)
+			*result = append(*result, t)
+		}
+
+		// Determine if we should recurse
+		shouldRecurse := false
+		if !hasValue && !hasRef {
+			shouldRecurse = true
+		} else if isMarker || isRootToken {
+			shouldRecurse = true
+		}
+
+		if shouldRecurse {
+			// Get child type before filtering (for inheritance in nested groups)
+			childType := currentType
+			if typeStr, ok := valueMap["$type"].(string); ok {
+				childType = typeStr
+			}
+			childMap := p.filterChildMap(valueMap)
+			if len(childMap) > 0 {
+				p.extractTokens(childMap, currentPath, newPath, childType, opts, result)
 			}
 		}
 	}
-	if extensionsNode := getNodeValue(valueNode, "$extensions"); extensionsNode != nil {
-		var extensions map[string]any
-		if err := extensionsNode.Decode(&extensions); err == nil {
-			t.Extensions = extensions
-		}
-	}
 }
 
-// isGroupMarker checks if a key is in the group markers list.
-func isGroupMarker(key string, groupMarkers []string) bool {
-	return slices.Contains(groupMarkers, key)
-}
-
-// isTransparent determines if a group marker should be transparent (not added to path).
-func isTransparent(key string, valueNode *yaml.Node, groupMarkers []string) bool {
-	if !isGroupMarker(key, groupMarkers) {
+// isTransparent checks if a key is a transparent group marker.
+func (p *JSONParser) isTransparent(key string, valueMap map[string]any, groupMarkers []string) bool {
+	if !slices.Contains(groupMarkers, key) {
 		return false
 	}
-	return getNodeValue(valueNode, "$value") == nil
+	_, hasValue := valueMap["$value"]
+	return !hasValue
+}
+
+// filterChildMap filters out DTCG metadata keys from a map.
+func (p *JSONParser) filterChildMap(valueMap map[string]any) map[string]any {
+	result := make(map[string]any, len(valueMap))
+	maps.Copy(result, valueMap)
+	delete(result, "$type")
+	delete(result, "$value")
+	delete(result, "$description")
+	delete(result, "$extensions")
+	delete(result, "$deprecated")
+	delete(result, "$schema")
+	return result
+}
+
+// createToken creates a Token from map data.
+// inheritedType is the $type from parent groups for inheritance.
+func (p *JSONParser) createToken(key, path string, valueMap map[string]any, jsonPath []string, opts Options, isRootToken bool, dollarValue, dollarRef any, inheritedType string) *token.Token {
+	// Build token name
+	name := path
+	if name == "" {
+		name = key
+	} else if !isRootToken {
+		name = path + "-" + key
+	}
+
+	// Build reference format
+	reference := "{" + strings.Join(jsonPath, ".") + "}"
+
+	// Extract value
+	value := ""
+	var rawValue any
+
+	if dollarValue != nil {
+		if strVal, ok := dollarValue.(string); ok {
+			value = strVal
+			rawValue = value
+		} else {
+			rawValue = dollarValue
+		}
+	} else if dollarRef != nil && opts.SchemaVersion != schema.Draft {
+		if strVal, ok := dollarRef.(string); ok {
+			value = strVal
+			rawValue = value
+		}
+	}
+
+	t := &token.Token{
+		Name:          name,
+		Value:         value,
+		Prefix:        opts.Prefix,
+		Path:          jsonPath,
+		Reference:     reference,
+		Line:          0, // Filled in by addPositions if needed
+		Character:     0,
+		SchemaVersion: opts.SchemaVersion,
+		RawValue:      rawValue,
+		IsResolved:    false,
+	}
+
+	// Extract metadata - token's own $type takes precedence over inherited
+	if typeStr, ok := valueMap["$type"].(string); ok {
+		t.Type = typeStr
+	} else if inheritedType != "" {
+		t.Type = inheritedType
+	}
+	if descStr, ok := valueMap["$description"].(string); ok {
+		t.Description = descStr
+	}
+	if deprecated, ok := valueMap["$deprecated"]; ok {
+		if depBool, ok := deprecated.(bool); ok {
+			t.Deprecated = depBool
+		} else if depStr, ok := deprecated.(string); ok {
+			t.Deprecated = true
+			t.DeprecationMessage = depStr
+		}
+	}
+	if extensions, ok := valueMap["$extensions"].(map[string]any); ok {
+		t.Extensions = extensions
+	}
+
+	return t
 }
 
 // buildPaths builds the JSON path and string path.
@@ -160,40 +239,43 @@ func buildPaths(jsonPath []string, path, key string, transparent bool) ([]string
 	return currentPath, newPath
 }
 
-// extractTokens recursively extracts tokens from AST.
-func (p *JSONParser) extractTokens(node *yaml.Node, jsonPath []string, path string, opts Options, result *[]*token.Token) error {
+// addPositions adds line/character positions to tokens by parsing with yaml.v3.
+// This is a second pass that only runs when position tracking is enabled.
+func (p *JSONParser) addPositions(data []byte, tokens []*token.Token) error {
+	// Build a map from token path (as dot-separated string) to token pointer
+	tokenByPath := make(map[string]*token.Token, len(tokens))
+	for _, t := range tokens {
+		pathKey := strings.Join(t.Path, ".")
+		tokenByPath[pathKey] = t
+	}
+
+	// Parse with yaml.v3 to get AST with position data
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return fmt.Errorf("failed to parse JSON for positions: %w", err)
+	}
+
+	// Walk the AST and update token positions
+	if len(root.Content) > 0 {
+		p.walkForPositions(root.Content[0], []string{}, tokenByPath)
+	}
+
+	return nil
+}
+
+// walkForPositions walks the yaml AST to find token positions.
+func (p *JSONParser) walkForPositions(node *yaml.Node, jsonPath []string, tokenByPath map[string]*token.Token) {
 	if node.Kind != yaml.MappingNode {
-		return nil
+		return
 	}
 
-	// Collect key-value pairs
-	type kvPair struct {
-		keyNode   *yaml.Node
-		valueNode *yaml.Node
-	}
-	numPairs := len(node.Content) / 2
-	pairs := make([]kvPair, numPairs)
-	for i := range numPairs {
-		pairs[i] = kvPair{
-			keyNode:   node.Content[i*2],
-			valueNode: node.Content[i*2+1],
-		}
-	}
-
-	// Sort for deterministic order unless SkipSort is set
-	if !opts.SkipSort {
-		sort.Slice(pairs, func(i, j int) bool {
-			return pairs[i].keyNode.Value < pairs[j].keyNode.Value
-		})
-	}
-
-	for _, pair := range pairs {
-		keyNode := pair.keyNode
-		valueNode := pair.valueNode
+	for i := 0; i < len(node.Content); i += 2 {
+		keyNode := node.Content[i]
+		valueNode := node.Content[i+1]
 		key := keyNode.Value
 
-		// Skip $schema field
-		if key == "$schema" {
+		// Skip $ keys
+		if strings.HasPrefix(key, "$") {
 			continue
 		}
 
@@ -202,124 +284,49 @@ func (p *JSONParser) extractTokens(node *yaml.Node, jsonPath []string, path stri
 			continue
 		}
 
-		// Check for token indicators
-		dollarValueNode := getNodeValue(valueNode, "$value")
-		dollarRefNode := getNodeValue(valueNode, "$ref")
-		hasValue := dollarValueNode != nil
-		hasRef := dollarRefNode != nil && opts.SchemaVersion != schema.Draft
+		// Build current path
+		currentPath := append(jsonPath, key)
+		currentPath = slices.Clip(currentPath)
+		pathKey := strings.Join(currentPath, ".")
 
-		// Check for root token
-		isRootToken := common.IsRootToken(key, opts.SchemaVersion, opts.GroupMarkers)
-		isTransparentMarker := isTransparent(key, valueNode, opts.GroupMarkers)
-		isMarker := isGroupMarker(key, opts.GroupMarkers) && opts.SchemaVersion == schema.Draft
-
-		// Build paths
-		currentPath, newPath := buildPaths(jsonPath, path, key, isTransparentMarker || isRootToken)
-
-		// Extract token if has $value or $ref
-		if hasValue || hasRef {
-			t, err := p.createToken(keyNode, path, valueNode, currentPath, opts, isRootToken)
-			if err != nil {
-				return err
+		// Check if this is a token we need to update
+		if t, ok := tokenByPath[pathKey]; ok {
+			// Extract position (yaml.v3 is 1-based, we use 0-based)
+			if keyNode.Line > 0 {
+				lineVal := keyNode.Line - 1
+				if lineVal >= 0 && lineVal <= math.MaxUint32 {
+					t.Line = uint32(lineVal)
+				}
 			}
-			*result = append(*result, t)
-		}
-
-		// Determine if we should recurse
-		shouldRecurse := false
-		if !hasValue && !hasRef {
-			shouldRecurse = true
-		} else if isMarker || isRootToken {
-			shouldRecurse = true
-		}
-
-		if shouldRecurse {
-			childNode := p.filterChildNode(valueNode)
-			if len(childNode.Content) > 0 {
-				if err := p.extractTokens(childNode, currentPath, newPath, opts, result); err != nil {
-					return err
+			if keyNode.Column > 0 {
+				colVal := keyNode.Column - 1
+				if colVal >= 0 && colVal <= math.MaxUint32 {
+					t.Character = uint32(colVal)
 				}
 			}
 		}
-	}
 
-	return nil
+		// Recurse into children
+		p.walkForPositions(valueNode, currentPath, tokenByPath)
+	}
 }
 
-// filterChildNode creates a child node with metadata keys filtered out.
-func (p *JSONParser) filterChildNode(valueNode *yaml.Node) *yaml.Node {
-	// Pre-allocate with capacity for all content (we'll use less due to filtering)
-	childNode := &yaml.Node{
-		Kind:    yaml.MappingNode,
-		Content: make([]*yaml.Node, 0, len(valueNode.Content)),
-	}
-	for i := 0; i < len(valueNode.Content); i += 2 {
-		k := valueNode.Content[i].Value
-		if k == "$type" || k == "$value" || k == "$description" || k == "$extensions" || k == "$deprecated" || k == "$schema" {
-			continue
-		}
-		childNode.Content = append(childNode.Content, valueNode.Content[i], valueNode.Content[i+1])
-	}
-	return childNode
-}
-
-// createToken creates a Token from AST nodes.
-func (p *JSONParser) createToken(keyNode *yaml.Node, path string, valueNode *yaml.Node, jsonPath []string, opts Options, isRootToken bool) (*token.Token, error) {
-	key := keyNode.Value
-
-	// Build token name
-	name := path
-	if name == "" {
-		name = key
-	} else if !isRootToken {
-		name = path + "-" + key
-	}
-
-	// Build reference format
-	reference := "{" + strings.Join(jsonPath, ".") + "}"
-
-	// Extract position
-	line, character, err := extractPosition(keyNode)
+// ParseFile parses a JSON token file and returns tokens.
+func (p *JSONParser) ParseFile(filesystem fs.FileSystem, path string, opts Options) ([]*token.Token, error) {
+	data, err := filesystem.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read file %s: %w", path, err)
 	}
 
-	// Extract value
-	dollarValueNode := getNodeValue(valueNode, "$value")
-	dollarRefNode := getNodeValue(valueNode, "$ref")
-
-	value := ""
-	var rawValue any
-
-	if dollarValueNode != nil {
-		if dollarValueNode.Kind == yaml.ScalarNode {
-			value = dollarValueNode.Value
-			rawValue = value
-		} else {
-			var structuredValue any
-			if err := dollarValueNode.Decode(&structuredValue); err == nil {
-				rawValue = structuredValue
-			}
-		}
-	} else if dollarRefNode != nil && opts.SchemaVersion != schema.Draft {
-		value = dollarRefNode.Value
-		rawValue = value
+	tokens, err := p.Parse(data, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse file %s: %w", path, err)
 	}
 
-	t := &token.Token{
-		Name:          name,
-		Value:         value,
-		Prefix:        opts.Prefix,
-		Path:          jsonPath,
-		Reference:     reference,
-		Line:          line,
-		Character:     character,
-		SchemaVersion: opts.SchemaVersion,
-		RawValue:      rawValue,
-		IsResolved:    false,
+	// Set FilePath on all tokens
+	for _, t := range tokens {
+		t.FilePath = path
 	}
 
-	extractMetadata(valueNode, t)
-
-	return t, nil
+	return tokens, nil
 }

@@ -27,6 +27,11 @@ type Options struct {
 	// SkipSort disables alphabetical sorting of tokens for better performance.
 	// When false (default), tokens are sorted for deterministic output order.
 	SkipSort bool
+
+	// SkipPositions disables position tracking for better performance.
+	// When true, Line and Character fields will be zero on all tokens.
+	// Use this when LSP features (go-to-definition) aren't needed.
+	SkipPositions bool
 }
 
 // Parser parses design token files.

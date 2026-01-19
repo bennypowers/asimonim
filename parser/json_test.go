@@ -58,3 +58,70 @@ func TestJSONParser_V2025_10(t *testing.T) {
 		t.Errorf("expected 2 tokens, got %d", len(tokens))
 	}
 }
+
+func TestJSONParser_SkipPositions(t *testing.T) {
+	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
+	data, err := mfs.ReadFile("/test/tokens.json")
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+
+	p := parser.NewJSONParser()
+
+	// Parse with position tracking
+	withPositions, err := p.Parse(data, parser.Options{
+		SchemaVersion: schema.Draft,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error with positions: %v", err)
+	}
+
+	// Parse without position tracking (fast mode)
+	withoutPositions, err := p.Parse(data, parser.Options{
+		SchemaVersion: schema.Draft,
+		SkipPositions: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error without positions: %v", err)
+	}
+
+	// Should have same number of tokens
+	if len(withPositions) != len(withoutPositions) {
+		t.Fatalf("expected %d tokens, got %d", len(withPositions), len(withoutPositions))
+	}
+
+	// Build map for comparison
+	posMap := make(map[string]*struct {
+		name, value, typ, desc string
+	})
+	for _, tok := range withPositions {
+		posMap[tok.Name] = &struct {
+			name, value, typ, desc string
+		}{tok.Name, tok.Value, tok.Type, tok.Description}
+	}
+
+	// Compare all tokens (except Line/Character which should be 0 in fast mode)
+	for _, tok := range withoutPositions {
+		expected, ok := posMap[tok.Name]
+		if !ok {
+			t.Errorf("token %s not found in position-tracked results", tok.Name)
+			continue
+		}
+		if tok.Name != expected.name {
+			t.Errorf("name mismatch: got %s, want %s", tok.Name, expected.name)
+		}
+		if tok.Value != expected.value {
+			t.Errorf("value mismatch for %s: got %s, want %s", tok.Name, tok.Value, expected.value)
+		}
+		if tok.Type != expected.typ {
+			t.Errorf("type mismatch for %s: got %s, want %s", tok.Name, tok.Type, expected.typ)
+		}
+		if tok.Description != expected.desc {
+			t.Errorf("description mismatch for %s: got %s, want %s", tok.Name, tok.Description, expected.desc)
+		}
+		// Fast mode should have zero positions
+		if tok.Line != 0 || tok.Character != 0 {
+			t.Errorf("expected zero positions in fast mode for %s, got Line=%d Character=%d", tok.Name, tok.Line, tok.Character)
+		}
+	}
+}
