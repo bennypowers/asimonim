@@ -1,0 +1,15 @@
+{
+  "prefix": "global",
+  "files": [
+    {
+      "path": "./tokens/base.json",
+      "prefix": "base"
+    },
+    {
+      "path": "./tokens/theme.json",
+      "prefix": "theme",
+      "groupMarkers": ["_"]
+    }
+  ],
+  "groupMarkers": ["DEFAULT"]
+}

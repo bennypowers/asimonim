@@ -17,6 +17,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"bennypowers.dev/asimonim/config"
 	"bennypowers.dev/asimonim/fs"
 	"bennypowers.dev/asimonim/parser"
 	"bennypowers.dev/asimonim/schema"
@@ -28,7 +29,7 @@ var Cmd = &cobra.Command{
 	Use:   "search <query> [files...]",
 	Short: "Search tokens by name, value, or type",
 	Long:  `Search design tokens by name, value, or type with optional regex support.`,
-	Args:  cobra.MinimumNArgs(2),
+	Args:  cobra.MinimumNArgs(1),
 	RunE:  run,
 }
 
@@ -63,12 +64,30 @@ func run(cmd *cobra.Command, args []string) error {
 	filesystem := fs.NewOSFileSystem()
 	jsonParser := parser.NewJSONParser()
 
+	// Load config from .config/design-tokens.{yaml,json}
+	cfg := config.LoadOrDefault(filesystem, ".")
+
+	// Use config files if no files provided
+	if len(files) == 0 {
+		expanded, err := cfg.ExpandFiles(filesystem, ".")
+		if err != nil {
+			return fmt.Errorf("error expanding config files: %w", err)
+		}
+		files = expanded
+	}
+
+	if len(files) == 0 {
+		return fmt.Errorf("no files specified and no files found in config")
+	}
+
 	var schemaVersion schema.Version
 	if schemaFlag != "" {
 		schemaVersion, err = schema.FromString(schemaFlag)
 		if err != nil {
 			return fmt.Errorf("invalid schema version: %s", schemaFlag)
 		}
+	} else if cfg.SchemaVersion() != schema.Unknown {
+		schemaVersion = cfg.SchemaVersion()
 	}
 
 	var matches []*token.Token
@@ -89,9 +108,11 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		opts := parser.Options{
-			SchemaVersion: version,
-			SkipPositions: true, // CLI doesn't need LSP position tracking
+		// Get per-file options from config
+		opts := cfg.OptionsForFile(file)
+		opts.SkipPositions = true // CLI doesn't need LSP position tracking
+		if version != schema.Unknown {
+			opts.SchemaVersion = version
 		}
 		tokens, err := jsonParser.ParseFile(filesystem, file, opts)
 		if err != nil {

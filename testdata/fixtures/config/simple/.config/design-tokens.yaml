@@ -1,0 +1,7 @@
+prefix: "rh"
+files:
+  - ./tokens.json
+groupMarkers:
+  - "_"
+  - "@"
+schema: draft

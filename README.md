@@ -148,6 +148,46 @@ Flags:
       --format string    Output format: text, json (default "text")
 ```
 
+## Configuration
+
+Asimonim reads configuration from `.config/design-tokens.{yaml,yml,json}`:
+
+```yaml
+# .config/design-tokens.yaml
+prefix: "rh"
+files:
+  - ./tokens.json
+  - ./tokens/**/*.yaml
+  - path: npm:@rhds/tokens/json/rhds.tokens.json
+    prefix: rh
+groupMarkers: ["_", "@", "DEFAULT"]
+schema: draft
+```
+
+When running commands without file arguments, files from config are used:
+
+```bash
+asimonim list      # Uses files from config
+asimonim validate  # Uses files from config
+```
+
+### Group Markers (Editor's Draft only)
+
+The Editor's Draft schema has no built-in way for a token to also act as a group. The `groupMarkers` option works around this by treating certain token names as group names. For example, with `groupMarkers: ["DEFAULT"]`:
+
+```json
+{
+  "color": {
+    "DEFAULT": { "$value": "#000" },
+    "light": { "$value": "#fff" }
+  }
+}
+```
+
+This produces `--prefix-color` (from DEFAULT) and `--prefix-color-light`. The 2025.10 stable schema uses `$root` instead, so `groupMarkers` is ignored for that schema.
+
+This configuration is also consumed by [dtls](https://github.com/bennypowers/design-tokens-language-server) and [cem](https://github.com/bennypowers/cem).
+
 ## Schema Versions
 
 Asimonim supports multiple DTCG schema versions:

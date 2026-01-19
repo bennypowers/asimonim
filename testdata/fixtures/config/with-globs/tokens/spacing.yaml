@@ -1,0 +1,8 @@
+spacing:
+  $type: dimension
+  small:
+    $value: 4px
+  medium:
+    $value: 8px
+  large:
+    $value: 16px

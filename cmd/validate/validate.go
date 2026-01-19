@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"bennypowers.dev/asimonim/config"
 	"bennypowers.dev/asimonim/fs"
 	"bennypowers.dev/asimonim/parser"
 	"bennypowers.dev/asimonim/resolver"
@@ -24,7 +25,7 @@ var Cmd = &cobra.Command{
 	Use:   "validate [files...]",
 	Short: "Validate design token files",
 	Long:  `Validate design token files for correctness and schema compliance.`,
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ArbitraryArgs,
 	RunE:  run,
 }
 
@@ -40,6 +41,23 @@ func run(cmd *cobra.Command, args []string) error {
 	filesystem := fs.NewOSFileSystem()
 	jsonParser := parser.NewJSONParser()
 
+	// Load config from .config/design-tokens.{yaml,json}
+	cfg := config.LoadOrDefault(filesystem, ".")
+
+	// Use config files if no args provided
+	files := args
+	if len(files) == 0 {
+		expanded, err := cfg.ExpandFiles(filesystem, ".")
+		if err != nil {
+			return fmt.Errorf("error expanding config files: %w", err)
+		}
+		files = expanded
+	}
+
+	if len(files) == 0 {
+		return fmt.Errorf("no files specified and no files found in config")
+	}
+
 	var schemaVersion schema.Version
 	if schemaFlag != "" {
 		var err error
@@ -47,11 +65,13 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("invalid schema version: %s", schemaFlag)
 		}
+	} else if cfg.SchemaVersion() != schema.Unknown {
+		schemaVersion = cfg.SchemaVersion()
 	}
 
 	hasErrors := false
 
-	for _, file := range args {
+	for _, file := range files {
 		if !quiet {
 			fmt.Printf("Validating %s...\n", file)
 		}
@@ -73,9 +93,11 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		opts := parser.Options{
-			SchemaVersion: version,
-			SkipPositions: true, // CLI doesn't need LSP position tracking
+		// Get per-file options from config
+		opts := cfg.OptionsForFile(file)
+		opts.SkipPositions = true // CLI doesn't need LSP position tracking
+		if version != schema.Unknown {
+			opts.SchemaVersion = version
 		}
 		tokens, err := jsonParser.ParseFile(filesystem, file, opts)
 		if err != nil {
