@@ -168,7 +168,11 @@ func expandGlob(filesystem asimfs.FileSystem, pattern string) ([]string, error) 
 		relPath = strings.TrimPrefix(relPath, string(filepath.Separator))
 
 		// Match against the pattern (doublestar handles both simple and ** globs)
-		if matchDoublestar(relPattern, relPath) {
+		matched, err := doublestar.Match(relPattern, relPath)
+		if err != nil {
+			return err
+		}
+		if matched {
 			matches = append(matches, path)
 		}
 
@@ -180,11 +184,4 @@ func expandGlob(filesystem asimfs.FileSystem, pattern string) ([]string, error) 
 	}
 
 	return matches, nil
-}
-
-// matchDoublestar provides ** glob matching using the doublestar library.
-// Supports complex patterns like packages/**/tokens/**/data.json
-func matchDoublestar(pattern, path string) bool {
-	matched, _ := doublestar.Match(pattern, path)
-	return matched
 }

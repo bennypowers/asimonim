@@ -340,6 +340,10 @@ func (p *JSONParser) walkForPositions(node *yaml.Node, jsonPath []string, tokenB
 	}
 
 	for i := 0; i < len(node.Content); i += 2 {
+		// Guard against malformed input with odd-length Content
+		if i+1 >= len(node.Content) {
+			break
+		}
 		keyNode := node.Content[i]
 		valueNode := node.Content[i+1]
 		key := keyNode.Value

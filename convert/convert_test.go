@@ -30,7 +30,9 @@ func TestSerialize_FlattenSimple(t *testing.T) {
 		t.Fatalf("failed to parse: %v", err)
 	}
 
-	_ = resolver.ResolveAliases(tokens, schema.Draft)
+	if err := resolver.ResolveAliases(tokens, schema.Draft); err != nil {
+		t.Fatalf("failed to resolve aliases: %v", err)
+	}
 
 	result := convert.Serialize(tokens, convert.Options{
 		InputSchema:  schema.Draft,
@@ -85,7 +87,9 @@ func TestSerialize_NestedPreserve(t *testing.T) {
 		t.Fatalf("failed to parse: %v", err)
 	}
 
-	_ = resolver.ResolveAliases(tokens, schema.Draft)
+	if err := resolver.ResolveAliases(tokens, schema.Draft); err != nil {
+		t.Fatalf("failed to resolve aliases: %v", err)
+	}
 
 	result := convert.Serialize(tokens, convert.Options{
 		InputSchema:  schema.Draft,
@@ -119,7 +123,9 @@ func TestSerialize_DraftToV2025(t *testing.T) {
 		t.Fatalf("failed to parse: %v", err)
 	}
 
-	_ = resolver.ResolveAliases(tokens, schema.Draft)
+	if err := resolver.ResolveAliases(tokens, schema.Draft); err != nil {
+		t.Fatalf("failed to resolve aliases: %v", err)
+	}
 
 	result := convert.Serialize(tokens, convert.Options{
 		InputSchema:  schema.Draft,
@@ -190,7 +196,9 @@ func TestSerialize_V2025ToDraft(t *testing.T) {
 		t.Fatalf("failed to parse: %v", err)
 	}
 
-	_ = resolver.ResolveAliases(tokens, schema.V2025_10)
+	if err := resolver.ResolveAliases(tokens, schema.V2025_10); err != nil {
+		t.Fatalf("failed to resolve aliases: %v", err)
+	}
 
 	result := convert.Serialize(tokens, convert.Options{
 		InputSchema:  schema.V2025_10,
@@ -265,7 +273,9 @@ func TestSerialize_CombineFiles(t *testing.T) {
 
 	// Combine tokens
 	allTokens := append(tokens1, tokens2...)
-	_ = resolver.ResolveAliases(allTokens, schema.Draft)
+	if err := resolver.ResolveAliases(allTokens, schema.Draft); err != nil {
+		t.Fatalf("failed to resolve aliases: %v", err)
+	}
 
 	result := convert.Serialize(allTokens, convert.Options{
 		InputSchema:  schema.Draft,
@@ -293,7 +303,9 @@ func TestSerialize_CustomDelimiter(t *testing.T) {
 		t.Fatalf("failed to parse: %v", err)
 	}
 
-	_ = resolver.ResolveAliases(tokens, schema.Draft)
+	if err := resolver.ResolveAliases(tokens, schema.Draft); err != nil {
+		t.Fatalf("failed to resolve aliases: %v", err)
+	}
 
 	// Use underscore as delimiter
 	result := convert.Serialize(tokens, convert.Options{
@@ -330,7 +342,9 @@ func TestSerialize_BasicDraftRoundtrip(t *testing.T) {
 		t.Fatalf("failed to parse: %v", err)
 	}
 
-	_ = resolver.ResolveAliases(tokens, schema.Draft)
+	if err := resolver.ResolveAliases(tokens, schema.Draft); err != nil {
+		t.Fatalf("failed to resolve aliases: %v", err)
+	}
 
 	// Serialize with same schema - values should pass through
 	result := convert.Serialize(tokens, convert.Options{

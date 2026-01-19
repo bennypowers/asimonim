@@ -39,7 +39,7 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 		tsValue := typescript.ToValue(value)
 
 		if tok.Description != "" {
-			sb.WriteString(fmt.Sprintf("/** %s */\n", tok.Description))
+			sb.WriteString(typescript.FormatJSDoc(tok.Description))
 		}
 		sb.WriteString(fmt.Sprintf("exports.%s = %s as const;\n", name, tsValue))
 	}

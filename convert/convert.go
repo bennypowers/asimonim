@@ -134,8 +134,12 @@ func buildNestedStructure(
 		// Navigate/create nested structure up to parent
 		for i := 0; i < len(path)-1; i++ {
 			segment := path[i]
-			if _, exists := current[segment]; !exists {
+			if existing, exists := current[segment]; !exists {
 				current[segment] = make(map[string]any)
+			} else if _, ok := existing.(map[string]any); !ok {
+				// Collision: existing value is not a map (e.g., a leaf token was here).
+				// Wrap the existing value in a map to allow nesting.
+				current[segment] = map[string]any{"$value": existing}
 			}
 			current = current[segment].(map[string]any)
 		}

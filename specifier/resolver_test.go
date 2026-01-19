@@ -7,7 +7,6 @@ license that can be found in the LICENSE file.
 package specifier
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -348,7 +347,7 @@ func TestDefaultResolver_EndToEnd(t *testing.T) {
 	if rf.Specifier != "npm:@rhds/tokens/json/rhds.tokens.json" {
 		t.Errorf("Specifier = %q, want %q", rf.Specifier, "npm:@rhds/tokens/json/rhds.tokens.json")
 	}
-	expectedPath := filepath.Join("/project", "node_modules", "@rhds", "tokens", "json", "rhds.tokens.json")
+	expectedPath := "/project/node_modules/@rhds/tokens/json/rhds.tokens.json"
 	if rf.Path != expectedPath {
 		t.Errorf("Path = %q, want %q", rf.Path, expectedPath)
 	}
@@ -361,7 +360,7 @@ func TestDefaultResolver_EndToEnd(t *testing.T) {
 	if rf.Specifier != "jsr:@luca/cases/mod.json" {
 		t.Errorf("Specifier = %q, want %q", rf.Specifier, "jsr:@luca/cases/mod.json")
 	}
-	expectedJSRPath := filepath.Join("/project", "node_modules", "@jsr", "luca__cases", "mod.json")
+	expectedJSRPath := "/project/node_modules/@jsr/luca__cases/mod.json"
 	if rf.Path != expectedJSRPath {
 		t.Errorf("Path = %q, want %q", rf.Path, expectedJSRPath)
 	}

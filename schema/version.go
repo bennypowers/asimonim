@@ -62,6 +62,8 @@ func FromURL(url string) (Version, error) {
 // FromString returns the schema version from a string representation.
 func FromString(s string) (Version, error) {
 	switch s {
+	case "unknown", "":
+		return Unknown, nil
 	case "draft":
 		return Draft, nil
 	case "v2025.10", "v2025_10", "2025.10", "2025", "v2025":

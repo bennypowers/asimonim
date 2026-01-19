@@ -158,16 +158,19 @@ func runInPlace(
 	resolvedFiles []*specifier.ResolvedFile,
 	targetSchema schema.Version,
 ) error {
+	var failures int
 	for _, rf := range resolvedFiles {
 		data, err := filesystem.ReadFile(rf.Path)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", rf.Specifier, err)
+			failures++
 			continue
 		}
 
 		detectedVersion, err := schema.DetectVersion(data, nil)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error detecting schema for %s: %v\n", rf.Specifier, err)
+			failures++
 			continue
 		}
 
@@ -185,11 +188,13 @@ func runInPlace(
 		tokens, err := jsonParser.ParseFile(filesystem, rf.Path, opts)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", rf.Specifier, err)
+			failures++
 			continue
 		}
 
 		if err := resolver.ResolveAliases(tokens, detectedVersion); err != nil {
 			fmt.Fprintf(os.Stderr, "Resolution error in %s: %v\n", rf.Specifier, err)
+			failures++
 			continue
 		}
 
@@ -202,15 +207,20 @@ func runInPlace(
 		jsonBytes, err := json.MarshalIndent(result, "", "  ")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error serializing %s: %v\n", rf.Specifier, err)
+			failures++
 			continue
 		}
 
 		if err := filesystem.WriteFile(rf.Path, jsonBytes, 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", rf.Specifier, err)
+			failures++
 			continue
 		}
 	}
 
+	if failures > 0 {
+		return fmt.Errorf("failed to convert %d file(s)", failures)
+	}
 	return nil
 }
 

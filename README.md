@@ -257,7 +257,7 @@ Asimonim supports multiple DTCG schema versions:
 | Version   | References          | Colors     | Features                    |
 | --------- | ------------------- | ---------- | --------------------------- |
 | Draft     | `{token.path}`      | Strings    | Group markers               |
-| V2025_10  | `$ref: "#/path"`    | Structured | `$extends`, `$root`         |
+| v2025.10  | `$ref: "#/path"`    | Structured | `$extends`, `$root`         |
 
 Schema version is automatically detected from file contents, or can be forced with the `--schema` flag.
 
