@@ -3,7 +3,7 @@
 
 BINARY_NAME := asimonim
 DIST_DIR := dist/bin
-GO_BUILD_FLAGS := -ldflags="-s -w"
+GO_BUILD_FLAGS := -ldflags="$(shell scripts/ldflags.sh)"
 
 # Workaround for Gentoo Linux "hole in findfunctab" error with race detector
 # See: https://bugs.gentoo.org/961618
@@ -14,7 +14,8 @@ else
 endif
 
 all:
-	go build -o $(DIST_DIR)/$(BINARY_NAME) .
+	@mkdir -p $(DIST_DIR)
+	go build $(GO_BUILD_FLAGS) -o $(DIST_DIR)/$(BINARY_NAME) .
 
 install: all
 	cp $(DIST_DIR)/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME)

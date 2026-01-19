@@ -1,0 +1,29 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test
+
+  build:
+    needs: test
+    uses: bennypowers/go-release-workflows/.github/workflows/build-binaries.yml@main
+    with:
+      binary-name: asimonim
+      # No release-tag = artifacts only + PR comment with build status
