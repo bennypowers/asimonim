@@ -17,7 +17,6 @@ import (
 	"bennypowers.dev/asimonim/convert/formatter/flatjson"
 	"bennypowers.dev/asimonim/convert/formatter/scss"
 	"bennypowers.dev/asimonim/convert/formatter/swift"
-	"bennypowers.dev/asimonim/convert/formatter/tailwind"
 	"bennypowers.dev/asimonim/convert/formatter/typescript"
 	"bennypowers.dev/asimonim/token"
 )
@@ -46,9 +45,6 @@ const (
 
 	// FormatSCSS outputs SCSS variables with kebab-case names.
 	FormatSCSS Format = "scss"
-
-	// FormatTailwind outputs a Tailwind theme configuration.
-	FormatTailwind Format = "tailwind"
 )
 
 // ValidFormats returns all valid format strings.
@@ -61,7 +57,6 @@ func ValidFormats() []string {
 		string(FormatTypeScript),
 		string(FormatCTS),
 		string(FormatSCSS),
-		string(FormatTailwind),
 	}
 }
 
@@ -82,8 +77,6 @@ func ParseFormat(s string) (Format, error) {
 		return FormatCTS, nil
 	case "scss", "sass":
 		return FormatSCSS, nil
-	case "tailwind", "tw":
-		return FormatTailwind, nil
 	default:
 		return "", fmt.Errorf("unknown format: %s (valid: %s)", s, strings.Join(ValidFormats(), ", "))
 	}
@@ -114,8 +107,6 @@ func FormatTokens(tokens []*token.Token, format Format, opts Options) ([]byte, e
 		f = cts.New()
 	case FormatSCSS:
 		f = scss.New()
-	case FormatTailwind:
-		f = tailwind.New()
 	default:
 		return nil, fmt.Errorf("unsupported format: %s", format)
 	}

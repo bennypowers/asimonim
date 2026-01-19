@@ -40,7 +40,6 @@ Output Formats:
   typescript TypeScript ESM module with 'as const' exports
   cts        TypeScript CommonJS module with 'as const' exports
   scss       SCSS variables with kebab-case names
-  tailwind   Tailwind theme configuration
 
 Examples:
   # Flatten to shallow structure
@@ -51,9 +50,6 @@ Examples:
 
   # Convert to SCSS variables
   asimonim convert --format scss -o _tokens.scss tokens/*.yaml
-
-  # Convert to Tailwind config
-  asimonim convert --format tailwind -o tailwind.tokens.js tokens/*.yaml
 
   # Convert to Android XML resources
   asimonim convert --format android -o values/tokens.xml tokens/*.yaml

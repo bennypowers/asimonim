@@ -57,8 +57,6 @@ func TestParseFormat(t *testing.T) {
 		{"commonjs", convert.FormatCTS, false},
 		{"scss", convert.FormatSCSS, false},
 		{"sass", convert.FormatSCSS, false},
-		{"tailwind", convert.FormatTailwind, false},
-		{"tw", convert.FormatTailwind, false},
 		{"invalid", "", true},
 	}
 
@@ -221,38 +219,6 @@ func TestFormatTokens_SCSS(t *testing.T) {
 	}
 }
 
-func TestFormatTokens_Tailwind(t *testing.T) {
-	tokens := loadTestTokens(t)
-	opts := convert.DefaultOptions()
-
-	output, err := convert.FormatTokens(tokens, convert.FormatTailwind, opts)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	result := string(output)
-
-	// Check Tailwind structure
-	if !strings.Contains(result, "module.exports =") {
-		t.Error("expected module.exports")
-	}
-	if !strings.Contains(result, `"theme"`) {
-		t.Error("expected theme key")
-	}
-	if !strings.Contains(result, `"extend"`) {
-		t.Error("expected extend key")
-	}
-	if !strings.Contains(result, `"colors"`) {
-		t.Error("expected colors key for color tokens")
-	}
-	if !strings.Contains(result, `"spacing"`) {
-		t.Error("expected spacing key for spacing tokens")
-	}
-	if !strings.Contains(result, "@type {import('tailwindcss').Config}") {
-		t.Error("expected Tailwind type annotation")
-	}
-}
-
 func TestFormatTokens_DTCG(t *testing.T) {
 	tokens := loadTestTokens(t)
 	opts := convert.DefaultOptions()
@@ -306,7 +272,7 @@ func TestFormatTokens_CTS(t *testing.T) {
 func TestValidFormats(t *testing.T) {
 	formats := convert.ValidFormats()
 
-	expected := []string{"dtcg", "json", "android", "swift", "typescript", "cts", "scss", "tailwind"}
+	expected := []string{"dtcg", "json", "android", "swift", "typescript", "cts", "scss"}
 	if len(formats) != len(expected) {
 		t.Errorf("expected %d formats, got %d", len(expected), len(formats))
 	}

@@ -12,7 +12,7 @@ Design systems use [design tokens][dtcg] to store visual primitives like colors,
 - **Multi-schema support**: Handles both Draft and V2025_10 DTCG schemas
 - **Automatic schema detection**: Duck-typing detection of schema version from file contents
 - **Alias resolution**: Resolve token references with cycle detection
-- **Multi-format export**: Convert tokens to TypeScript, SCSS, Swift, Tailwind, XML, and more
+- **Multi-format export**: Convert tokens to TypeScript, SCSS, Swift, XML, and more
 - **CSS output**: Generate CSS custom properties from tokens
 - **Search**: Find tokens by name, value, or type with regex support
 - **Validation**: Check files for schema compliance and circular references
@@ -166,7 +166,6 @@ Flags:
 | `typescript` | `.ts`     | TypeScript ESM module with `as const` exports      |
 | `cts`        | `.cts`    | TypeScript CommonJS module with `as const` exports |
 | `scss`       | `.scss`   | SCSS variables with kebab-case names               |
-| `tailwind`   | `.js`     | Tailwind theme configuration                       |
 
 **Examples:**
 
@@ -191,9 +190,6 @@ asimonim convert --format cts -o tokens.cts tokens/*.yaml
 
 # Generate SCSS variables with prefix
 asimonim convert --format scss --prefix rh -o _tokens.scss tokens/*.yaml
-
-# Generate Tailwind theme config
-asimonim convert --format tailwind -o tailwind.tokens.js tokens/*.yaml
 
 # Generate Android XML resources
 asimonim convert --format android -o values/tokens.xml tokens/*.yaml
