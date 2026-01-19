@@ -12,8 +12,8 @@ import asimfs "bennypowers.dev/asimonim/fs"
 // The rootDir is the starting directory for node_modules lookup.
 func NewDefaultResolver(fs asimfs.FileSystem, rootDir string) Resolver {
 	return NewChainResolver(
-		NewNPMResolver(fs, rootDir),
-		NewJSRResolver(),
+		NewNodeModulesResolver(fs, rootDir),
+		NewJSRNodeModulesResolver(fs, rootDir),
 		NewLocalResolver(),
 	)
 }

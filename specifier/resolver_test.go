@@ -59,11 +59,11 @@ func TestLocalResolver_CanResolve(t *testing.T) {
 	}
 }
 
-func TestNPMResolver_ScopedPackage(t *testing.T) {
+func TestNodeModulesResolver_ScopedPackage(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddFile("/project/node_modules/@design-tokens/test-package/tokens.json", `{"color":{}}`, 0644)
 
-	resolver := NewNPMResolver(mfs, "/project")
+	resolver := NewNodeModulesResolver(mfs, "/project")
 
 	rf, err := resolver.Resolve("npm:@design-tokens/test-package/tokens.json")
 	if err != nil {
@@ -82,11 +82,11 @@ func TestNPMResolver_ScopedPackage(t *testing.T) {
 	}
 }
 
-func TestNPMResolver_UnscopedPackage(t *testing.T) {
+func TestNodeModulesResolver_UnscopedPackage(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddFile("/project/node_modules/simple-tokens/colors.json", `{"color":{}}`, 0644)
 
-	resolver := NewNPMResolver(mfs, "/project")
+	resolver := NewNodeModulesResolver(mfs, "/project")
 
 	rf, err := resolver.Resolve("npm:simple-tokens/colors.json")
 	if err != nil {
@@ -99,12 +99,12 @@ func TestNPMResolver_UnscopedPackage(t *testing.T) {
 	}
 }
 
-func TestNPMResolver_WalksUpDirectoryTree(t *testing.T) {
+func TestNodeModulesResolver_WalksUpDirectoryTree(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddFile("/project/node_modules/parent-tokens/tokens.json", `{"spacing":{}}`, 0644)
 	mfs.AddDir("/project/subdir", 0755)
 
-	resolver := NewNPMResolver(mfs, "/project/subdir")
+	resolver := NewNodeModulesResolver(mfs, "/project/subdir")
 
 	rf, err := resolver.Resolve("npm:parent-tokens/tokens.json")
 	if err != nil {
@@ -117,11 +117,11 @@ func TestNPMResolver_WalksUpDirectoryTree(t *testing.T) {
 	}
 }
 
-func TestNPMResolver_PackageNotFound(t *testing.T) {
+func TestNodeModulesResolver_PackageNotFound(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddDir("/project", 0755)
 
-	resolver := NewNPMResolver(mfs, "/project")
+	resolver := NewNodeModulesResolver(mfs, "/project")
 
 	_, err := resolver.Resolve("npm:nonexistent/tokens.json")
 	if err == nil {
@@ -132,9 +132,9 @@ func TestNPMResolver_PackageNotFound(t *testing.T) {
 	}
 }
 
-func TestNPMResolver_CanResolve(t *testing.T) {
+func TestNodeModulesResolver_CanResolve(t *testing.T) {
 	mfs := mapfs.New()
-	resolver := NewNPMResolver(mfs, "/project")
+	resolver := NewNodeModulesResolver(mfs, "/project")
 
 	if !resolver.CanResolve("npm:pkg/file.json") {
 		t.Error("expected CanResolve to return true for npm specifier")
@@ -147,20 +147,84 @@ func TestNPMResolver_CanResolve(t *testing.T) {
 	}
 }
 
-func TestJSRResolver_NotImplemented(t *testing.T) {
-	resolver := NewJSRResolver()
+func TestJSRNodeModulesResolver_ScopedPackage(t *testing.T) {
+	mfs := mapfs.New()
+	// JSR scoped package: jsr:@design-tokens/test → @jsr/design-tokens__test
+	mfs.AddFile("/project/node_modules/@jsr/design-tokens__test/tokens.json", `{"color":{}}`, 0644)
 
-	_, err := resolver.Resolve("jsr:@std/tokens/mod.json")
-	if err == nil {
-		t.Fatal("expected error for jsr specifier")
+	resolver := NewJSRNodeModulesResolver(mfs, "/project")
+
+	rf, err := resolver.Resolve("jsr:@design-tokens/test/tokens.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "not implemented") {
-		t.Errorf("error = %q, want to contain 'not implemented'", err.Error())
+
+	if rf.Specifier != "jsr:@design-tokens/test/tokens.json" {
+		t.Errorf("Specifier = %q, want %q", rf.Specifier, "jsr:@design-tokens/test/tokens.json")
+	}
+	expectedPath := "/project/node_modules/@jsr/design-tokens__test/tokens.json"
+	if rf.Path != expectedPath {
+		t.Errorf("Path = %q, want %q", rf.Path, expectedPath)
+	}
+	if rf.Kind != KindJSR {
+		t.Errorf("Kind = %v, want KindJSR", rf.Kind)
 	}
 }
 
-func TestJSRResolver_CanResolve(t *testing.T) {
-	resolver := NewJSRResolver()
+func TestJSRNodeModulesResolver_UnscopedPackage(t *testing.T) {
+	mfs := mapfs.New()
+	// JSR unscoped package: jsr:simple-tokens → @jsr/simple-tokens
+	mfs.AddFile("/project/node_modules/@jsr/simple-tokens/colors.json", `{"color":{}}`, 0644)
+
+	resolver := NewJSRNodeModulesResolver(mfs, "/project")
+
+	rf, err := resolver.Resolve("jsr:simple-tokens/colors.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expectedPath := "/project/node_modules/@jsr/simple-tokens/colors.json"
+	if rf.Path != expectedPath {
+		t.Errorf("Path = %q, want %q", rf.Path, expectedPath)
+	}
+}
+
+func TestJSRNodeModulesResolver_WalksUpDirectoryTree(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/node_modules/@jsr/std__tokens/tokens.json", `{"spacing":{}}`, 0644)
+	mfs.AddDir("/project/subdir", 0755)
+
+	resolver := NewJSRNodeModulesResolver(mfs, "/project/subdir")
+
+	rf, err := resolver.Resolve("jsr:@std/tokens/tokens.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expectedPath := "/project/node_modules/@jsr/std__tokens/tokens.json"
+	if rf.Path != expectedPath {
+		t.Errorf("Path = %q, want %q", rf.Path, expectedPath)
+	}
+}
+
+func TestJSRNodeModulesResolver_PackageNotFound(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddDir("/project", 0755)
+
+	resolver := NewJSRNodeModulesResolver(mfs, "/project")
+
+	_, err := resolver.Resolve("jsr:@nonexistent/pkg/tokens.json")
+	if err == nil {
+		t.Fatal("expected error for nonexistent package")
+	}
+	if !strings.Contains(err.Error(), "jsr package not found") {
+		t.Errorf("error = %q, want to contain 'jsr package not found'", err.Error())
+	}
+}
+
+func TestJSRNodeModulesResolver_CanResolve(t *testing.T) {
+	mfs := mapfs.New()
+	resolver := NewJSRNodeModulesResolver(mfs, "/project")
 
 	if !resolver.CanResolve("jsr:pkg/file.json") {
 		t.Error("expected CanResolve to return true for jsr specifier")
@@ -173,14 +237,15 @@ func TestJSRResolver_CanResolve(t *testing.T) {
 func TestChainResolver_TriesInOrder(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddFile("/project/node_modules/@scope/pkg/file.json", `{}`, 0644)
+	mfs.AddFile("/project/node_modules/@jsr/std__tokens/mod.json", `{}`, 0644)
 
 	chain := NewChainResolver(
-		NewNPMResolver(mfs, "/project"),
-		NewJSRResolver(),
+		NewNodeModulesResolver(mfs, "/project"),
+		NewJSRNodeModulesResolver(mfs, "/project"),
 		NewLocalResolver(),
 	)
 
-	// npm: should be handled by NPMResolver
+	// npm: should be handled by NodeModulesResolver
 	rf, err := chain.Resolve("npm:@scope/pkg/file.json")
 	if err != nil {
 		t.Fatalf("unexpected error for npm: %v", err)
@@ -189,10 +254,13 @@ func TestChainResolver_TriesInOrder(t *testing.T) {
 		t.Errorf("Kind = %v, want KindNPM", rf.Kind)
 	}
 
-	// jsr: should be handled by JSRResolver (returns error)
-	_, err = chain.Resolve("jsr:pkg/file.json")
-	if err == nil {
-		t.Fatal("expected error for jsr specifier")
+	// jsr: should be handled by JSRNodeModulesResolver
+	rf, err = chain.Resolve("jsr:@std/tokens/mod.json")
+	if err != nil {
+		t.Fatalf("unexpected error for jsr: %v", err)
+	}
+	if rf.Kind != KindJSR {
+		t.Errorf("Kind = %v, want KindJSR", rf.Kind)
 	}
 
 	// local path should be handled by LocalResolver
@@ -208,7 +276,7 @@ func TestChainResolver_TriesInOrder(t *testing.T) {
 func TestChainResolver_CanResolve(t *testing.T) {
 	mfs := mapfs.New()
 	chain := NewChainResolver(
-		NewNPMResolver(mfs, "/project"),
+		NewNodeModulesResolver(mfs, "/project"),
 		NewLocalResolver(),
 	)
 
@@ -223,6 +291,7 @@ func TestChainResolver_CanResolve(t *testing.T) {
 func TestDefaultResolver_EndToEnd(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddFile("/project/node_modules/@rhds/tokens/json/rhds.tokens.json", `{"color":{}}`, 0644)
+	mfs.AddFile("/project/node_modules/@jsr/luca__cases/mod.json", `{"case":{}}`, 0644)
 
 	resolver := NewDefaultResolver(mfs, "/project")
 
@@ -239,6 +308,22 @@ func TestDefaultResolver_EndToEnd(t *testing.T) {
 		t.Errorf("Path = %q, want %q", rf.Path, expectedPath)
 	}
 
+	// Test jsr resolution
+	rf, err = resolver.Resolve("jsr:@luca/cases/mod.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rf.Specifier != "jsr:@luca/cases/mod.json" {
+		t.Errorf("Specifier = %q, want %q", rf.Specifier, "jsr:@luca/cases/mod.json")
+	}
+	expectedJSRPath := filepath.Join("/project", "node_modules", "@jsr", "luca__cases", "mod.json")
+	if rf.Path != expectedJSRPath {
+		t.Errorf("Path = %q, want %q", rf.Path, expectedJSRPath)
+	}
+	if rf.Kind != KindJSR {
+		t.Errorf("Kind = %v, want KindJSR", rf.Kind)
+	}
+
 	// Test local resolution
 	rf, err = resolver.Resolve("./tokens.json")
 	if err != nil {
@@ -246,11 +331,5 @@ func TestDefaultResolver_EndToEnd(t *testing.T) {
 	}
 	if rf.Path != "./tokens.json" {
 		t.Errorf("Path = %q, want %q", rf.Path, "./tokens.json")
-	}
-
-	// Test jsr: returns error
-	_, err = resolver.Resolve("jsr:pkg/file.json")
-	if err == nil {
-		t.Fatal("expected error for jsr specifier")
 	}
 }
