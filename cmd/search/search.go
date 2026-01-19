@@ -9,6 +9,7 @@ package search
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"regexp"
 	"sort"
@@ -39,6 +40,12 @@ func init() {
 	Cmd.Flags().String("type", "", "Filter by token type")
 	Cmd.Flags().Bool("regex", false, "Query is a regex")
 	Cmd.Flags().String("format", "table", "Output format: table, names, markdown")
+	Cmd.Flags().String("group", "", "Filter by group/path prefix (e.g., color.brand)")
+	Cmd.Flags().Bool("deprecated", false, "Show only deprecated tokens")
+	Cmd.Flags().Bool("no-deprecated", false, "Hide deprecated tokens")
+	Cmd.Flags().Bool("toc", false, "Include table of contents (markdown only)")
+	Cmd.Flags().Int("toc-depth", 3, "Maximum TOC depth (1-6)")
+	Cmd.Flags().Bool("links", false, "Add anchor links to tokens (markdown only)")
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -51,6 +58,12 @@ func run(cmd *cobra.Command, args []string) error {
 	useRegex, _ := cmd.Flags().GetBool("regex")
 	format, _ := cmd.Flags().GetString("format")
 	schemaFlag, _ := cmd.Flags().GetString("schema")
+	groupFilter, _ := cmd.Flags().GetString("group")
+	onlyDeprecated, _ := cmd.Flags().GetBool("deprecated")
+	hideDeprecated, _ := cmd.Flags().GetBool("no-deprecated")
+	includeTOC, _ := cmd.Flags().GetBool("toc")
+	tocDepth, _ := cmd.Flags().GetInt("toc-depth")
+	showLinks, _ := cmd.Flags().GetBool("links")
 
 	var pattern *regexp.Regexp
 	var err error
@@ -91,12 +104,20 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	var matches []*token.Token
+	var allGroupMeta = make(map[string]render.GroupMeta)
 
 	for _, file := range files {
 		data, err := filesystem.ReadFile(file)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", file, err)
 			continue
+		}
+
+		// Extract group metadata for markdown rendering
+		if format == "markdown" || format == "md" {
+			if groupMeta, err := render.ExtractGroupMeta(data); err == nil {
+				maps.Copy(allGroupMeta, groupMeta)
+			}
 		}
 
 		version := schemaVersion
@@ -121,10 +142,6 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 
 		for _, tok := range tokens {
-			if typeFilter != "" && tok.Type != typeFilter {
-				continue
-			}
-
 			matched := false
 			if nameOnly {
 				matched = matchString(tok.Name, query, pattern)
@@ -143,6 +160,9 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Apply filters
+	matches = filterTokens(matches, typeFilter, groupFilter, onlyDeprecated, hideDeprecated)
+
 	sort.Slice(matches, func(i, j int) bool {
 		return matches[i].Name < matches[j].Name
 	})
@@ -154,10 +174,60 @@ func run(cmd *cobra.Command, args []string) error {
 	case "names":
 		return render.Names(rows)
 	case "markdown", "md":
-		return render.Markdown(rows)
+		opts := render.MarkdownOptions{
+			GroupMeta:  allGroupMeta,
+			IncludeTOC: includeTOC,
+			TOCDepth:   tocDepth,
+			ShowLinks:  showLinks,
+		}
+		return render.MarkdownWithOptions(rows, opts)
 	default:
 		return render.Table(rows)
 	}
+}
+
+func filterTokens(tokens []*token.Token, typeFilter, groupFilter string, onlyDeprecated, hideDeprecated bool) []*token.Token {
+	result := tokens
+
+	if typeFilter != "" {
+		filtered := make([]*token.Token, 0, len(result))
+		for _, tok := range result {
+			if tok.Type == typeFilter {
+				filtered = append(filtered, tok)
+			}
+		}
+		result = filtered
+	}
+
+	if groupFilter != "" {
+		filtered := make([]*token.Token, 0, len(result))
+		for _, tok := range result {
+			if strings.HasPrefix(tok.DotPath(), groupFilter) {
+				filtered = append(filtered, tok)
+			}
+		}
+		result = filtered
+	}
+
+	if onlyDeprecated {
+		filtered := make([]*token.Token, 0, len(result))
+		for _, tok := range result {
+			if tok.Deprecated {
+				filtered = append(filtered, tok)
+			}
+		}
+		result = filtered
+	} else if hideDeprecated {
+		filtered := make([]*token.Token, 0, len(result))
+		for _, tok := range result {
+			if !tok.Deprecated {
+				filtered = append(filtered, tok)
+			}
+		}
+		result = filtered
+	}
+
+	return result
 }
 
 func matchString(s, query string, pattern *regexp.Regexp) bool {
