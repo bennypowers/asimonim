@@ -142,12 +142,17 @@ func isTransparent(key string, valueNode *yaml.Node, groupMarkers []string) bool
 }
 
 // buildPaths builds the JSON path and string path.
+// Returns the new jsonPath slice and string path.
+// The returned slice shares capacity with the input for recursion efficiency,
+// but is clipped to prevent mutation of parent paths.
 func buildPaths(jsonPath []string, path, key string, transparent bool) ([]string, string) {
 	if transparent {
 		return jsonPath, path
 	}
-	currentPath := append([]string{}, jsonPath...)
-	currentPath = append(currentPath, key)
+	// Append key to path - this may reuse capacity from parent
+	currentPath := append(jsonPath, key)
+	// Clip to prevent child modifications from affecting this level
+	currentPath = slices.Clip(currentPath)
 	newPath := key
 	if path != "" {
 		newPath = path + "-" + key
@@ -161,21 +166,26 @@ func (p *JSONParser) extractTokens(node *yaml.Node, jsonPath []string, path stri
 		return nil
 	}
 
-	// Collect and sort key-value pairs for deterministic order
+	// Collect key-value pairs
 	type kvPair struct {
 		keyNode   *yaml.Node
 		valueNode *yaml.Node
 	}
-	pairs := make([]kvPair, 0)
-	for i := 0; i < len(node.Content); i += 2 {
-		pairs = append(pairs, kvPair{
-			keyNode:   node.Content[i],
-			valueNode: node.Content[i+1],
+	numPairs := len(node.Content) / 2
+	pairs := make([]kvPair, numPairs)
+	for i := range numPairs {
+		pairs[i] = kvPair{
+			keyNode:   node.Content[i*2],
+			valueNode: node.Content[i*2+1],
+		}
+	}
+
+	// Sort for deterministic order unless SkipSort is set
+	if !opts.SkipSort {
+		sort.Slice(pairs, func(i, j int) bool {
+			return pairs[i].keyNode.Value < pairs[j].keyNode.Value
 		})
 	}
-	sort.Slice(pairs, func(i, j int) bool {
-		return pairs[i].keyNode.Value < pairs[j].keyNode.Value
-	})
 
 	for _, pair := range pairs {
 		keyNode := pair.keyNode
@@ -238,9 +248,10 @@ func (p *JSONParser) extractTokens(node *yaml.Node, jsonPath []string, path stri
 
 // filterChildNode creates a child node with metadata keys filtered out.
 func (p *JSONParser) filterChildNode(valueNode *yaml.Node) *yaml.Node {
+	// Pre-allocate with capacity for all content (we'll use less due to filtering)
 	childNode := &yaml.Node{
 		Kind:    yaml.MappingNode,
-		Content: make([]*yaml.Node, 0),
+		Content: make([]*yaml.Node, 0, len(valueNode.Content)),
 	}
 	for i := 0; i < len(valueNode.Content); i += 2 {
 		k := valueNode.Content[i].Value

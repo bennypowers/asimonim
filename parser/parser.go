@@ -23,6 +23,10 @@ type Options struct {
 
 	// GroupMarkers are token names that can be both tokens and groups (draft only).
 	GroupMarkers []string
+
+	// SkipSort disables alphabetical sorting of tokens for better performance.
+	// When false (default), tokens are sorted for deterministic output order.
+	SkipSort bool
 }
 
 // Parser parses design token files.
