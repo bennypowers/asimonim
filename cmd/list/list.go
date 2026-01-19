@@ -38,7 +38,7 @@ func init() {
 	Cmd.Flags().String("type", "", "Filter by token type")
 	Cmd.Flags().Bool("resolved", false, "Show resolved values")
 	Cmd.Flags().Bool("css", false, "Output as CSS custom properties")
-	Cmd.Flags().String("format", "table", "Output format: table, json, css")
+	Cmd.Flags().String("format", "table", "Output format: table, json, css, markdown")
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -146,12 +146,31 @@ func run(cmd *cobra.Command, args []string) error {
 		return outputJSON(allTokens, resolved)
 	case "css":
 		return outputCSS(allTokens, resolved)
+	case "markdown", "md":
+		return outputMarkdown(allTokens, resolved)
 	default:
 		return outputTable(allTokens, resolved)
 	}
 }
 
 func outputTable(tokens []*token.Token, resolved bool) error {
+	if len(tokens) == 0 {
+		return nil
+	}
+
+	// Calculate column widths
+	nameWidth := 4 // "Name"
+	typeWidth := 4 // "Type"
+	for _, tok := range tokens {
+		name := tok.CSSVariableName()
+		if len(name) > nameWidth {
+			nameWidth = len(name)
+		}
+		if len(tok.Type) > typeWidth {
+			typeWidth = len(tok.Type)
+		}
+	}
+
 	for _, tok := range tokens {
 		typeStr := tok.Type
 		if typeStr == "" {
@@ -177,7 +196,7 @@ func outputTable(tokens []*token.Token, resolved bool) error {
 			swatch = colorSwatch(displayValue)
 		}
 
-		fmt.Printf("%-40s %-12s %s%s%s\n", tok.Name, typeStr, swatch, displayValue, aliasRef)
+		fmt.Printf("%-*s  %-*s  %s%s%s\n", nameWidth, tok.CSSVariableName(), typeWidth, typeStr, swatch, displayValue, aliasRef)
 	}
 	return nil
 }
@@ -209,7 +228,7 @@ func outputJSON(tokens []*token.Token, resolved bool) error {
 			value = fmt.Sprintf("%v", tok.ResolvedValue)
 		}
 		output = append(output, tokenOutput{
-			Name:        tok.Name,
+			Name:        tok.CSSVariableName(),
 			Value:       value,
 			Type:        tok.Type,
 			Description: tok.Description,
@@ -219,6 +238,51 @@ func outputJSON(tokens []*token.Token, resolved bool) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	return enc.Encode(output)
+}
+
+func outputMarkdown(tokens []*token.Token, resolved bool) error {
+	if len(tokens) == 0 {
+		return nil
+	}
+
+	// Calculate column widths for alignment
+	nameWidth := 4 // "Name"
+	typeWidth := 4 // "Type"
+	valWidth := 5  // "Value"
+	for _, tok := range tokens {
+		name := tok.CSSVariableName()
+		if len(name) > nameWidth {
+			nameWidth = len(name)
+		}
+		if len(tok.Type) > typeWidth {
+			typeWidth = len(tok.Type)
+		}
+		value := tok.Value
+		if resolved && tok.ResolvedValue != nil {
+			value = fmt.Sprintf("%v", tok.ResolvedValue)
+		}
+		if len(value) > valWidth {
+			valWidth = len(value)
+		}
+	}
+
+	// Header
+	fmt.Printf("| %-*s | %-*s | %-*s |\n", nameWidth, "Name", typeWidth, "Type", valWidth, "Value")
+	fmt.Printf("|-%s-|-%s-|-%s-|\n", strings.Repeat("-", nameWidth), strings.Repeat("-", typeWidth), strings.Repeat("-", valWidth))
+
+	// Rows
+	for _, tok := range tokens {
+		typeStr := tok.Type
+		if typeStr == "" {
+			typeStr = "-"
+		}
+		value := tok.Value
+		if resolved && tok.ResolvedValue != nil {
+			value = fmt.Sprintf("%v", tok.ResolvedValue)
+		}
+		fmt.Printf("| %-*s | %-*s | %-*s |\n", nameWidth, tok.CSSVariableName(), typeWidth, typeStr, valWidth, value)
+	}
+	return nil
 }
 
 func outputCSS(tokens []*token.Token, resolved bool) error {

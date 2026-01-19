@@ -165,12 +165,29 @@ func matchString(s, query string, pattern *regexp.Regexp) bool {
 }
 
 func outputTable(tokens []*token.Token) error {
+	if len(tokens) == 0 {
+		return nil
+	}
+
+	// Calculate column widths
+	nameWidth := 4
+	typeWidth := 4
+	for _, tok := range tokens {
+		name := tok.CSSVariableName()
+		if len(name) > nameWidth {
+			nameWidth = len(name)
+		}
+		if len(tok.Type) > typeWidth {
+			typeWidth = len(tok.Type)
+		}
+	}
+
 	for _, tok := range tokens {
 		typeStr := tok.Type
 		if typeStr == "" {
 			typeStr = "-"
 		}
-		fmt.Printf("%-40s %-12s %s\n", tok.Name, typeStr, tok.Value)
+		fmt.Printf("%-*s  %-*s  %s\n", nameWidth, tok.CSSVariableName(), typeWidth, typeStr, tok.Value)
 	}
 	return nil
 }
@@ -187,7 +204,7 @@ func outputJSON(tokens []*token.Token) error {
 	output := make([]tokenOutput, 0, len(tokens))
 	for _, tok := range tokens {
 		output = append(output, tokenOutput{
-			Name:        tok.Name,
+			Name:        tok.CSSVariableName(),
 			Value:       tok.Value,
 			Type:        tok.Type,
 			Description: tok.Description,
@@ -202,7 +219,7 @@ func outputJSON(tokens []*token.Token) error {
 
 func outputNames(tokens []*token.Token) error {
 	for _, tok := range tokens {
-		fmt.Println(tok.Name)
+		fmt.Println(tok.CSSVariableName())
 	}
 	return nil
 }
