@@ -1,2 +1,8 @@
 dist
 benchmark_results/
+*.test
+*.out
+coverage.out
+.idea/
+.vscode/
+.DS_Store
