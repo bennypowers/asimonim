@@ -46,6 +46,10 @@ type Token struct {
 	// Path is the JSON path to this token (e.g., ["color", "primary"]).
 	Path []string `json:"-"`
 
+	// DefinitionURI is the file URI where this token is defined.
+	// This is typically set by LSP servers for go-to-definition support.
+	DefinitionURI string `json:"-"`
+
 	// Line is the 0-based line number where this token is defined.
 	Line uint32 `json:"-"`
 
