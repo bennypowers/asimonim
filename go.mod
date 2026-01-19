@@ -3,6 +3,7 @@ module bennypowers.dev/asimonim
 go 1.25.5
 
 require (
+	github.com/bmatcuk/doublestar/v4 v4.9.2
 	github.com/mazznoer/csscolorparser v0.1.8
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0

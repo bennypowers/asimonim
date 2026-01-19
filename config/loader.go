@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"gopkg.in/yaml.v3"
 
 	asimfs "bennypowers.dev/asimonim/fs"
@@ -194,41 +195,9 @@ func expandGlob(filesystem asimfs.FileSystem, pattern string) ([]string, error) 
 	return matches, nil
 }
 
-// matchDoublestar provides simple ** glob matching.
-// This is a basic implementation that handles common patterns like **/*.yaml
+// matchDoublestar provides ** glob matching using the doublestar library.
+// Supports complex patterns like packages/**/tokens/**/data.json
 func matchDoublestar(pattern, path string) bool {
-	// Handle simple ** patterns
-	if strings.Contains(pattern, "**") {
-		// Split pattern by **
-		parts := strings.Split(pattern, "**")
-		if len(parts) != 2 {
-			return false
-		}
-
-		prefix := parts[0]
-		suffix := strings.TrimPrefix(parts[1], string(filepath.Separator))
-
-		// Path must end with the suffix pattern
-		if suffix != "" {
-			// Match suffix as a simple glob
-			matched, _ := filepath.Match(suffix, filepath.Base(path))
-			if !matched {
-				// Try matching against the full relative suffix path
-				pathSuffix := path
-				if strings.Contains(suffix, string(filepath.Separator)) {
-					// Multi-level suffix, need more complex matching
-					if strings.HasSuffix(path, strings.ReplaceAll(suffix, "*", "")) {
-						return true
-					}
-				}
-				matched, _ = filepath.Match(suffix, pathSuffix)
-			}
-			return matched
-		}
-
-		// Pattern is just "prefix/**", match anything under prefix
-		return strings.HasPrefix(path, strings.TrimSuffix(prefix, string(filepath.Separator)))
-	}
-
-	return false
+	matched, _ := doublestar.Match(pattern, path)
+	return matched
 }
