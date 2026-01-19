@@ -170,18 +170,8 @@ func expandGlob(filesystem asimfs.FileSystem, pattern string) ([]string, error) 
 		relPath := strings.TrimPrefix(path, baseDir)
 		relPath = strings.TrimPrefix(relPath, string(filepath.Separator))
 
-		// Match against the pattern
-		matched, err := filepath.Match(relPattern, relPath)
-		if err != nil {
-			return err
-		}
-
-		// Also try matching with ** support (doublestar)
-		if !matched {
-			matched = matchDoublestar(relPattern, relPath)
-		}
-
-		if matched {
+		// Match against the pattern (doublestar handles both simple and ** globs)
+		if matchDoublestar(relPattern, relPath) {
 			matches = append(matches, path)
 		}
 
