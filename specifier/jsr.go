@@ -28,11 +28,16 @@ type JSRNodeModulesResolver struct {
 
 // NewJSRNodeModulesResolver creates a resolver for jsr: package specifiers
 // that looks in node_modules/@jsr/.
-func NewJSRNodeModulesResolver(fs asimfs.FileSystem, rootDir string) *JSRNodeModulesResolver {
+// The rootDir must be an absolute path - this is required for compatibility
+// with virtual/in-memory filesystems that don't have a working directory concept.
+func NewJSRNodeModulesResolver(fs asimfs.FileSystem, rootDir string) (*JSRNodeModulesResolver, error) {
+	if !filepath.IsAbs(rootDir) {
+		return nil, fmt.Errorf("rootDir must be an absolute path, got: %s", rootDir)
+	}
 	return &JSRNodeModulesResolver{
 		fs:      fs,
 		rootDir: rootDir,
-	}
+	}, nil
 }
 
 // Resolve resolves a jsr: specifier to a filesystem path.
@@ -47,21 +52,20 @@ func (r *JSRNodeModulesResolver) Resolve(spec string) (*ResolvedFile, error) {
 	// Translate the package name to the npm compatibility format
 	npmPackageName := jsrToNPMCompatPackage(parsed.Package)
 
-	// Convert rootDir to absolute path for proper walk-up
+	// rootDir is guaranteed absolute by constructor
 	dir := r.rootDir
-	if !filepath.IsAbs(dir) {
-		absDir, err := filepath.Abs(dir)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve path %s: %w", dir, err)
-		}
-		dir = absDir
-	}
-
 	startDir := dir
 
 	// Walk up directory tree looking for node_modules
 	for {
-		nodeModulesPath := filepath.Join(dir, "node_modules", "@jsr", npmPackageName, parsed.File)
+		nodeModulesBase := filepath.Join(dir, "node_modules")
+		nodeModulesPath := filepath.Clean(filepath.Join(nodeModulesBase, "@jsr", npmPackageName, parsed.File))
+
+		// Path traversal protection: verify path stays inside node_modules
+		if !isInsideDir(nodeModulesPath, nodeModulesBase) {
+			return nil, fmt.Errorf("path traversal detected in specifier: %s", spec)
+		}
+
 		if r.fs.Exists(nodeModulesPath) {
 			return &ResolvedFile{
 				Specifier: spec,

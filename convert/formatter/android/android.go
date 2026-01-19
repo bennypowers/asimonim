@@ -38,7 +38,7 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 		xmlType := xmlType(tok.Type)
 
 		sb.WriteString(fmt.Sprintf("    <%s name=\"%s\">%s</%s>\n",
-			xmlType, name, formatter.EscapeXML(fmt.Sprintf("%v", value)), xmlType))
+			xmlType, formatter.EscapeXML(name), formatter.EscapeXML(fmt.Sprintf("%v", value)), xmlType))
 	}
 
 	sb.WriteString("</resources>\n")

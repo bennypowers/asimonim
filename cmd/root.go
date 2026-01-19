@@ -32,7 +32,7 @@ func Execute() error {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringP("schema", "s", "", "Force schema version (draft, v2025_10)")
+	rootCmd.PersistentFlags().StringP("schema", "s", "", "Force schema version (draft, v2025.10)")
 	rootCmd.PersistentFlags().StringP("prefix", "p", "", "Prefix for output variable names")
 
 	_ = viper.BindPFlag("schema", rootCmd.PersistentFlags().Lookup("schema"))

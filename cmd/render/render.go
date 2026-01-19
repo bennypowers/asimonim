@@ -52,11 +52,10 @@ type HierarchyNode struct {
 
 // MarkdownOptions configures markdown output.
 type MarkdownOptions struct {
-	GroupMeta      map[string]GroupMeta // key: dot-separated path
-	IncludeTOC     bool
-	TOCDepth       int
-	ShowLinks      bool
-	ShowDeprecated *bool // nil = show all, true = only deprecated, false = hide deprecated
+	GroupMeta  map[string]GroupMeta // key: dot-separated path
+	IncludeTOC bool
+	TOCDepth   int
+	ShowLinks  bool
 }
 
 // ComputeRows transforms tokens into display rows with all values computed.
@@ -186,7 +185,7 @@ func formatCompositeValue(m map[string]any, prefix string) string {
 	}
 	// strokeStyle: dashArray lineCap
 	if hasKeys(m, "dashArray", "lineCap") {
-		return fmt.Sprintf("dash:%v cap:%s", m["dashArray"], fv("lineCap"))
+		return fmt.Sprintf("dash:%s cap:%s", fv("dashArray"), fv("lineCap"))
 	}
 	// transition: duration delay timingFunction
 	if hasKeys(m, "duration", "timingFunction") {
@@ -478,7 +477,10 @@ func extractGroupMetaRecursive(obj map[string]any, path []string, result map[str
 			continue
 		}
 		if child, ok := value.(map[string]any); ok {
-			childPath := append(path, key)
+			// Create a new slice to avoid aliasing the backing array
+			childPath := make([]string, len(path)+1)
+			copy(childPath, path)
+			childPath[len(path)] = key
 			extractGroupMetaRecursive(child, childPath, result)
 		}
 	}

@@ -327,7 +327,10 @@ func TestMarkdownWithOptionsGolden(t *testing.T) {
 
 	// Capture stdout
 	old := os.Stdout
-	r, w, _ := os.Pipe()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
 	os.Stdout = w
 
 	tokens := []*token.Token{

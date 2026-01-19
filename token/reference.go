@@ -67,6 +67,13 @@ func ParseJSONPointerRef(ref string) (string, bool) {
 	}
 	// Convert /path/to/token to path.to.token
 	parts := strings.Split(matches[1], "/")
+	// Decode RFC 6901 escape sequences in each segment
+	// Order matters: ~1 must be replaced before ~0
+	for i, part := range parts {
+		part = strings.ReplaceAll(part, "~1", "/")
+		part = strings.ReplaceAll(part, "~0", "~")
+		parts[i] = part
+	}
 	return strings.Join(parts, "."), true
 }
 

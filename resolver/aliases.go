@@ -56,7 +56,10 @@ func resolveToken(tok *token.Token, tokenByName map[string]*token.Token, version
 		isAlias = true
 		result := resolveCurlyBraceRef(tok.Value, tokenByName)
 		if !result.ok {
-			// Leave unresolved - will show raw reference
+			// Resolution failed - use original value as fallback
+			tok.ResolvedValue = tok.Value
+			tok.ResolutionChain = nil
+			tok.IsResolved = true
 			return
 		}
 		tok.ResolvedValue = result.value
@@ -65,6 +68,10 @@ func resolveToken(tok *token.Token, tokenByName map[string]*token.Token, version
 		isAlias = true
 		result := resolveJSONPointerRef(tok.Value, tokenByName)
 		if !result.ok {
+			// Resolution failed - use original value as fallback
+			tok.ResolvedValue = tok.Value
+			tok.ResolutionChain = nil
+			tok.IsResolved = true
 			return
 		}
 		tok.ResolvedValue = result.value

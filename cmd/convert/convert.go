@@ -62,7 +62,7 @@ Examples:
   asimonim convert --format swift -o DesignTokens.swift tokens/*.yaml
 
   # In-place schema conversion
-  asimonim convert --in-place --schema v2025_10 tokens/*.yaml`,
+  asimonim convert --in-place --schema v2025.10 tokens/*.yaml`,
 	Args: cobra.ArbitraryArgs,
 	RunE: run,
 }
@@ -102,7 +102,15 @@ func run(cmd *cobra.Command, args []string) error {
 
 	filesystem := fs.NewOSFileSystem()
 	jsonParser := parser.NewJSONParser()
-	specResolver := specifier.NewDefaultResolver(filesystem, ".")
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+	specResolver, err := specifier.NewDefaultResolver(filesystem, cwd)
+	if err != nil {
+		return fmt.Errorf("failed to create resolver: %w", err)
+	}
 
 	// Load config from .config/design-tokens.{yaml,json}
 	cfg := config.LoadOrDefault(filesystem, ".")
@@ -260,7 +268,9 @@ func runCombined(
 	if detectedVersion == schema.Unknown {
 		detectedVersion = schema.Draft
 	}
-	_ = resolver.ResolveAliases(allTokens, detectedVersion)
+	if err := resolver.ResolveAliases(allTokens, detectedVersion); err != nil {
+		return fmt.Errorf("error resolving aliases: %w", err)
+	}
 
 	// Determine output schema
 	outputSchema := targetSchema

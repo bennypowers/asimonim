@@ -40,11 +40,11 @@ type Specifier struct {
 }
 
 var (
-	// npmPattern matches npm:@scope/pkg/path or npm:pkg/path
-	npmPattern = regexp.MustCompile(`^npm:(@[^/]+/[^/]+|[^/]+)(/.*)$`)
+	// npmPattern matches npm:@scope/pkg/path, npm:pkg/path, or bare npm:pkg
+	npmPattern = regexp.MustCompile(`^npm:(@[^/]+/[^/]+|[^/]+)(/.*)?$`)
 
-	// jsrPattern matches jsr:@scope/pkg/path or jsr:pkg/path
-	jsrPattern = regexp.MustCompile(`^jsr:(@[^/]+/[^/]+|[^/]+)(/.*)$`)
+	// jsrPattern matches jsr:@scope/pkg/path, jsr:pkg/path, or bare jsr:pkg
+	jsrPattern = regexp.MustCompile(`^jsr:(@[^/]+/[^/]+|[^/]+)(/.*)?$`)
 )
 
 // Parse parses a specifier string into a Specifier struct.
@@ -83,9 +83,11 @@ func Parse(spec string) *Specifier {
 	}
 }
 
-// IsPackageSpecifier returns true if the string is an npm or jsr specifier.
+// IsPackageSpecifier returns true if the string is a valid npm or jsr specifier.
+// It uses the same validation as Parse to ensure consistency.
 func IsPackageSpecifier(spec string) bool {
-	return strings.HasPrefix(spec, "npm:") || strings.HasPrefix(spec, "jsr:")
+	parsed := Parse(spec)
+	return parsed.Kind == KindNPM || parsed.Kind == KindJSR
 }
 
 // IsNPM returns true if this is an npm specifier.

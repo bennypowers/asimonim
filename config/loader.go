@@ -123,10 +123,7 @@ func expandFilePath(filesystem asimfs.FileSystem, rootDir, pattern string) ([]st
 
 	// Check if pattern contains glob characters
 	if !containsGlob(pattern) {
-		// Not a glob, just return the path if it exists
-		if filesystem.Exists(pattern) {
-			return []string{pattern}, nil
-		}
+		// Not a glob, return the path directly (errors handled when file is read)
 		return []string{pattern}, nil
 	}
 

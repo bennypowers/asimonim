@@ -51,10 +51,10 @@ type Token struct {
 	Extensions map[string]any `json:"$extensions,omitempty"`
 
 	// Deprecated indicates if this token should no longer be used.
-	Deprecated bool `json:"deprecated,omitempty"`
+	Deprecated bool `json:"$deprecated,omitempty"`
 
 	// DeprecationMessage provides context for deprecated tokens.
-	DeprecationMessage string `json:"deprecationMessage,omitempty"`
+	DeprecationMessage string `json:"$deprecationMessage,omitempty"`
 
 	// FilePath is the file this token was loaded from.
 	FilePath string `json:"-"`
@@ -98,7 +98,11 @@ type Token struct {
 
 // CSSVariableName returns the CSS custom property name for this token.
 // e.g., "--color-primary" or "--my-prefix-color-primary"
+// Returns an empty string if the token has no name.
 func (t *Token) CSSVariableName() string {
+	if t.Name == "" {
+		return ""
+	}
 	name := strings.ReplaceAll(t.Name, ".", "-")
 	if t.Prefix != "" {
 		prefix := strings.ReplaceAll(t.Prefix, ".", "-")

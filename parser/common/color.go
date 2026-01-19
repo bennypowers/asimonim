@@ -8,6 +8,7 @@ package common
 
 import (
 	"fmt"
+	"strings"
 
 	"bennypowers.dev/asimonim/schema"
 )
@@ -78,27 +79,39 @@ func (o *ObjectColorValue) ToCSS() string {
 		return *o.Hex
 	}
 
-	// Convert components to string
-	var compStr string
+	// Build components string using strings.Builder
+	var sb strings.Builder
 	for i, comp := range o.Components {
 		if i > 0 {
-			compStr += " "
+			sb.WriteString(" ")
 		}
 		switch v := comp.(type) {
 		case float64:
-			compStr += fmt.Sprintf("%.4g", v)
+			sb.WriteString(fmt.Sprintf("%.4g", v))
 		case string:
-			compStr += v // "none" keyword
+			sb.WriteString(v) // "none" keyword
 		default:
-			compStr += fmt.Sprintf("%v", v)
+			sb.WriteString(fmt.Sprintf("%v", v))
 		}
 	}
+	compStr := sb.String()
 
-	// Generate CSS color() function with optional alpha
-	if o.Alpha != nil && *o.Alpha < AlphaThreshold {
-		return fmt.Sprintf("color(%s %s / %.4g)", o.ColorSpace, compStr, *o.Alpha)
+	hasAlpha := o.Alpha != nil && *o.Alpha < AlphaThreshold
+
+	// hsl and hwb use native functions, not color()
+	switch o.ColorSpace {
+	case "hsl", "hwb":
+		if hasAlpha {
+			return fmt.Sprintf("%s(%s / %.4g)", o.ColorSpace, compStr, *o.Alpha)
+		}
+		return fmt.Sprintf("%s(%s)", o.ColorSpace, compStr)
+	default:
+		// Generate CSS color() function with optional alpha
+		if hasAlpha {
+			return fmt.Sprintf("color(%s %s / %.4g)", o.ColorSpace, compStr, *o.Alpha)
+		}
+		return fmt.Sprintf("color(%s %s)", o.ColorSpace, compStr)
 	}
-	return fmt.Sprintf("color(%s %s)", o.ColorSpace, compStr)
 }
 
 // Version returns the schema version for this color.

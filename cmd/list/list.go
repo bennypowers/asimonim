@@ -61,13 +61,29 @@ func run(cmd *cobra.Command, args []string) error {
 	tocDepth, _ := cmd.Flags().GetInt("toc-depth")
 	showLinks, _ := cmd.Flags().GetBool("links")
 
+	if tocDepth < 1 || tocDepth > 6 {
+		return fmt.Errorf("toc-depth must be between 1 and 6, got %d", tocDepth)
+	}
+
+	if onlyDeprecated && hideDeprecated {
+		return fmt.Errorf("cannot use --deprecated and --no-deprecated together")
+	}
+
 	if css {
 		format = "css"
 	}
 
 	filesystem := fs.NewOSFileSystem()
 	jsonParser := parser.NewJSONParser()
-	specResolver := specifier.NewDefaultResolver(filesystem, ".")
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+	specResolver, err := specifier.NewDefaultResolver(filesystem, cwd)
+	if err != nil {
+		return fmt.Errorf("failed to create resolver: %w", err)
+	}
 
 	// Load config from .config/design-tokens.{yaml,json}
 	cfg := config.LoadOrDefault(filesystem, ".")
@@ -155,7 +171,9 @@ func run(cmd *cobra.Command, args []string) error {
 	if detectedVersion == schema.Unknown {
 		detectedVersion = schema.Draft
 	}
-	_ = resolver.ResolveAliases(allTokens, detectedVersion)
+	if err := resolver.ResolveAliases(allTokens, detectedVersion); err != nil {
+		return fmt.Errorf("error resolving aliases: %w", err)
+	}
 
 	// Apply filters
 	allTokens = filterTokens(allTokens, typeFilter, groupFilter, onlyDeprecated, hideDeprecated)

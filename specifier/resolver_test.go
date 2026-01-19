@@ -63,7 +63,10 @@ func TestNodeModulesResolver_ScopedPackage(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddFile("/project/node_modules/@design-tokens/test-package/tokens.json", `{"color":{}}`, 0644)
 
-	resolver := NewNodeModulesResolver(mfs, "/project")
+	resolver, err := NewNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
 
 	rf, err := resolver.Resolve("npm:@design-tokens/test-package/tokens.json")
 	if err != nil {
@@ -86,7 +89,10 @@ func TestNodeModulesResolver_UnscopedPackage(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddFile("/project/node_modules/simple-tokens/colors.json", `{"color":{}}`, 0644)
 
-	resolver := NewNodeModulesResolver(mfs, "/project")
+	resolver, err := NewNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
 
 	rf, err := resolver.Resolve("npm:simple-tokens/colors.json")
 	if err != nil {
@@ -104,7 +110,10 @@ func TestNodeModulesResolver_WalksUpDirectoryTree(t *testing.T) {
 	mfs.AddFile("/project/node_modules/parent-tokens/tokens.json", `{"spacing":{}}`, 0644)
 	mfs.AddDir("/project/subdir", 0755)
 
-	resolver := NewNodeModulesResolver(mfs, "/project/subdir")
+	resolver, err := NewNodeModulesResolver(mfs, "/project/subdir")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
 
 	rf, err := resolver.Resolve("npm:parent-tokens/tokens.json")
 	if err != nil {
@@ -121,9 +130,12 @@ func TestNodeModulesResolver_PackageNotFound(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddDir("/project", 0755)
 
-	resolver := NewNodeModulesResolver(mfs, "/project")
+	resolver, err := NewNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
 
-	_, err := resolver.Resolve("npm:nonexistent/tokens.json")
+	_, err = resolver.Resolve("npm:nonexistent/tokens.json")
 	if err == nil {
 		t.Fatal("expected error for nonexistent package")
 	}
@@ -134,7 +146,10 @@ func TestNodeModulesResolver_PackageNotFound(t *testing.T) {
 
 func TestNodeModulesResolver_CanResolve(t *testing.T) {
 	mfs := mapfs.New()
-	resolver := NewNodeModulesResolver(mfs, "/project")
+	resolver, err := NewNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
 
 	if !resolver.CanResolve("npm:pkg/file.json") {
 		t.Error("expected CanResolve to return true for npm specifier")
@@ -152,7 +167,10 @@ func TestJSRNodeModulesResolver_ScopedPackage(t *testing.T) {
 	// JSR scoped package: jsr:@design-tokens/test → @jsr/design-tokens__test
 	mfs.AddFile("/project/node_modules/@jsr/design-tokens__test/tokens.json", `{"color":{}}`, 0644)
 
-	resolver := NewJSRNodeModulesResolver(mfs, "/project")
+	resolver, err := NewJSRNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
 
 	rf, err := resolver.Resolve("jsr:@design-tokens/test/tokens.json")
 	if err != nil {
@@ -176,7 +194,10 @@ func TestJSRNodeModulesResolver_UnscopedPackage(t *testing.T) {
 	// JSR unscoped package: jsr:simple-tokens → @jsr/simple-tokens
 	mfs.AddFile("/project/node_modules/@jsr/simple-tokens/colors.json", `{"color":{}}`, 0644)
 
-	resolver := NewJSRNodeModulesResolver(mfs, "/project")
+	resolver, err := NewJSRNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
 
 	rf, err := resolver.Resolve("jsr:simple-tokens/colors.json")
 	if err != nil {
@@ -194,7 +215,10 @@ func TestJSRNodeModulesResolver_WalksUpDirectoryTree(t *testing.T) {
 	mfs.AddFile("/project/node_modules/@jsr/std__tokens/tokens.json", `{"spacing":{}}`, 0644)
 	mfs.AddDir("/project/subdir", 0755)
 
-	resolver := NewJSRNodeModulesResolver(mfs, "/project/subdir")
+	resolver, err := NewJSRNodeModulesResolver(mfs, "/project/subdir")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
 
 	rf, err := resolver.Resolve("jsr:@std/tokens/tokens.json")
 	if err != nil {
@@ -211,9 +235,12 @@ func TestJSRNodeModulesResolver_PackageNotFound(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddDir("/project", 0755)
 
-	resolver := NewJSRNodeModulesResolver(mfs, "/project")
+	resolver, err := NewJSRNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
 
-	_, err := resolver.Resolve("jsr:@nonexistent/pkg/tokens.json")
+	_, err = resolver.Resolve("jsr:@nonexistent/pkg/tokens.json")
 	if err == nil {
 		t.Fatal("expected error for nonexistent package")
 	}
@@ -224,7 +251,10 @@ func TestJSRNodeModulesResolver_PackageNotFound(t *testing.T) {
 
 func TestJSRNodeModulesResolver_CanResolve(t *testing.T) {
 	mfs := mapfs.New()
-	resolver := NewJSRNodeModulesResolver(mfs, "/project")
+	resolver, err := NewJSRNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
 
 	if !resolver.CanResolve("jsr:pkg/file.json") {
 		t.Error("expected CanResolve to return true for jsr specifier")
@@ -239,9 +269,17 @@ func TestChainResolver_TriesInOrder(t *testing.T) {
 	mfs.AddFile("/project/node_modules/@scope/pkg/file.json", `{}`, 0644)
 	mfs.AddFile("/project/node_modules/@jsr/std__tokens/mod.json", `{}`, 0644)
 
+	npmResolver, err := NewNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create npm resolver: %v", err)
+	}
+	jsrResolver, err := NewJSRNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create jsr resolver: %v", err)
+	}
 	chain := NewChainResolver(
-		NewNodeModulesResolver(mfs, "/project"),
-		NewJSRNodeModulesResolver(mfs, "/project"),
+		npmResolver,
+		jsrResolver,
 		NewLocalResolver(),
 	)
 
@@ -275,8 +313,12 @@ func TestChainResolver_TriesInOrder(t *testing.T) {
 
 func TestChainResolver_CanResolve(t *testing.T) {
 	mfs := mapfs.New()
+	npmResolver, err := NewNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create npm resolver: %v", err)
+	}
 	chain := NewChainResolver(
-		NewNodeModulesResolver(mfs, "/project"),
+		npmResolver,
 		NewLocalResolver(),
 	)
 
@@ -293,7 +335,10 @@ func TestDefaultResolver_EndToEnd(t *testing.T) {
 	mfs.AddFile("/project/node_modules/@rhds/tokens/json/rhds.tokens.json", `{"color":{}}`, 0644)
 	mfs.AddFile("/project/node_modules/@jsr/luca__cases/mod.json", `{"case":{}}`, 0644)
 
-	resolver := NewDefaultResolver(mfs, "/project")
+	resolver, err := NewDefaultResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
 
 	// Test npm resolution
 	rf, err := resolver.Resolve("npm:@rhds/tokens/json/rhds.tokens.json")

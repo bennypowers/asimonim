@@ -29,7 +29,7 @@ func (v Version) String() string {
 	case Draft:
 		return "draft"
 	case V2025_10:
-		return "v2025_10"
+		return "v2025.10"
 	default:
 		return "unknown"
 	}
@@ -64,7 +64,7 @@ func FromString(s string) (Version, error) {
 	switch s {
 	case "draft":
 		return Draft, nil
-	case "v2025_10":
+	case "v2025.10", "v2025_10", "2025.10", "2025", "v2025":
 		return V2025_10, nil
 	default:
 		return Unknown, fmt.Errorf("unrecognized schema version string: %s", s)

@@ -28,7 +28,7 @@ type Config struct {
 	GroupMarkers []string `yaml:"groupMarkers" json:"groupMarkers"`
 
 	// Schema forces a specific schema version (optional).
-	// Valid values: "draft", "v2025_10"
+	// Valid values: "draft", "v2025.10"
 	Schema string `yaml:"schema" json:"schema"`
 }
 

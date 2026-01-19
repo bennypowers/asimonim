@@ -75,8 +75,30 @@ func hasFeature(data map[string]any, featureName string) bool {
 		return true
 	}
 	for _, value := range data {
-		if obj, ok := value.(map[string]any); ok {
-			if hasFeature(obj, featureName) {
+		switch v := value.(type) {
+		case map[string]any:
+			if hasFeature(v, featureName) {
+				return true
+			}
+		case []any:
+			if hasFeatureInSlice(v, featureName) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasFeatureInSlice recursively checks for a feature in slice elements.
+func hasFeatureInSlice(arr []any, featureName string) bool {
+	for _, elem := range arr {
+		switch v := elem.(type) {
+		case map[string]any:
+			if hasFeature(v, featureName) {
+				return true
+			}
+		case []any:
+			if hasFeatureInSlice(v, featureName) {
 				return true
 			}
 		}
@@ -104,25 +126,9 @@ func checkForStructuredColors(obj any) bool {
 				return true
 			}
 		}
-	}
-	return false
-}
-
-// hasStringColorValues checks for draft-style string color values.
-func hasStringColorValues(data map[string]any) bool {
-	return checkForStringColors(data)
-}
-
-func checkForStringColors(obj any) bool {
-	switch v := obj.(type) {
-	case map[string]any:
-		if colorType, ok := v["$type"].(string); ok && colorType == "color" {
-			if value, ok := v["$value"].(string); ok && value != "" {
-				return true
-			}
-		}
-		for _, child := range v {
-			if checkForStringColors(child) {
+	case []any:
+		for _, elem := range v {
+			if checkForStructuredColors(elem) {
 				return true
 			}
 		}

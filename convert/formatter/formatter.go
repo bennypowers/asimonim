@@ -26,12 +26,16 @@ type Options struct {
 	// Prefix is added to output variable names.
 	Prefix string
 
-	// Delimiter is the separator for flattened keys (default "-").
+	// Delimiter is the separator for flattened keys.
+	// Zero value is empty string; consuming code should set "-" if needed.
 	Delimiter string
 }
 
 // ResolvedValue returns the resolved value for a token, falling back to raw or original value.
 func ResolvedValue(tok *token.Token) any {
+	if tok == nil {
+		return nil
+	}
 	if tok.ResolvedValue != nil {
 		return tok.ResolvedValue
 	}
@@ -72,6 +76,9 @@ func ApplyPrefix(name, prefix, delimiter string) string {
 func ApplyPrefixCamel(name, prefix string) string {
 	if prefix == "" {
 		return name
+	}
+	if name == "" {
+		return ToCamelCase(prefix)
 	}
 	return ToCamelCase(prefix) + strings.ToUpper(name[:1]) + name[1:]
 }

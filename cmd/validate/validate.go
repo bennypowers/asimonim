@@ -37,11 +37,20 @@ func init() {
 
 func run(cmd *cobra.Command, args []string) error {
 	quiet, _ := cmd.Flags().GetBool("quiet")
+	strict, _ := cmd.Flags().GetBool("strict")
 	schemaFlag, _ := cmd.Flags().GetString("schema")
 
 	filesystem := fs.NewOSFileSystem()
 	jsonParser := parser.NewJSONParser()
-	specResolver := specifier.NewDefaultResolver(filesystem, ".")
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+	specResolver, err := specifier.NewDefaultResolver(filesystem, cwd)
+	if err != nil {
+		return fmt.Errorf("failed to create resolver: %w", err)
+	}
 
 	// Load config from .config/design-tokens.{yaml,json}
 	cfg := config.LoadOrDefault(filesystem, ".")
@@ -80,6 +89,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	hasErrors := false
+	hasWarnings := false
 
 	for _, rf := range resolvedFiles {
 		if !quiet {
@@ -129,6 +139,20 @@ func run(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
+		// Check for deprecated tokens (warnings)
+		deprecatedCount := 0
+		for _, tok := range tokens {
+			if tok.Deprecated {
+				deprecatedCount++
+			}
+		}
+		if deprecatedCount > 0 {
+			hasWarnings = true
+			if !quiet {
+				fmt.Fprintf(os.Stderr, "Warning: %s contains %d deprecated token(s)\n", rf.Specifier, deprecatedCount)
+			}
+		}
+
 		if !quiet {
 			fmt.Printf("  %d tokens, schema: %s\n", len(tokens), version)
 		}
@@ -136,6 +160,10 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if hasErrors {
 		return fmt.Errorf("validation failed")
+	}
+
+	if strict && hasWarnings {
+		return fmt.Errorf("validation failed due to warnings (strict mode)")
 	}
 
 	if !quiet {

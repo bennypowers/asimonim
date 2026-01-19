@@ -66,6 +66,14 @@ func run(cmd *cobra.Command, args []string) error {
 	tocDepth, _ := cmd.Flags().GetInt("toc-depth")
 	showLinks, _ := cmd.Flags().GetBool("links")
 
+	if onlyDeprecated && hideDeprecated {
+		return fmt.Errorf("cannot use --deprecated and --no-deprecated together")
+	}
+
+	if tocDepth < 1 || tocDepth > 6 {
+		return fmt.Errorf("toc-depth must be between 1 and 6, got %d", tocDepth)
+	}
+
 	var pattern *regexp.Regexp
 	var err error
 	if useRegex {
@@ -77,7 +85,15 @@ func run(cmd *cobra.Command, args []string) error {
 
 	filesystem := fs.NewOSFileSystem()
 	jsonParser := parser.NewJSONParser()
-	specResolver := specifier.NewDefaultResolver(filesystem, ".")
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+	specResolver, err := specifier.NewDefaultResolver(filesystem, cwd)
+	if err != nil {
+		return fmt.Errorf("failed to create resolver: %w", err)
+	}
 
 	// Load config from .config/design-tokens.{yaml,json}
 	cfg := config.LoadOrDefault(filesystem, ".")

@@ -297,19 +297,11 @@ func convertStringReferences(s string, inputSchema, outputSchema schema.Version)
 }
 
 // convertMapReferences converts references within a map.
+// Note: $ref conversion from V2025_10 to Draft is handled by convertV2025ToDraft.
 func convertMapReferences(m map[string]any, inputSchema, outputSchema schema.Version) map[string]any {
 	result := make(map[string]any)
 
 	for k, v := range m {
-		if k == "$ref" && inputSchema == schema.V2025_10 && outputSchema == schema.Draft {
-			if ref, ok := v.(string); ok {
-				tokenPath := common.ConvertJSONPointerToTokenPath(ref)
-				// Return a curly brace reference for the $value key
-				delete(result, "$ref")
-				result["$value"] = "{" + tokenPath + "}"
-				continue
-			}
-		}
 		result[k] = convertReferences(v, inputSchema, outputSchema)
 	}
 

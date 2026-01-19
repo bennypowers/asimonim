@@ -54,7 +54,7 @@ Usage:
   asimonim validate [files...]
 
 Flags:
-  -s, --schema string    Force schema version (draft, v2025_10)
+  -s, --schema string    Force schema version (draft, v2025.10)
       --strict           Fail on warnings
       --quiet            Only output errors
 ```
@@ -66,7 +66,7 @@ Flags:
 asimonim validate colors.json spacing.json typography.json
 
 # Force a specific schema version
-asimonim validate tokens.json --schema v2025_10
+asimonim validate tokens.json --schema v2025.10
 
 # Quiet mode for CI
 asimonim validate tokens.json --quiet
@@ -81,7 +81,7 @@ Usage:
   asimonim list [files...]
 
 Flags:
-  -s, --schema string    Force schema version (draft, v2025_10)
+  -s, --schema string    Force schema version (draft, v2025.10)
       --type string      Filter by token type
       --resolved         Show resolved values (follow aliases)
       --format string    Output format: table, json, css (default "table")
@@ -113,7 +113,7 @@ Usage:
   asimonim search <query> [files...]
 
 Flags:
-  -s, --schema string    Force schema version (draft, v2025_10)
+  -s, --schema string    Force schema version (draft, v2025.10)
       --name             Search names only
       --value            Search values only
       --type string      Filter by token type
@@ -151,7 +151,7 @@ Flags:
   -p, --prefix string      Prefix for output variable names
       --flatten            Flatten to shallow structure (dtcg/json formats only)
   -d, --delimiter string   Delimiter for flattened keys (default "-")
-  -s, --schema string      Force output schema version (draft, v2025_10)
+  -s, --schema string      Force output schema version (draft, v2025.10)
   -i, --in-place           Overwrite input files with converted output
 ```
 
@@ -174,11 +174,11 @@ Flags:
 # Flatten tokens to shallow structure
 asimonim convert --flatten tokens/*.yaml -o flat.json
 
-# Convert from Editor's Draft to v2025_10 (stable)
-asimonim convert --schema v2025_10 tokens.yaml -o stable.json
+# Convert from Editor's Draft to v2025.10 (stable)
+asimonim convert --schema v2025.10 tokens.yaml -o stable.json
 
 # In-place schema conversion
-asimonim convert --in-place --schema v2025_10 tokens/*.yaml
+asimonim convert --in-place --schema v2025.10 tokens/*.yaml
 
 # Combine multiple files
 asimonim convert colors.yaml spacing.yaml -o combined.json
@@ -250,7 +250,7 @@ The Editor's Draft schema has no built-in way for a token to also act as a group
 }
 ```
 
-This produces `--prefix-color` (from DEFAULT) and `--prefix-color-light`. The 2025.10 stable schema uses `$root` instead, so `groupMarkers` is ignored for that schema.
+This produces `--prefix-color` (from DEFAULT) and `--prefix-color-light`. The v2025.10 stable schema uses `$root` instead, so `groupMarkers` is ignored for that schema.
 
 This configuration is also consumed by [dtls](https://github.com/bennypowers/design-tokens-language-server) and [cem](https://github.com/bennypowers/cem).
 

@@ -9,12 +9,16 @@ package scss
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
 	"bennypowers.dev/asimonim/convert/formatter"
 	"bennypowers.dev/asimonim/token"
 )
+
+// secondsDurationPattern matches duration values like "2s", "0.5s", "-1.5s".
+var secondsDurationPattern = regexp.MustCompile(`^[+-]?\d+(\.\d+)?s$`)
 
 // Formatter outputs SCSS variables with kebab-case names.
 type Formatter struct{}
@@ -92,7 +96,7 @@ func toSCSSValue(tokenType string, value any) string {
 		if strings.HasPrefix(s, "#") || strings.HasSuffix(s, "px") ||
 			strings.HasSuffix(s, "rem") || strings.HasSuffix(s, "em") ||
 			strings.HasSuffix(s, "%") || strings.HasSuffix(s, "ms") ||
-			strings.HasSuffix(s, "s") {
+			secondsDurationPattern.MatchString(s) {
 			return s
 		}
 	}

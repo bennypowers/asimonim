@@ -30,7 +30,9 @@ func loadTestTokens(t *testing.T) []*token.Token {
 	if err != nil {
 		t.Fatalf("failed to parse: %v", err)
 	}
-	_ = resolver.ResolveAliases(tokens, schema.Draft)
+	if err := resolver.ResolveAliases(tokens, schema.Draft); err != nil {
+		t.Fatalf("failed to resolve aliases: %v", err)
+	}
 	return tokens
 }
 

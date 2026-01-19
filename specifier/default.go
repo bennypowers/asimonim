@@ -9,11 +9,20 @@ package specifier
 import asimfs "bennypowers.dev/asimonim/fs"
 
 // NewDefaultResolver creates a resolver chain that handles npm:, jsr:, and local paths.
-// The rootDir is the starting directory for node_modules lookup.
-func NewDefaultResolver(fs asimfs.FileSystem, rootDir string) Resolver {
+// The rootDir must be an absolute path - this is required for compatibility
+// with virtual/in-memory filesystems that don't have a working directory concept.
+func NewDefaultResolver(fs asimfs.FileSystem, rootDir string) (Resolver, error) {
+	npmResolver, err := NewNodeModulesResolver(fs, rootDir)
+	if err != nil {
+		return nil, err
+	}
+	jsrResolver, err := NewJSRNodeModulesResolver(fs, rootDir)
+	if err != nil {
+		return nil, err
+	}
 	return NewChainResolver(
-		NewNodeModulesResolver(fs, rootDir),
-		NewJSRNodeModulesResolver(fs, rootDir),
+		npmResolver,
+		jsrResolver,
 		NewLocalResolver(),
-	)
+	), nil
 }

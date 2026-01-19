@@ -9,11 +9,13 @@ package swift
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/mazznoer/csscolorparser"
 
 	"bennypowers.dev/asimonim/convert/formatter"
+	"bennypowers.dev/asimonim/internal/logger"
 	"bennypowers.dev/asimonim/token"
 )
 
@@ -82,7 +84,8 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 		for _, tok := range sorted {
 			name := formatter.ToCamelCase(strings.Join(tok.Path, "-"))
 			value := formatter.ResolvedValue(tok)
-			sb.WriteString(fmt.Sprintf("        public static let %s = \"%v\"\n", name, value))
+			swiftValue := toSwiftValue(tok.Type, value)
+			sb.WriteString(fmt.Sprintf("        public static let %s = %s\n", name, swiftValue))
 		}
 		sb.WriteString("    }\n")
 	}
@@ -113,9 +116,24 @@ func toSwiftValue(tokenType string, value any) string {
 		}
 	case token.TypeDuration:
 		if s, ok := value.(string); ok {
-			s = strings.TrimSuffix(s, "ms")
-			s = strings.TrimSuffix(s, "s")
-			return fmt.Sprintf("TimeInterval(%s)", s)
+			var numStr string
+			var isMilliseconds bool
+			if strings.HasSuffix(s, "ms") {
+				numStr = strings.TrimSuffix(s, "ms")
+				isMilliseconds = true
+			} else if strings.HasSuffix(s, "s") {
+				numStr = strings.TrimSuffix(s, "s")
+			} else {
+				numStr = s
+			}
+			num, err := strconv.ParseFloat(numStr, 64)
+			if err != nil {
+				return fmt.Sprintf("TimeInterval(%s)", numStr)
+			}
+			if isMilliseconds {
+				num = num / 1000.0
+			}
+			return fmt.Sprintf("TimeInterval(%g)", num)
 		}
 	case token.TypeNumber, token.TypeFontWeight:
 		switch v := value.(type) {
@@ -150,7 +168,8 @@ func structuredColorToSwift(colorObj map[string]any) string {
 	}
 
 	if len(components) < 3 {
-		return `""`
+		logger.Warn("structured color has fewer than 3 components, using Color.clear")
+		return "Color.clear"
 	}
 
 	swiftColorSpace := mapColorSpaceToSwift(colorSpace)

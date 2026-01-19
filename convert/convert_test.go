@@ -8,6 +8,7 @@ package convert_test
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"bennypowers.dev/asimonim/convert"
@@ -54,17 +55,20 @@ func TestSerialize_FlattenSimple(t *testing.T) {
 		t.Fatalf("failed to unmarshal expected: %v", err)
 	}
 
-	// Check that all expected keys exist in result
-	for key := range expectedMap {
-		if _, ok := gotMap[key]; !ok {
-			t.Errorf("expected key %q not found in result", key)
+	// Deep compare the maps
+	if !reflect.DeepEqual(expectedMap, gotMap) {
+		// Provide detailed diff for debugging
+		for key := range expectedMap {
+			if _, ok := gotMap[key]; !ok {
+				t.Errorf("expected key %q not found in result", key)
+			} else if !reflect.DeepEqual(expectedMap[key], gotMap[key]) {
+				t.Errorf("value mismatch for key %q:\n  expected: %v\n  got: %v", key, expectedMap[key], gotMap[key])
+			}
 		}
-	}
-
-	// Check that all result keys exist in expected
-	for key := range gotMap {
-		if _, ok := expectedMap[key]; !ok {
-			t.Errorf("unexpected key %q in result", key)
+		for key := range gotMap {
+			if _, ok := expectedMap[key]; !ok {
+				t.Errorf("unexpected key %q in result", key)
+			}
 		}
 	}
 }
@@ -313,8 +317,8 @@ func TestSerialize_CustomDelimiter(t *testing.T) {
 	}
 }
 
-func TestSerialize_CompositeTypes(t *testing.T) {
-	// Test that composite types (shadow, border) pass through unchanged
+func TestSerialize_BasicDraftRoundtrip(t *testing.T) {
+	// Test that basic tokens roundtrip through serialization unchanged
 	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
 
 	p := parser.NewJSONParser()
@@ -340,8 +344,26 @@ func TestSerialize_CompositeTypes(t *testing.T) {
 	}
 
 	// Should have color group
-	if _, ok := result["color"]; !ok {
-		t.Error("expected 'color' group")
+	colorGroup, ok := result["color"].(map[string]any)
+	if !ok {
+		t.Fatal("expected 'color' group")
+	}
+
+	// Verify primary token structure preserved
+	primary, ok := colorGroup["primary"].(map[string]any)
+	if !ok {
+		t.Fatal("expected 'primary' token in color group")
+	}
+	if primary["$value"] != "#FF6B35" {
+		t.Errorf("expected primary $value '#FF6B35', got %v", primary["$value"])
+	}
+	if primary["$description"] != "Primary brand color" {
+		t.Errorf("expected primary $description 'Primary brand color', got %v", primary["$description"])
+	}
+
+	// Should have spacing group
+	if _, ok := result["spacing"]; !ok {
+		t.Error("expected 'spacing' group")
 	}
 }
 

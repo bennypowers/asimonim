@@ -38,7 +38,7 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 		tsValue := ToValue(value)
 
 		if tok.Description != "" {
-			sb.WriteString(fmt.Sprintf("/** %s */\n", tok.Description))
+			sb.WriteString(formatJSDoc(tok.Description))
 		}
 		sb.WriteString(fmt.Sprintf("export const %s = %s as const;\n", name, tsValue))
 	}
@@ -63,4 +63,24 @@ func ToValue(value any) string {
 	default:
 		return fmt.Sprintf("%q", fmt.Sprintf("%v", v))
 	}
+}
+
+// formatJSDoc formats a description as a valid JSDoc comment.
+// Handles multi-line descriptions and escapes "*/" to prevent comment breakage.
+func formatJSDoc(desc string) string {
+	// Escape */ to prevent premature comment closing
+	desc = strings.ReplaceAll(desc, "*/", "*\\/")
+
+	if !strings.Contains(desc, "\n") {
+		return fmt.Sprintf("/** %s */\n", desc)
+	}
+
+	// Multi-line JSDoc
+	var sb strings.Builder
+	sb.WriteString("/**\n")
+	for _, line := range strings.Split(desc, "\n") {
+		sb.WriteString(fmt.Sprintf(" * %s\n", line))
+	}
+	sb.WriteString(" */\n")
+	return sb.String()
 }

@@ -49,15 +49,21 @@ func (f *Formatter) Format(tokens []*token.Token, _ formatter.Options) ([]byte, 
 			keyPath = []string{"DEFAULT"}
 		}
 
-		current := theme[themeKey].(map[string]any)
+		current, ok := theme[themeKey].(map[string]any)
+		if !ok {
+			current = make(map[string]any)
+			theme[themeKey] = current
+		}
 		for i, segment := range keyPath {
 			if i == len(keyPath)-1 {
 				current[segment] = formatter.ResolvedValue(tok)
 			} else {
-				if _, exists := current[segment]; !exists {
-					current[segment] = make(map[string]any)
+				next, ok := current[segment].(map[string]any)
+				if !ok {
+					next = make(map[string]any)
+					current[segment] = next
 				}
-				current = current[segment].(map[string]any)
+				current = next
 			}
 		}
 	}
