@@ -95,7 +95,9 @@ func resolveCurlyBraceRef(value string, tokenByName map[string]*token.Token) res
 		return resolveResult{value: value, ok: true}
 	}
 
-	// Only support whole-token references for now
+	// Per DTCG spec, curly brace syntax references complete token values only.
+	// Partial references (e.g., "1px solid {color.red}") are not specified
+	// and are returned unchanged.
 	if len(refs) > 1 || !strings.HasPrefix(value, "{") || !strings.HasSuffix(value, "}") {
 		return resolveResult{value: value, ok: true}
 	}
