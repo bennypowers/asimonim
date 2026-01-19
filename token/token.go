@@ -70,6 +70,11 @@ type Token struct {
 
 	// IsResolved indicates if alias resolution has been performed.
 	IsResolved bool `json:"-"`
+
+	// ResolutionChain contains the token names in the resolution chain.
+	// For example, if A references B which references C, A's chain is [B, C].
+	// Empty if this token is not an alias.
+	ResolutionChain []string `json:"-"`
 }
 
 // CSSVariableName returns the CSS custom property name for this token.

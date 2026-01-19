@@ -161,12 +161,13 @@ func (p *JSONParser) extractTokens(data map[string]any, jsonPath []string, path,
 		isTransparentMarker := p.isTransparent(key, valueMap, opts.GroupMarkers)
 		isMarker := slices.Contains(opts.GroupMarkers, key) && opts.SchemaVersion == schema.Draft
 
-		// Build paths
-		currentPath, newPath := buildPaths(jsonPath, path, key, isTransparentMarker || isRootToken)
+		// Build paths - transparent markers don't affect either path
+		// Value markers affect jsonPath (for references) but not name path
+		currentPath, newPath := buildPaths(jsonPath, path, key, isTransparentMarker || isRootToken, isMarker)
 
 		// Extract token if has $value or $ref
 		if hasValue || hasRef {
-			t := p.createToken(key, path, valueMap, currentPath, opts, isRootToken, dollarValue, dollarRef, currentType)
+			t := p.createToken(key, path, valueMap, currentPath, opts, isRootToken || isMarker, dollarValue, dollarRef, currentType)
 			*result = append(*result, t)
 		}
 
@@ -287,14 +288,20 @@ func (p *JSONParser) createToken(key, path string, valueMap map[string]any, json
 // Returns the new jsonPath slice and string path.
 // The returned slice shares capacity with the input for recursion efficiency,
 // but is clipped to prevent mutation of parent paths.
-func buildPaths(jsonPath []string, path, key string, transparent bool) ([]string, string) {
+func buildPaths(jsonPath []string, path, key string, transparent, nameTransparent bool) ([]string, string) {
 	if transparent {
 		return jsonPath, path
 	}
-	// Append key to path - this may reuse capacity from parent
+	// Append key to jsonPath - this may reuse capacity from parent
 	currentPath := append(jsonPath, key)
 	// Clip to prevent child modifications from affecting this level
 	currentPath = slices.Clip(currentPath)
+
+	// For markers with values, add to jsonPath but not to name
+	if nameTransparent {
+		return currentPath, path
+	}
+
 	newPath := key
 	if path != "" {
 		newPath = path + "-" + key

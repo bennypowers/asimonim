@@ -54,19 +54,21 @@ func resolveToken(tok *token.Token, tokenByName map[string]*token.Token, version
 
 	if strings.Contains(tok.Value, "{") {
 		isAlias = true
-		resolved, ok := resolveCurlyBraceRef(tok.Value, tokenByName)
-		if !ok {
+		result := resolveCurlyBraceRef(tok.Value, tokenByName)
+		if !result.ok {
 			// Leave unresolved - will show raw reference
 			return
 		}
-		tok.ResolvedValue = resolved
+		tok.ResolvedValue = result.value
+		tok.ResolutionChain = result.chain
 	} else if version != schema.Draft && strings.HasPrefix(tok.Value, "#/") {
 		isAlias = true
-		resolved, ok := resolveJSONPointerRef(tok.Value, tokenByName)
-		if !ok {
+		result := resolveJSONPointerRef(tok.Value, tokenByName)
+		if !result.ok {
 			return
 		}
-		tok.ResolvedValue = resolved
+		tok.ResolvedValue = result.value
+		tok.ResolutionChain = result.chain
 	}
 
 	if !isAlias {
@@ -80,15 +82,22 @@ func resolveToken(tok *token.Token, tokenByName map[string]*token.Token, version
 	tok.IsResolved = true
 }
 
-func resolveCurlyBraceRef(value string, tokenByName map[string]*token.Token) (any, bool) {
+// resolveResult holds the result of resolving a reference.
+type resolveResult struct {
+	value any
+	chain []string
+	ok    bool
+}
+
+func resolveCurlyBraceRef(value string, tokenByName map[string]*token.Token) resolveResult {
 	refs := extractCurlyBraceRefs(value)
 	if len(refs) == 0 {
-		return value, true
+		return resolveResult{value: value, ok: true}
 	}
 
 	// Only support whole-token references for now
 	if len(refs) > 1 || !strings.HasPrefix(value, "{") || !strings.HasSuffix(value, "}") {
-		return value, true
+		return resolveResult{value: value, ok: true}
 	}
 
 	ref := refs[0]
@@ -97,29 +106,37 @@ func resolveCurlyBraceRef(value string, tokenByName map[string]*token.Token) (an
 	refToken := tokenByName[tokenName]
 	if refToken == nil {
 		// Reference not found - leave unresolved
-		return nil, false
+		return resolveResult{ok: false}
 	}
 
 	if !refToken.IsResolved {
 		// Referenced token not yet resolved - leave unresolved
-		return nil, false
+		return resolveResult{ok: false}
 	}
 
-	return refToken.ResolvedValue, true
+	// Build the chain: this reference + any chain from the referenced token
+	chain := []string{refToken.Name}
+	chain = append(chain, refToken.ResolutionChain...)
+
+	return resolveResult{value: refToken.ResolvedValue, chain: chain, ok: true}
 }
 
-func resolveJSONPointerRef(value string, tokenByName map[string]*token.Token) (any, bool) {
+func resolveJSONPointerRef(value string, tokenByName map[string]*token.Token) resolveResult {
 	path := strings.TrimPrefix(value, "#/")
 	tokenName := strings.ReplaceAll(path, "/", "-")
 
 	refToken := tokenByName[tokenName]
 	if refToken == nil {
-		return nil, false
+		return resolveResult{ok: false}
 	}
 
 	if !refToken.IsResolved {
-		return nil, false
+		return resolveResult{ok: false}
 	}
 
-	return refToken.ResolvedValue, true
+	// Build the chain: this reference + any chain from the referenced token
+	chain := []string{refToken.Name}
+	chain = append(chain, refToken.ResolutionChain...)
+
+	return resolveResult{value: refToken.ResolvedValue, chain: chain, ok: true}
 }

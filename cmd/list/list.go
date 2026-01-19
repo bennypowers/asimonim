@@ -8,15 +8,13 @@ license that can be found in the LICENSE file.
 package list
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 
-	"github.com/mazznoer/csscolorparser"
 	"github.com/spf13/cobra"
 
+	"bennypowers.dev/asimonim/cmd/render"
 	"bennypowers.dev/asimonim/config"
 	"bennypowers.dev/asimonim/fs"
 	"bennypowers.dev/asimonim/parser"
@@ -38,7 +36,7 @@ func init() {
 	Cmd.Flags().String("type", "", "Filter by token type")
 	Cmd.Flags().Bool("resolved", false, "Show resolved values")
 	Cmd.Flags().Bool("css", false, "Output as CSS custom properties")
-	Cmd.Flags().String("format", "table", "Output format: table, json, css, markdown")
+	Cmd.Flags().String("format", "table", "Output format: table, css, markdown")
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -141,163 +139,15 @@ func run(cmd *cobra.Command, args []string) error {
 		return allTokens[i].Name < allTokens[j].Name
 	})
 
+	// Compute display rows once
+	rows := render.ComputeRows(allTokens, resolved)
+
 	switch format {
-	case "json":
-		return outputJSON(allTokens, resolved)
 	case "css":
-		return outputCSS(allTokens, resolved)
+		return render.CSS(rows)
 	case "markdown", "md":
-		return outputMarkdown(allTokens, resolved)
+		return render.Markdown(rows)
 	default:
-		return outputTable(allTokens, resolved)
+		return render.Table(rows)
 	}
-}
-
-func outputTable(tokens []*token.Token, resolved bool) error {
-	if len(tokens) == 0 {
-		return nil
-	}
-
-	// Calculate column widths
-	nameWidth := 4 // "Name"
-	typeWidth := 4 // "Type"
-	for _, tok := range tokens {
-		name := tok.CSSVariableName()
-		if len(name) > nameWidth {
-			nameWidth = len(name)
-		}
-		if len(tok.Type) > typeWidth {
-			typeWidth = len(tok.Type)
-		}
-	}
-
-	for _, tok := range tokens {
-		typeStr := tok.Type
-		if typeStr == "" {
-			typeStr = "-"
-		}
-
-		// Determine display value and whether this is an alias
-		displayValue := tok.Value
-		isAlias := strings.HasPrefix(tok.Value, "{") && strings.HasSuffix(tok.Value, "}")
-		aliasRef := ""
-
-		if isAlias && tok.ResolvedValue != nil {
-			// Show resolved value with alias reference
-			displayValue = fmt.Sprintf("%v", tok.ResolvedValue)
-			aliasRef = fmt.Sprintf(" → %s", tok.Value)
-		} else if resolved && tok.ResolvedValue != nil {
-			displayValue = fmt.Sprintf("%v", tok.ResolvedValue)
-		}
-
-		// Show color swatch for color tokens with parseable values
-		swatch := ""
-		if tok.Type == "color" && !strings.HasPrefix(displayValue, "{") {
-			swatch = colorSwatch(displayValue)
-		}
-
-		fmt.Printf("%-*s  %-*s  %s%s%s\n", nameWidth, tok.CSSVariableName(), typeWidth, typeStr, swatch, displayValue, aliasRef)
-	}
-	return nil
-}
-
-// colorSwatch returns a 24-bit ANSI color block for the given color value.
-// Returns empty string if the color cannot be parsed.
-func colorSwatch(value string) string {
-	c, err := csscolorparser.Parse(value)
-	if err != nil {
-		return ""
-	}
-	r, g, b, _ := c.RGBA255()
-	// 24-bit truecolor: ESC[48;2;R;G;Bm sets background, two spaces, then reset
-	return fmt.Sprintf("\x1b[48;2;%d;%d;%dm  \x1b[0m ", r, g, b)
-}
-
-func outputJSON(tokens []*token.Token, resolved bool) error {
-	type tokenOutput struct {
-		Name        string `json:"name"`
-		Value       string `json:"value"`
-		Type        string `json:"type,omitempty"`
-		Description string `json:"description,omitempty"`
-	}
-
-	output := make([]tokenOutput, 0, len(tokens))
-	for _, tok := range tokens {
-		value := tok.Value
-		if resolved && tok.ResolvedValue != nil {
-			value = fmt.Sprintf("%v", tok.ResolvedValue)
-		}
-		output = append(output, tokenOutput{
-			Name:        tok.CSSVariableName(),
-			Value:       value,
-			Type:        tok.Type,
-			Description: tok.Description,
-		})
-	}
-
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	return enc.Encode(output)
-}
-
-func outputMarkdown(tokens []*token.Token, resolved bool) error {
-	if len(tokens) == 0 {
-		return nil
-	}
-
-	// Calculate column widths for alignment
-	nameWidth := 4 // "Name"
-	typeWidth := 4 // "Type"
-	valWidth := 5  // "Value"
-	for _, tok := range tokens {
-		name := tok.CSSVariableName()
-		if len(name) > nameWidth {
-			nameWidth = len(name)
-		}
-		if len(tok.Type) > typeWidth {
-			typeWidth = len(tok.Type)
-		}
-		value := tok.Value
-		if resolved && tok.ResolvedValue != nil {
-			value = fmt.Sprintf("%v", tok.ResolvedValue)
-		}
-		if len(value) > valWidth {
-			valWidth = len(value)
-		}
-	}
-
-	// Header
-	fmt.Printf("| %-*s | %-*s | %-*s |\n", nameWidth, "Name", typeWidth, "Type", valWidth, "Value")
-	fmt.Printf("|-%s-|-%s-|-%s-|\n", strings.Repeat("-", nameWidth), strings.Repeat("-", typeWidth), strings.Repeat("-", valWidth))
-
-	// Rows
-	for _, tok := range tokens {
-		typeStr := tok.Type
-		if typeStr == "" {
-			typeStr = "-"
-		}
-		value := tok.Value
-		if resolved && tok.ResolvedValue != nil {
-			value = fmt.Sprintf("%v", tok.ResolvedValue)
-		}
-		fmt.Printf("| %-*s | %-*s | %-*s |\n", nameWidth, tok.CSSVariableName(), typeWidth, typeStr, valWidth, value)
-	}
-	return nil
-}
-
-func outputCSS(tokens []*token.Token, resolved bool) error {
-	fmt.Println(":root {")
-	for _, tok := range tokens {
-		value := tok.Value
-		if resolved && tok.ResolvedValue != nil {
-			value = fmt.Sprintf("%v", tok.ResolvedValue)
-		}
-		cssName := tok.CSSVariableName()
-		if strings.HasPrefix(value, "{") && strings.Contains(value, ":") {
-			continue
-		}
-		fmt.Printf("  %s: %s;\n", cssName, value)
-	}
-	fmt.Println("}")
-	return nil
 }
