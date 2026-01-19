@@ -22,6 +22,7 @@ import (
 	"bennypowers.dev/asimonim/parser"
 	"bennypowers.dev/asimonim/resolver"
 	"bennypowers.dev/asimonim/schema"
+	"bennypowers.dev/asimonim/specifier"
 	"bennypowers.dev/asimonim/token"
 )
 
@@ -66,21 +67,30 @@ func run(cmd *cobra.Command, args []string) error {
 
 	filesystem := fs.NewOSFileSystem()
 	jsonParser := parser.NewJSONParser()
+	specResolver := specifier.NewDefaultResolver(filesystem, ".")
 
 	// Load config from .config/design-tokens.{yaml,json}
 	cfg := config.LoadOrDefault(filesystem, ".")
 
 	// Use config files if no args provided
-	files := args
-	if len(files) == 0 {
-		expanded, err := cfg.ExpandFiles(filesystem, ".")
+	var resolvedFiles []*specifier.ResolvedFile
+	if len(args) == 0 {
+		var err error
+		resolvedFiles, err = cfg.ResolveFiles(specResolver, filesystem, ".")
 		if err != nil {
-			return fmt.Errorf("error expanding config files: %w", err)
+			return fmt.Errorf("error resolving config files: %w", err)
 		}
-		files = expanded
+	} else {
+		for _, arg := range args {
+			rf, err := specResolver.Resolve(arg)
+			if err != nil {
+				return fmt.Errorf("error resolving %s: %w", arg, err)
+			}
+			resolvedFiles = append(resolvedFiles, rf)
+		}
 	}
 
-	if len(files) == 0 {
+	if len(resolvedFiles) == 0 {
 		return fmt.Errorf("no files specified and no files found in config")
 	}
 
@@ -100,10 +110,10 @@ func run(cmd *cobra.Command, args []string) error {
 	var allGroupMeta = make(map[string]render.GroupMeta)
 
 	// Phase 1: Parse all files
-	for _, file := range files {
-		data, err := filesystem.ReadFile(file)
+	for _, rf := range resolvedFiles {
+		data, err := filesystem.ReadFile(rf.Path)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", file, err)
+			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", rf.Specifier, err)
 			continue
 		}
 
@@ -118,7 +128,7 @@ func run(cmd *cobra.Command, args []string) error {
 		if version == schema.Unknown {
 			version, err = schema.DetectVersion(data, nil)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error detecting schema for %s: %v\n", file, err)
+				fmt.Fprintf(os.Stderr, "Error detecting schema for %s: %v\n", rf.Specifier, err)
 				continue
 			}
 		}
@@ -126,15 +136,15 @@ func run(cmd *cobra.Command, args []string) error {
 			detectedVersion = version
 		}
 
-		// Get per-file options from config
-		opts := cfg.OptionsForFile(file)
+		// Get per-file options from config (use original specifier for matching)
+		opts := cfg.OptionsForFile(rf.Specifier)
 		opts.SkipPositions = true // CLI doesn't need LSP position tracking
 		if version != schema.Unknown {
 			opts.SchemaVersion = version
 		}
-		tokens, err := jsonParser.ParseFile(filesystem, file, opts)
+		tokens, err := jsonParser.ParseFile(filesystem, rf.Path, opts)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", file, err)
+			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", rf.Specifier, err)
 			continue
 		}
 

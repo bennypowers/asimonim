@@ -15,6 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	asimfs "bennypowers.dev/asimonim/fs"
+	"bennypowers.dev/asimonim/specifier"
 )
 
 // ConfigFileName is the base name of the config file without extension.
@@ -78,6 +79,29 @@ func (c *Config) ExpandFiles(filesystem asimfs.FileSystem, rootDir string) ([]st
 			return nil, err
 		}
 		result = append(result, expanded...)
+	}
+
+	return result, nil
+}
+
+// ResolveFiles expands glob patterns and resolves package specifiers to filesystem paths.
+// Returns ResolvedFile entries that preserve both the original specifier and resolved path.
+func (c *Config) ResolveFiles(resolver specifier.Resolver, filesystem asimfs.FileSystem, rootDir string) ([]*specifier.ResolvedFile, error) {
+	var result []*specifier.ResolvedFile
+
+	for _, spec := range c.Files {
+		expanded, err := expandFilePath(filesystem, rootDir, spec.Path)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, path := range expanded {
+			resolved, err := resolver.Resolve(path)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, resolved)
+		}
 	}
 
 	return result, nil

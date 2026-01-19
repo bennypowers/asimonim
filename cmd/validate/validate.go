@@ -18,6 +18,7 @@ import (
 	"bennypowers.dev/asimonim/parser"
 	"bennypowers.dev/asimonim/resolver"
 	"bennypowers.dev/asimonim/schema"
+	"bennypowers.dev/asimonim/specifier"
 )
 
 // Cmd is the validate cobra command.
@@ -40,21 +41,30 @@ func run(cmd *cobra.Command, args []string) error {
 
 	filesystem := fs.NewOSFileSystem()
 	jsonParser := parser.NewJSONParser()
+	specResolver := specifier.NewDefaultResolver(filesystem, ".")
 
 	// Load config from .config/design-tokens.{yaml,json}
 	cfg := config.LoadOrDefault(filesystem, ".")
 
 	// Use config files if no args provided
-	files := args
-	if len(files) == 0 {
-		expanded, err := cfg.ExpandFiles(filesystem, ".")
+	var resolvedFiles []*specifier.ResolvedFile
+	if len(args) == 0 {
+		var err error
+		resolvedFiles, err = cfg.ResolveFiles(specResolver, filesystem, ".")
 		if err != nil {
-			return fmt.Errorf("error expanding config files: %w", err)
+			return fmt.Errorf("error resolving config files: %w", err)
 		}
-		files = expanded
+	} else {
+		for _, arg := range args {
+			rf, err := specResolver.Resolve(arg)
+			if err != nil {
+				return fmt.Errorf("error resolving %s: %w", arg, err)
+			}
+			resolvedFiles = append(resolvedFiles, rf)
+		}
 	}
 
-	if len(files) == 0 {
+	if len(resolvedFiles) == 0 {
 		return fmt.Errorf("no files specified and no files found in config")
 	}
 
@@ -71,14 +81,14 @@ func run(cmd *cobra.Command, args []string) error {
 
 	hasErrors := false
 
-	for _, file := range files {
+	for _, rf := range resolvedFiles {
 		if !quiet {
-			fmt.Printf("Validating %s...\n", file)
+			fmt.Printf("Validating %s...\n", rf.Specifier)
 		}
 
-		data, err := filesystem.ReadFile(file)
+		data, err := filesystem.ReadFile(rf.Path)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", file, err)
+			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", rf.Specifier, err)
 			hasErrors = true
 			continue
 		}
@@ -87,34 +97,34 @@ func run(cmd *cobra.Command, args []string) error {
 		if version == schema.Unknown {
 			version, err = schema.DetectVersion(data, nil)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error detecting schema for %s: %v\n", file, err)
+				fmt.Fprintf(os.Stderr, "Error detecting schema for %s: %v\n", rf.Specifier, err)
 				hasErrors = true
 				continue
 			}
 		}
 
-		// Get per-file options from config
-		opts := cfg.OptionsForFile(file)
+		// Get per-file options from config (use original specifier for matching)
+		opts := cfg.OptionsForFile(rf.Specifier)
 		opts.SkipPositions = true // CLI doesn't need LSP position tracking
 		if version != schema.Unknown {
 			opts.SchemaVersion = version
 		}
-		tokens, err := jsonParser.ParseFile(filesystem, file, opts)
+		tokens, err := jsonParser.ParseFile(filesystem, rf.Path, opts)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", file, err)
+			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", rf.Specifier, err)
 			hasErrors = true
 			continue
 		}
 
 		graph := resolver.BuildDependencyGraph(tokens)
 		if cycle := graph.FindCycle(); cycle != nil {
-			fmt.Fprintf(os.Stderr, "Circular reference in %s: %v\n", file, cycle)
+			fmt.Fprintf(os.Stderr, "Circular reference in %s: %v\n", rf.Specifier, cycle)
 			hasErrors = true
 			continue
 		}
 
 		if err := resolver.ResolveAliases(tokens, version); err != nil {
-			fmt.Fprintf(os.Stderr, "Resolution error in %s: %v\n", file, err)
+			fmt.Fprintf(os.Stderr, "Resolution error in %s: %v\n", rf.Specifier, err)
 			hasErrors = true
 			continue
 		}
