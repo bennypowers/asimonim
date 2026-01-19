@@ -7,8 +7,9 @@ license that can be found in the LICENSE file.
 package schema
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"gopkg.in/yaml.v3"
 )
 
 // DetectionConfig provides configuration for schema version detection.
@@ -25,8 +26,8 @@ type DetectionConfig struct {
 // 4. Default to draft (backward compatibility)
 func DetectVersion(content []byte, config *DetectionConfig) (Version, error) {
 	var data map[string]any
-	if err := json.Unmarshal(content, &data); err != nil {
-		return Unknown, fmt.Errorf("invalid JSON: %w", err)
+	if err := yaml.Unmarshal(content, &data); err != nil {
+		return Unknown, fmt.Errorf("invalid YAML/JSON: %w", err)
 	}
 
 	// 1. Check for explicit $schema field

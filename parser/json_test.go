@@ -59,6 +59,43 @@ func TestJSONParser_V2025_10(t *testing.T) {
 	}
 }
 
+func TestJSONParser_ParseYAML(t *testing.T) {
+	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple-yaml", "/test")
+
+	p := parser.NewJSONParser()
+	tokens, err := p.ParseFile(mfs, "/test/tokens.yaml", parser.Options{
+		SchemaVersion: schema.Draft,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(tokens) != 5 {
+		t.Errorf("expected 5 tokens, got %d", len(tokens))
+	}
+
+	// Check that we found expected tokens
+	names := make(map[string]bool)
+	for _, tok := range tokens {
+		names[tok.Name] = true
+	}
+
+	expected := []string{"color-primary", "color-secondary", "spacing-small", "spacing-medium", "spacing-large"}
+	for _, name := range expected {
+		if !names[name] {
+			t.Errorf("expected token %s not found", name)
+		}
+	}
+
+	// Check that $type inheritance works
+	for _, tok := range tokens {
+		if tok.Type == "" {
+			t.Errorf("expected token %s to have a type", tok.Name)
+		}
+	}
+}
+
 func TestJSONParser_SkipPositions(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
 	data, err := mfs.ReadFile("/test/tokens.json")

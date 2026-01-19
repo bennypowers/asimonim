@@ -31,15 +31,26 @@ func NewJSONParser() *JSONParser {
 	return &JSONParser{}
 }
 
-// Parse parses JSON token data and returns tokens.
+// Parse parses JSON or YAML token data and returns tokens.
 func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
-	// Remove comments using jsonc
-	cleanJSON := jsonc.ToJSON(data)
-
-	// Parse with encoding/json (fast path)
 	var raw map[string]any
-	if err := json.Unmarshal(cleanJSON, &raw); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	var positionData []byte
+
+	// Detect format: JSON typically starts with '{' or whitespace then '{'
+	// YAML uses indentation-based structure
+	if isLikelyJSON(data) {
+		// JSON path: strip comments and parse
+		cleanJSON := jsonc.ToJSON(data)
+		if err := json.Unmarshal(cleanJSON, &raw); err != nil {
+			return nil, fmt.Errorf("failed to parse JSON: %w", err)
+		}
+		positionData = cleanJSON
+	} else {
+		// YAML path: parse directly with yaml.v3
+		if err := yaml.Unmarshal(data, &raw); err != nil {
+			return nil, fmt.Errorf("failed to parse YAML: %w", err)
+		}
+		positionData = data
 	}
 
 	// Extract tokens using the single extraction path
@@ -48,12 +59,30 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 
 	// Optional second pass: add position tracking
 	if !opts.SkipPositions {
-		if err := p.addPositions(cleanJSON, result); err != nil {
+		if err := p.addPositions(positionData, result); err != nil {
 			return nil, err
 		}
 	}
 
 	return result, nil
+}
+
+// isLikelyJSON checks if data appears to be JSON rather than YAML.
+// JSON typically starts with '{' (optionally preceded by whitespace/BOM).
+func isLikelyJSON(data []byte) bool {
+	for _, b := range data {
+		switch b {
+		case ' ', '\t', '\n', '\r':
+			continue
+		case 0xEF, 0xBB, 0xBF: // UTF-8 BOM
+			continue
+		case '{':
+			return true
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 // extractTokens recursively extracts tokens from a parsed map.
