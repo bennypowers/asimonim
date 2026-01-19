@@ -1,3 +1,60 @@
+## Architecture
+
+```
+asimonim/
+├── cmd/                    # CLI commands (Cobra)
+│   ├── root.go            # Entry point, global flags
+│   ├── validate/          # File validation
+│   ├── list/              # Token listing with filters
+│   ├── search/            # Token search with regex
+│   ├── convert/           # Format conversion
+│   ├── version/           # Version info
+│   └── render/            # Output formatting (table, CSS, markdown)
+├── parser/                # Token parsing
+│   ├── json.go            # JSON/YAML parser
+│   └── common/            # Shared regex patterns, reference extraction
+├── token/                 # Core Token type and constants
+├── schema/                # Schema version handling
+│   ├── version.go         # Version type and conversions
+│   └── detector.go        # Duck-typing schema detection
+├── resolver/              # Alias resolution
+│   ├── aliases.go         # Reference resolution logic
+│   └── graph.go           # Dependency graph + cycle detection
+├── convert/               # Output format conversion
+│   ├── convert.go         # Serialization logic
+│   └── formatter/         # Format implementations (dtcg, scss, swift, etc.)
+├── config/                # Configuration loading (.config/design-tokens.yaml)
+├── specifier/             # npm: and jsr: package specifier resolution
+├── fs/                    # FileSystem interface (enables testability)
+├── internal/
+│   ├── mapfs/             # In-memory filesystem for tests
+│   ├── logger/            # Internal logger
+│   └── version/           # Build version info
+└── testutil/              # Test helpers (NewFixtureFS, golden files)
+```
+
+### Data Flow
+
+1. **Input**: CLI receives file paths or reads from config
+2. **Resolution**: `specifier.Resolver` handles npm:/jsr: paths
+3. **Detection**: `schema.DetectVersion` duck-types the schema version
+4. **Parsing**: `parser.JSONParser` extracts tokens from JSON/YAML
+5. **Resolution**: `resolver.ResolveAliases` resolves token references
+6. **Output**: `render` or `convert` formats tokens for display/export
+
+### Key Interfaces
+
+- `fs.FileSystem`: Abstracts file I/O for testability
+- `specifier.Resolver`: Resolves package specifiers to file paths
+- `convert/formatter.Formatter`: Serializes tokens to output formats
+
+### Adding New Output Formats
+
+1. Create package in `convert/formatter/{name}/`
+2. Implement `formatter.Formatter` interface
+3. Register in `convert/format.go` (ParseFormat, ValidFormats)
+4. Add tests
+
 ## asimonim CLI usage
 
 When running asimonim commands against test fixtures, use the `-p` flag:
