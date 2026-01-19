@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mazznoer/csscolorparser"
 	"github.com/spf13/cobra"
 
 	"bennypowers.dev/asimonim/fs"
@@ -63,7 +64,9 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	var allTokens []*token.Token
+	var detectedVersion schema.Version
 
+	// Phase 1: Parse all files
 	for _, file := range args {
 		data, err := filesystem.ReadFile(file)
 		if err != nil {
@@ -79,6 +82,9 @@ func run(cmd *cobra.Command, args []string) error {
 				continue
 			}
 		}
+		if detectedVersion == schema.Unknown {
+			detectedVersion = version
+		}
 
 		opts := parser.Options{
 			SchemaVersion: version,
@@ -90,14 +96,14 @@ func run(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		if resolved {
-			if err := resolver.ResolveAliases(tokens, version); err != nil {
-				fmt.Fprintf(os.Stderr, "Error resolving %s: %v\n", file, err)
-			}
-		}
-
 		allTokens = append(allTokens, tokens...)
 	}
+
+	// Phase 2: Resolve aliases across all tokens (enables cross-file references)
+	if detectedVersion == schema.Unknown {
+		detectedVersion = schema.Draft
+	}
+	_ = resolver.ResolveAliases(allTokens, detectedVersion)
 
 	if typeFilter != "" {
 		filtered := make([]*token.Token, 0)
@@ -125,17 +131,45 @@ func run(cmd *cobra.Command, args []string) error {
 
 func outputTable(tokens []*token.Token, resolved bool) error {
 	for _, tok := range tokens {
-		value := tok.Value
-		if resolved && tok.ResolvedValue != nil {
-			value = fmt.Sprintf("%v", tok.ResolvedValue)
-		}
 		typeStr := tok.Type
 		if typeStr == "" {
 			typeStr = "-"
 		}
-		fmt.Printf("%-40s %-12s %s\n", tok.Name, typeStr, value)
+
+		// Determine display value and whether this is an alias
+		displayValue := tok.Value
+		isAlias := strings.HasPrefix(tok.Value, "{") && strings.HasSuffix(tok.Value, "}")
+		aliasRef := ""
+
+		if isAlias && tok.ResolvedValue != nil {
+			// Show resolved value with alias reference
+			displayValue = fmt.Sprintf("%v", tok.ResolvedValue)
+			aliasRef = fmt.Sprintf(" → %s", tok.Value)
+		} else if resolved && tok.ResolvedValue != nil {
+			displayValue = fmt.Sprintf("%v", tok.ResolvedValue)
+		}
+
+		// Show color swatch for color tokens with parseable values
+		swatch := ""
+		if tok.Type == "color" && !strings.HasPrefix(displayValue, "{") {
+			swatch = colorSwatch(displayValue)
+		}
+
+		fmt.Printf("%-40s %-12s %s%s%s\n", tok.Name, typeStr, swatch, displayValue, aliasRef)
 	}
 	return nil
+}
+
+// colorSwatch returns a 24-bit ANSI color block for the given color value.
+// Returns empty string if the color cannot be parsed.
+func colorSwatch(value string) string {
+	c, err := csscolorparser.Parse(value)
+	if err != nil {
+		return ""
+	}
+	r, g, b, _ := c.RGBA255()
+	// 24-bit truecolor: ESC[48;2;R;G;Bm sets background, two spaces, then reset
+	return fmt.Sprintf("\x1b[48;2;%d;%d;%dm  \x1b[0m ", r, g, b)
 }
 
 func outputJSON(tokens []*token.Token, resolved bool) error {

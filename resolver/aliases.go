@@ -39,33 +39,32 @@ func ResolveAliases(tokens []*token.Token, version schema.Version) error {
 		if tok == nil {
 			continue
 		}
-		if err := resolveToken(tok, tokenByName, version); err != nil {
-			return err
-		}
+		resolveToken(tok, tokenByName, version)
 	}
 
 	return nil
 }
 
-func resolveToken(tok *token.Token, tokenByName map[string]*token.Token, version schema.Version) error {
+func resolveToken(tok *token.Token, tokenByName map[string]*token.Token, version schema.Version) {
 	if tok.IsResolved {
-		return nil
+		return
 	}
 
 	isAlias := false
 
 	if strings.Contains(tok.Value, "{") {
 		isAlias = true
-		resolved, err := resolveCurlyBraceRef(tok.Value, tokenByName)
-		if err != nil {
-			return err
+		resolved, ok := resolveCurlyBraceRef(tok.Value, tokenByName)
+		if !ok {
+			// Leave unresolved - will show raw reference
+			return
 		}
 		tok.ResolvedValue = resolved
 	} else if version != schema.Draft && strings.HasPrefix(tok.Value, "#/") {
 		isAlias = true
-		resolved, err := resolveJSONPointerRef(tok.Value, tokenByName)
-		if err != nil {
-			return err
+		resolved, ok := resolveJSONPointerRef(tok.Value, tokenByName)
+		if !ok {
+			return
 		}
 		tok.ResolvedValue = resolved
 	}
@@ -79,18 +78,17 @@ func resolveToken(tok *token.Token, tokenByName map[string]*token.Token, version
 	}
 
 	tok.IsResolved = true
-	return nil
 }
 
-func resolveCurlyBraceRef(value string, tokenByName map[string]*token.Token) (any, error) {
+func resolveCurlyBraceRef(value string, tokenByName map[string]*token.Token) (any, bool) {
 	refs := extractCurlyBraceRefs(value)
 	if len(refs) == 0 {
-		return value, nil
+		return value, true
 	}
 
 	// Only support whole-token references for now
 	if len(refs) > 1 || !strings.HasPrefix(value, "{") || !strings.HasSuffix(value, "}") {
-		return value, nil
+		return value, true
 	}
 
 	ref := refs[0]
@@ -98,28 +96,30 @@ func resolveCurlyBraceRef(value string, tokenByName map[string]*token.Token) (an
 
 	refToken := tokenByName[tokenName]
 	if refToken == nil {
-		return nil, fmt.Errorf("%w: %s", schema.ErrUnresolvedReference, ref)
+		// Reference not found - leave unresolved
+		return nil, false
 	}
 
 	if !refToken.IsResolved {
-		return nil, fmt.Errorf("referenced token not yet resolved: %s", ref)
+		// Referenced token not yet resolved - leave unresolved
+		return nil, false
 	}
 
-	return refToken.ResolvedValue, nil
+	return refToken.ResolvedValue, true
 }
 
-func resolveJSONPointerRef(value string, tokenByName map[string]*token.Token) (any, error) {
+func resolveJSONPointerRef(value string, tokenByName map[string]*token.Token) (any, bool) {
 	path := strings.TrimPrefix(value, "#/")
 	tokenName := strings.ReplaceAll(path, "/", "-")
 
 	refToken := tokenByName[tokenName]
 	if refToken == nil {
-		return nil, fmt.Errorf("%w: %s", schema.ErrUnresolvedReference, value)
+		return nil, false
 	}
 
 	if !refToken.IsResolved {
-		return nil, fmt.Errorf("referenced token not yet resolved: %s", value)
+		return nil, false
 	}
 
-	return refToken.ResolvedValue, nil
+	return refToken.ResolvedValue, true
 }

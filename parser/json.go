@@ -47,8 +47,16 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 		positionData = cleanJSON
 	} else {
 		// YAML path: parse directly with yaml.v3
-		if err := yaml.Unmarshal(data, &raw); err != nil {
+		var yamlRaw any
+		if err := yaml.Unmarshal(data, &yamlRaw); err != nil {
 			return nil, fmt.Errorf("failed to parse YAML: %w", err)
+		}
+		// Normalize map types (YAML numeric keys create map[any]any)
+		normalized := normalizeMap(yamlRaw)
+		var ok bool
+		raw, ok = normalized.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("YAML root must be an object")
 		}
 		positionData = data
 	}
@@ -83,6 +91,32 @@ func isLikelyJSON(data []byte) bool {
 		}
 	}
 	return false
+}
+
+// normalizeMap recursively converts map[interface{}]interface{} to map[string]any.
+// YAML with numeric keys (like "10:") creates map[interface{}]interface{},
+// which must be normalized for our string-keyed processing.
+func normalizeMap(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		for k, val := range x {
+			x[k] = normalizeMap(val)
+		}
+		return x
+	case map[any]any:
+		result := make(map[string]any, len(x))
+		for k, val := range x {
+			result[fmt.Sprintf("%v", k)] = normalizeMap(val)
+		}
+		return result
+	case []any:
+		for i, val := range x {
+			x[i] = normalizeMap(val)
+		}
+		return x
+	default:
+		return v
+	}
 }
 
 // extractTokens recursively extracts tokens from a parsed map.
