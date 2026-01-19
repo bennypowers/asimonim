@@ -9,7 +9,9 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
+	"bennypowers.dev/asimonim/cmd/convert"
 	"bennypowers.dev/asimonim/cmd/list"
 	"bennypowers.dev/asimonim/cmd/search"
 	"bennypowers.dev/asimonim/cmd/validate"
@@ -28,10 +30,32 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringP("schema", "s", "", "Force schema version (draft, v2025_10)")
+	cobra.OnInitialize(initConfig)
 
+	rootCmd.PersistentFlags().StringP("schema", "s", "", "Force schema version (draft, v2025_10)")
+	rootCmd.PersistentFlags().StringP("prefix", "p", "", "Prefix for output variable names")
+
+	_ = viper.BindPFlag("schema", rootCmd.PersistentFlags().Lookup("schema"))
+	_ = viper.BindPFlag("prefix", rootCmd.PersistentFlags().Lookup("prefix"))
+
+	rootCmd.AddCommand(convert.Cmd)
 	rootCmd.AddCommand(list.Cmd)
 	rootCmd.AddCommand(search.Cmd)
 	rootCmd.AddCommand(validate.Cmd)
 	rootCmd.AddCommand(version.Cmd)
+}
+
+func initConfig() {
+	// Look for config in .config directory
+	viper.SetConfigName("design-tokens")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".config")
+	viper.AddConfigPath(".")
+
+	// Environment variables
+	viper.SetEnvPrefix("ASIMONIM")
+	viper.AutomaticEnv()
+
+	// Read config file if it exists (ignore error if not found)
+	_ = viper.ReadInConfig()
 }

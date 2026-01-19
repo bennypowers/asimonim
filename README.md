@@ -12,6 +12,7 @@ Design systems use [design tokens][dtcg] to store visual primitives like colors,
 - **Multi-schema support**: Handles both Draft and V2025_10 DTCG schemas
 - **Automatic schema detection**: Duck-typing detection of schema version from file contents
 - **Alias resolution**: Resolve token references with cycle detection
+- **Multi-format export**: Convert tokens to TypeScript, SCSS, Swift, Tailwind, XML, and more
 - **CSS output**: Generate CSS custom properties from tokens
 - **Search**: Find tokens by name, value, or type with regex support
 - **Validation**: Check files for schema compliance and circular references
@@ -134,6 +135,71 @@ asimonim search "spacing" tokens.json --type dimension
 
 # Output matching token names only
 asimonim search "primary" tokens.json --format names
+```
+
+### `asimonim convert`
+
+Convert and combine DTCG token files between formats.
+
+```
+Usage:
+  asimonim convert [files...]
+
+Flags:
+  -o, --output string      Output file (default: stdout)
+  -f, --format string      Output format (default "dtcg")
+  -p, --prefix string      Prefix for output variable names
+      --flatten            Flatten to shallow structure (dtcg/json formats only)
+  -d, --delimiter string   Delimiter for flattened keys (default "-")
+  -s, --schema string      Force output schema version (draft, v2025_10)
+  -i, --in-place           Overwrite input files with converted output
+```
+
+**Output Formats:**
+
+| Format       | Extension | Description                                        |
+| ------------ | --------- | -------------------------------------------------- |
+| `dtcg`       | `.json`   | DTCG-compliant JSON (default)                      |
+| `json`       | `.json`   | Flat key-value JSON                                |
+| `android`    | `.xml`    | Android-style XML resources                        |
+| `swift`      | `.swift`  | iOS Swift constants with native SwiftUI Color      |
+| `typescript` | `.ts`     | TypeScript ESM module with `as const` exports      |
+| `cts`        | `.cts`    | TypeScript CommonJS module with `as const` exports |
+| `scss`       | `.scss`   | SCSS variables with kebab-case names               |
+| `tailwind`   | `.js`     | Tailwind theme configuration                       |
+
+**Examples:**
+
+```bash
+# Flatten tokens to shallow structure
+asimonim convert --flatten tokens/*.yaml -o flat.json
+
+# Convert from Editor's Draft to v2025_10 (stable)
+asimonim convert --schema v2025_10 tokens.yaml -o stable.json
+
+# In-place schema conversion
+asimonim convert --in-place --schema v2025_10 tokens/*.yaml
+
+# Combine multiple files
+asimonim convert colors.yaml spacing.yaml -o combined.json
+
+# Generate TypeScript ESM module
+asimonim convert --format typescript -o tokens.ts tokens/*.yaml
+
+# Generate TypeScript CommonJS module
+asimonim convert --format cts -o tokens.cts tokens/*.yaml
+
+# Generate SCSS variables with prefix
+asimonim convert --format scss --prefix rh -o _tokens.scss tokens/*.yaml
+
+# Generate Tailwind theme config
+asimonim convert --format tailwind -o tailwind.tokens.js tokens/*.yaml
+
+# Generate Android XML resources
+asimonim convert --format android -o values/tokens.xml tokens/*.yaml
+
+# Generate iOS Swift constants
+asimonim convert --format swift -o DesignTokens.swift tokens/*.yaml
 ```
 
 ### `asimonim version`

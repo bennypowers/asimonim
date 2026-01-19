@@ -1,0 +1,18 @@
+{
+  "color-primary": {
+    "$type": "color",
+    "$value": "#FF6B35"
+  },
+  "color-secondary": {
+    "$type": "color",
+    "$value": "#4ECDC4"
+  },
+  "spacing-large": {
+    "$type": "dimension",
+    "$value": "16px"
+  },
+  "spacing-small": {
+    "$type": "dimension",
+    "$value": "4px"
+  }
+}

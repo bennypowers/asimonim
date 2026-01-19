@@ -1,0 +1,16 @@
+{
+  "color": {
+    "brand": {
+      "primary": {
+        "$description": "Primary brand color",
+        "$type": "color",
+        "$value": "#FF6B35"
+      },
+      "secondary": {
+        "$description": "Secondary color reference",
+        "$type": "color",
+        "$value": "{color.brand.primary}"
+      }
+    }
+  }
+}
