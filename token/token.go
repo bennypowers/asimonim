@@ -119,6 +119,51 @@ func (t *Token) DotPath() string {
 	return strings.Join(t.Path, ".")
 }
 
+// CSSSyntax returns the CSS syntax string for this token's type.
+// For example, a "color" token returns "<color>".
+// Returns "<custom-ident>" for unknown types.
+func (t *Token) CSSSyntax() string {
+	return TypeToCSSSyntax(t.Type)
+}
+
+// TypeToCSSSyntax maps a DTCG token type to its CSS syntax string.
+// This is useful for generating CSS @property rules or custom property definitions.
+// Returns "<custom-ident>" for unknown types as a safe fallback.
+func TypeToCSSSyntax(tokenType string) string {
+	switch tokenType {
+	case TypeColor:
+		return "<color>"
+	case TypeDimension:
+		return "<length>"
+	case TypeNumber:
+		return "<number>"
+	case TypeString:
+		return "<custom-ident>"
+	case TypeFontFamily:
+		return "<custom-ident>+"
+	case TypeFontWeight:
+		return "<number>"
+	case TypeDuration:
+		return "<time>"
+	case TypeCubicBezier:
+		return "<easing-function>"
+	case TypeShadow:
+		return "<shadow>"
+	case TypeBorder:
+		return "<line-width> || <line-style> || <color>"
+	case TypeGradient:
+		return "<image>"
+	case TypeTypography:
+		return "<custom-ident>" // Complex composite type
+	case TypeStrokeStyle:
+		return "<line-style>"
+	case TypeTransition:
+		return "<time> || <easing-function>"
+	default:
+		return "<custom-ident>" // Fallback for unknown types
+	}
+}
+
 // DisplayValue returns a formatted string for display in hover/UI.
 // It uses ResolvedValue if resolved, otherwise RawValue if set, else Value.
 // The value is formatted based on the token's Type for human readability.

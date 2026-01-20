@@ -98,6 +98,70 @@ func TestToken_DotPath(t *testing.T) {
 	}
 }
 
+func TestTypeToCSSSyntax(t *testing.T) {
+	tests := []struct {
+		tokenType string
+		expected  string
+	}{
+		{token.TypeColor, "<color>"},
+		{token.TypeDimension, "<length>"},
+		{token.TypeNumber, "<number>"},
+		{token.TypeString, "<custom-ident>"},
+		{token.TypeFontFamily, "<custom-ident>+"},
+		{token.TypeFontWeight, "<number>"},
+		{token.TypeDuration, "<time>"},
+		{token.TypeCubicBezier, "<easing-function>"},
+		{token.TypeShadow, "<shadow>"},
+		{token.TypeBorder, "<line-width> || <line-style> || <color>"},
+		{token.TypeGradient, "<image>"},
+		{token.TypeTypography, "<custom-ident>"},
+		{token.TypeStrokeStyle, "<line-style>"},
+		{token.TypeTransition, "<time> || <easing-function>"},
+		{"unknownType", "<custom-ident>"},
+		{"", "<custom-ident>"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.tokenType, func(t *testing.T) {
+			if got := token.TypeToCSSSyntax(tt.tokenType); got != tt.expected {
+				t.Errorf("TypeToCSSSyntax(%q) = %q, want %q", tt.tokenType, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestToken_CSSSyntax(t *testing.T) {
+	tests := []struct {
+		name     string
+		token    token.Token
+		expected string
+	}{
+		{
+			name:     "color token",
+			token:    token.Token{Type: token.TypeColor},
+			expected: "<color>",
+		},
+		{
+			name:     "dimension token",
+			token:    token.Token{Type: token.TypeDimension},
+			expected: "<length>",
+		},
+		{
+			name:     "empty type",
+			token:    token.Token{Type: ""},
+			expected: "<custom-ident>",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.token.CSSSyntax(); got != tt.expected {
+				t.Errorf("Token.CSSSyntax() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestToken_DisplayValue(t *testing.T) {
 	tests := []struct {
 		name     string
