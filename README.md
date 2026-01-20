@@ -254,10 +254,10 @@ This configuration is also consumed by [dtls](https://github.com/bennypowers/des
 
 Asimonim supports multiple DTCG schema versions:
 
-| Version   | References          | Colors     | Features                    |
-| --------- | ------------------- | ---------- | --------------------------- |
-| Draft     | `{token.path}`      | Strings    | Group markers               |
-| v2025.10  | `$ref: "#/path"`    | Structured | `$extends`, `$root`         |
+| Version   | References                         | Colors     | Features                    |
+| --------- | ---------------------------------- | ---------- | --------------------------- |
+| Draft     | `{token.path}`                     | Strings    | Group markers               |
+| v2025.10  | `{token.path}` or `$ref: "#/path"` | Structured | `$extends`, `$root`         |
 
 Schema version is automatically detected from file contents, or can be forced with the `--schema` flag.
 

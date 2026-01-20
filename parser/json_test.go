@@ -59,6 +59,49 @@ func TestJSONParser_V2025_10(t *testing.T) {
 	}
 }
 
+func TestJSONParser_V2025_10_CurlyRefs(t *testing.T) {
+	mfs := testutil.NewFixtureFS(t, "fixtures/v2025_10/curly-refs", "/test")
+
+	p := parser.NewJSONParser()
+	tokens, err := p.ParseFile(mfs, "/test/tokens.json", parser.Options{})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(tokens) != 3 {
+		t.Errorf("expected 3 tokens, got %d", len(tokens))
+	}
+
+	// Check that curly-brace refs are preserved
+	tokenByName := make(map[string]*struct {
+		value, desc string
+	})
+	for _, tok := range tokens {
+		tokenByName[tok.Name] = &struct {
+			value, desc string
+		}{tok.Value, tok.Description}
+	}
+
+	// Secondary should have curly-brace ref
+	if sec := tokenByName["color-brand-secondary"]; sec != nil {
+		if sec.value != "{color.brand.primary}" {
+			t.Errorf("expected secondary value to be curly-brace ref, got %s", sec.value)
+		}
+	} else {
+		t.Error("expected token color-brand-secondary not found")
+	}
+
+	// Action should have chained curly-brace ref
+	if action := tokenByName["color-semantic-action"]; action != nil {
+		if action.value != "{color.brand.secondary}" {
+			t.Errorf("expected action value to be curly-brace ref, got %s", action.value)
+		}
+	} else {
+		t.Error("expected token color-semantic-action not found")
+	}
+}
+
 func TestJSONParser_ParseYAML(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple-yaml", "/test")
 

@@ -161,7 +161,7 @@ func ParseFile(path string, opts Options) ([]*Token, error) {
 asimonim supports multiple DTCG schema versions:
 
 - **Draft** (Editor's Draft): String colors, curly brace refs `{token.path}`, group markers
-- **V2025_10** (Stable): Structured colors, JSON Pointer refs `$ref: "#/path"`, `$extends`, `$root`
+- **V2025_10** (Stable): Structured colors, curly brace refs `{token.path}` or JSON Pointer refs `$ref: "#/path"`, `$extends`, `$root`
 
 When extending for new schema versions:
 1. Define new `SchemaVersion` constant in `schema/version.go`
