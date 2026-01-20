@@ -60,6 +60,137 @@ func TestToken_CSSVariableName(t *testing.T) {
 	}
 }
 
+func TestNewMap(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "color-primary", Value: "#FF0000"},
+		{Name: "color-secondary", Value: "#00FF00"},
+		{Name: "spacing-small", Value: "8px"},
+	}
+
+	t.Run("creates map with correct length", func(t *testing.T) {
+		m := token.NewMap(tokens, "")
+		if m.Len() != 3 {
+			t.Errorf("Map.Len() = %d, want 3", m.Len())
+		}
+	})
+
+	t.Run("applies prefix to tokens", func(t *testing.T) {
+		m := token.NewMap(tokens, "my-prefix")
+		tok, ok := m.Get("color-primary")
+		if !ok {
+			t.Fatal("expected to find token")
+		}
+		if tok.Prefix != "my-prefix" {
+			t.Errorf("token.Prefix = %q, want %q", tok.Prefix, "my-prefix")
+		}
+	})
+
+	t.Run("does not modify original tokens", func(t *testing.T) {
+		_ = token.NewMap(tokens, "my-prefix")
+		if tokens[0].Prefix != "" {
+			t.Errorf("original token was modified, Prefix = %q", tokens[0].Prefix)
+		}
+	})
+}
+
+func TestMap_Get(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "color-primary", Value: "#FF0000"},
+		{Name: "color-secondary", Value: "#00FF00"},
+	}
+
+	t.Run("lookup by short name without prefix", func(t *testing.T) {
+		m := token.NewMap(tokens, "")
+		tok, ok := m.Get("color-primary")
+		if !ok {
+			t.Fatal("expected to find token")
+		}
+		if tok.Value != "#FF0000" {
+			t.Errorf("tok.Value = %q, want %q", tok.Value, "#FF0000")
+		}
+	})
+
+	t.Run("lookup by full CSS name without prefix", func(t *testing.T) {
+		m := token.NewMap(tokens, "")
+		tok, ok := m.Get("--color-primary")
+		if !ok {
+			t.Fatal("expected to find token")
+		}
+		if tok.Value != "#FF0000" {
+			t.Errorf("tok.Value = %q, want %q", tok.Value, "#FF0000")
+		}
+	})
+
+	t.Run("lookup by short name with prefix", func(t *testing.T) {
+		m := token.NewMap(tokens, "rh")
+		tok, ok := m.Get("color-primary")
+		if !ok {
+			t.Fatal("expected to find token by short name")
+		}
+		if tok.Value != "#FF0000" {
+			t.Errorf("tok.Value = %q, want %q", tok.Value, "#FF0000")
+		}
+	})
+
+	t.Run("lookup by full CSS name with prefix", func(t *testing.T) {
+		m := token.NewMap(tokens, "rh")
+		tok, ok := m.Get("--rh-color-primary")
+		if !ok {
+			t.Fatal("expected to find token by full CSS name")
+		}
+		if tok.Value != "#FF0000" {
+			t.Errorf("tok.Value = %q, want %q", tok.Value, "#FF0000")
+		}
+	})
+
+	t.Run("lookup by dot-path", func(t *testing.T) {
+		tokensWithPath := []*token.Token{
+			{Name: "color-brand-primary", Value: "#FF0000"},
+		}
+		m := token.NewMap(tokensWithPath, "")
+		tok, ok := m.Get("color.brand.primary")
+		if !ok {
+			t.Fatal("expected to find token by dot-path")
+		}
+		if tok.Value != "#FF0000" {
+			t.Errorf("tok.Value = %q, want %q", tok.Value, "#FF0000")
+		}
+	})
+
+	t.Run("returns false for missing token", func(t *testing.T) {
+		m := token.NewMap(tokens, "")
+		_, ok := m.Get("nonexistent")
+		if ok {
+			t.Error("expected not to find nonexistent token")
+		}
+	})
+}
+
+func TestMap_All(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "a", Value: "1"},
+		{Name: "b", Value: "2"},
+		{Name: "c", Value: "3"},
+	}
+	m := token.NewMap(tokens, "")
+	all := m.All()
+
+	if len(all) != 3 {
+		t.Errorf("len(All()) = %d, want 3", len(all))
+	}
+
+	// Verify all tokens are present (order not guaranteed)
+	values := make(map[string]bool)
+	for _, tok := range all {
+		values[tok.Value] = true
+	}
+	for _, expected := range []string{"1", "2", "3"} {
+		if !values[expected] {
+			t.Errorf("missing token with value %q", expected)
+		}
+	}
+}
+
 func TestToken_DotPath(t *testing.T) {
 	tests := []struct {
 		name     string

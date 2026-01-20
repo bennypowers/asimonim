@@ -99,6 +99,81 @@ type Token struct {
 	ResolutionChain []string `json:"-"`
 }
 
+// Map provides prefix-aware token lookup by name.
+// It allows looking up tokens by either short name (color-primary)
+// or full CSS variable name (--prefix-color-primary).
+type Map struct {
+	prefix string
+	tokens map[string]*Token
+}
+
+// NewMap creates a Map from tokens with optional prefix for lookups.
+// Tokens are indexed by their CSSVariableName for efficient lookup.
+func NewMap(tokens []*Token, prefix string) *Map {
+	m := &Map{
+		prefix: strings.TrimLeft(prefix, "-"),
+		tokens: make(map[string]*Token, len(tokens)),
+	}
+	for _, t := range tokens {
+		// Apply prefix to token if not already set
+		tok := t
+		if tok.Prefix == "" && prefix != "" {
+			// Create a copy with prefix set
+			copy := *t
+			copy.Prefix = prefix
+			tok = &copy
+		}
+		m.tokens[tok.CSSVariableName()] = tok
+	}
+	return m
+}
+
+// Get returns the Token for the given name, prepending the prefix if needed.
+// Accepts short names (color-primary), full CSS names (--prefix-color-primary),
+// or dot-path names (color.primary).
+func (m *Map) Get(name string) (*Token, bool) {
+	fullName := m.normalizeName(name)
+	tok, ok := m.tokens[fullName]
+	return tok, ok
+}
+
+// All returns all tokens in the map.
+func (m *Map) All() []*Token {
+	result := make([]*Token, 0, len(m.tokens))
+	for _, t := range m.tokens {
+		result = append(result, t)
+	}
+	return result
+}
+
+// Len returns the number of tokens in the map.
+func (m *Map) Len() int {
+	return len(m.tokens)
+}
+
+// normalizeName converts a name to a full CSS variable name.
+func (m *Map) normalizeName(name string) string {
+	// Convert dot-path to dash-separated
+	name = strings.ReplaceAll(name, ".", "-")
+
+	// Already a full CSS variable name
+	if strings.HasPrefix(name, "--") {
+		return name
+	}
+
+	// Strip leading dashes for normalization
+	name = strings.TrimLeft(name, "-")
+
+	// Add prefix if configured and not already present
+	if m.prefix != "" {
+		if !strings.HasPrefix(name, m.prefix+"-") {
+			return "--" + m.prefix + "-" + name
+		}
+	}
+
+	return "--" + name
+}
+
 // CSSVariableName returns the CSS custom property name for this token.
 // e.g., "--color-primary" or "--my-prefix-color-primary"
 // Returns an empty string if the token has no name.
