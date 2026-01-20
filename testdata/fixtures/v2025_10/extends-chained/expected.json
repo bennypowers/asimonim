@@ -1,0 +1,11 @@
+{
+  "description": "Chained extension: brand extends light extends base",
+  "expected_tokens": [
+    "base-color-primary",
+    "brand-color-accent",
+    "brand-color-primary",
+    "brand-color-secondary",
+    "light-color-primary",
+    "light-color-secondary"
+  ]
+}

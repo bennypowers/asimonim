@@ -1,0 +1,5 @@
+{
+  "description": "Circular extension: groupA extends groupB extends groupA",
+  "should_error": true,
+  "error_contains": "circular"
+}

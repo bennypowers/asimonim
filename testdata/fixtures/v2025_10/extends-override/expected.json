@@ -1,0 +1,14 @@
+{
+  "description": "Override: theme.color-primary overrides base.color-primary",
+  "expected_tokens": [
+    "base-color-primary",
+    "base-color-secondary",
+    "theme-color-primary",
+    "theme-color-secondary"
+  ],
+  "override_check": {
+    "token": "theme-color-primary",
+    "expected_value": "#0000FF",
+    "expected_description": "Theme primary override"
+  }
+}

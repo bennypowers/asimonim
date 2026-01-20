@@ -1,0 +1,10 @@
+{
+  "description": "Nested path extension: theme extends colors/semantic",
+  "expected_tokens": [
+    "colors-semantic-error",
+    "colors-semantic-success",
+    "theme-error",
+    "theme-success",
+    "theme-warning"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Simple extension: theme extends base",
+  "expected_tokens": [
+    "base-color-blue",
+    "base-color-red",
+    "theme-color-blue",
+    "theme-color-green",
+    "theme-color-red"
+  ]
+}
