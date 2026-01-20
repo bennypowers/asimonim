@@ -1,0 +1,19 @@
+{
+  "base": {
+    "color": {
+      "$type": "color",
+      "primary": {
+        "$value": "#FF6B35"
+      }
+    }
+  },
+  "theme": {
+    "$extends": "#/base",
+    "color": {
+      "secondary": {
+        "$type": "color",
+        "$value": "#00FF00"
+      }
+    }
+  }
+}

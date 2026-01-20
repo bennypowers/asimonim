@@ -1,0 +1,21 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10.json",
+  "color": {
+    "$type": "color",
+    "_": {
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [1, 0.42, 0.21],
+        "alpha": 1
+      },
+      "$description": "Group marker token (draft pattern)"
+    },
+    "primary": {
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [0, 0.5, 1],
+        "alpha": 1
+      }
+    }
+  }
+}

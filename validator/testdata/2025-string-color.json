@@ -1,0 +1,10 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10.json",
+  "color": {
+    "$type": "color",
+    "primary": {
+      "$value": "#FF6B35",
+      "$description": "String color in 2025.10 schema"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "color": {
+    "$type": "color",
+    "primary": {
+      "$value": "#FF6B35",
+      "$description": "Primary brand color"
+    },
+    "secondary": {
+      "$value": "rgb(100, 150, 200)",
+      "$description": "Secondary color"
+    }
+  },
+  "spacing": {
+    "$type": "dimension",
+    "small": {
+      "$value": "8px"
+    }
+  }
+}

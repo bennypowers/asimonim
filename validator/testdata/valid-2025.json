@@ -1,0 +1,22 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10.json",
+  "color": {
+    "$type": "color",
+    "primary": {
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [1, 0.42, 0.21],
+        "alpha": 1,
+        "hex": "#FF6B36"
+      },
+      "$description": "Primary brand color"
+    },
+    "secondary": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [0.7, 0.15, 180],
+        "alpha": 1
+      }
+    }
+  }
+}
