@@ -5,6 +5,9 @@ on:
     types:
       - published
 
+permissions:
+  contents: write
+
 jobs:
   build:
     uses: bennypowers/go-release-workflows/.github/workflows/build-binaries.yml@main
