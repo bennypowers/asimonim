@@ -84,7 +84,7 @@ func validateDraft(data map[string]any, filePath string, path []string) []Valida
 	var errors []ValidationError
 
 	for key, value := range data {
-		currentPath := append(path, key)
+		currentPath := append(path[:len(path):len(path)], key)
 		pathStr := strings.Join(currentPath, ".")
 
 		// Check for $ref (2025.10 feature)
@@ -159,7 +159,7 @@ func validateV2025(data map[string]any, filePath string, path []string) []Valida
 	groupMarkerPath := ""
 
 	for key, value := range data {
-		currentPath := append(path, key)
+		currentPath := append(path[:len(path):len(path)], key)
 		pathStr := strings.Join(currentPath, ".")
 
 		// Skip schema field
