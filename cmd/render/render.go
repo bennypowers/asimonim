@@ -62,10 +62,12 @@ type MarkdownOptions struct {
 func ComputeRows(tokens []*token.Token, resolved bool) []Row {
 	rows := make([]Row, 0, len(tokens))
 	for _, tok := range tokens {
+		// Use DisplayValue() for type-aware formatting, then apply reference conversion
+		displayVal := tok.DisplayValue()
 		row := Row{
 			Name:               tok.CSSVariableName(),
 			Type:               tok.Type,
-			Value:              FormatValue(tok.Value, tok.Prefix),
+			Value:              convertReferences(displayVal, tok.Prefix),
 			Description:        tok.Description,
 			Deprecated:         tok.Deprecated,
 			DeprecationMessage: tok.DeprecationMessage,
@@ -75,19 +77,12 @@ func ComputeRows(tokens []*token.Token, resolved bool) []Row {
 			row.Type = "-"
 		}
 
-		// Handle alias resolution
-		if len(tok.ResolutionChain) > 0 && tok.ResolvedValue != nil {
-			row.Value = FormatValue(tok.ResolvedValue, tok.Prefix)
-			// Convert chain to CSS variable names
+		// Handle alias resolution chain display
+		if len(tok.ResolutionChain) > 0 {
 			row.RefChain = make([]string, len(tok.ResolutionChain))
 			for i, name := range tok.ResolutionChain {
 				row.RefChain[i] = NameToCSSVar(name, tok.Prefix)
 			}
-		} else if resolved && tok.ResolvedValue != nil {
-			row.Value = FormatValue(tok.ResolvedValue, tok.Prefix)
-		} else if row.Value == "" && tok.RawValue != nil {
-			// Composite types (cubicBezier, shadow, etc.) have empty Value but populated RawValue
-			row.Value = FormatValue(tok.RawValue, tok.Prefix)
 		}
 
 		// Check if this is a parseable color
@@ -102,136 +97,19 @@ func ComputeRows(tokens []*token.Token, resolved bool) []Row {
 	return rows
 }
 
-// FormatValue converts any value to a display string.
-// References like {foo.bar} are converted to CSS variable names.
-func FormatValue(v any, prefix string) string {
-	switch val := v.(type) {
-	case string:
-		return formatStringValue(val, prefix)
-	case []any:
-		// cubicBezier: [x1, y1, x2, y2] -> cubic-bezier(x1, y1, x2, y2)
-		if len(val) == 4 && isNumericArray(val) {
-			return fmt.Sprintf("cubic-bezier(%v, %v, %v, %v)", val[0], val[1], val[2], val[3])
-		}
-		// Array of references or values - format each element
-		parts := make([]string, len(val))
-		for i, v := range val {
-			if s, ok := v.(string); ok {
-				parts[i] = formatStringValue(s, prefix)
-			} else {
-				parts[i] = fmt.Sprintf("%v", v)
-			}
-		}
-		return strings.Join(parts, ", ")
-	case map[string]any:
-		return formatCompositeValue(val, prefix)
-	default:
-		return fmt.Sprintf("%v", val)
-	}
-}
-
-// formatStringValue formats a string value, converting references to CSS variable names.
-func formatStringValue(s, prefix string) string {
+// convertReferences converts {ref.path} references to CSS variable names.
+func convertReferences(s, prefix string) string {
 	if !strings.Contains(s, "{") {
 		return s
 	}
-	// Replace each {ref.path} with --prefix-ref-path
-	result := refPattern.ReplaceAllStringFunc(s, func(match string) string {
-		// Extract the path from {path}
+	return refPattern.ReplaceAllStringFunc(s, func(match string) string {
 		path := strings.TrimSuffix(strings.TrimPrefix(match, "{"), "}")
 		name := strings.ReplaceAll(path, ".", "-")
 		return NameToCSSVar(name, prefix)
 	})
-	return result
 }
 
 var refPattern = regexp.MustCompile(`\{[^}]+\}`)
-
-// isNumericArray checks if all elements in the array are numeric (for cubicBezier detection).
-func isNumericArray(arr []any) bool {
-	for _, v := range arr {
-		switch v.(type) {
-		case int, int64, float64:
-			continue
-		default:
-			return false
-		}
-	}
-	return true
-}
-
-// formatCompositeValue formats a composite token value (shadow, border, etc.) as CSS.
-func formatCompositeValue(m map[string]any, prefix string) string {
-	// Helper to format a value from the map, converting references
-	fv := func(key string) string {
-		v := m[key]
-		if s, ok := v.(string); ok {
-			return formatStringValue(s, prefix)
-		}
-		return fmt.Sprintf("%v", v)
-	}
-
-	// shadow: offsetX offsetY blur spread color
-	if hasKeys(m, "offsetX", "offsetY", "blur", "color") {
-		spread := ""
-		if s, ok := m["spread"].(string); ok && s != "" && s != "0px" {
-			spread = " " + formatStringValue(s, prefix)
-		}
-		return fmt.Sprintf("%s %s %s%s %s", fv("offsetX"), fv("offsetY"), fv("blur"), spread, fv("color"))
-	}
-	// border: width style color
-	if hasKeys(m, "width", "style", "color") {
-		return fmt.Sprintf("%s %s %s", fv("width"), fv("style"), fv("color"))
-	}
-	// strokeStyle: dashArray lineCap
-	if hasKeys(m, "dashArray", "lineCap") {
-		return fmt.Sprintf("dash:%s cap:%s", fv("dashArray"), fv("lineCap"))
-	}
-	// transition: duration delay timingFunction
-	if hasKeys(m, "duration", "timingFunction") {
-		delay := ""
-		if d, ok := m["delay"].(string); ok && d != "" && d != "0s" && d != "0ms" {
-			delay = " " + formatStringValue(d, prefix)
-		}
-		return fmt.Sprintf("%s%s %s", fv("duration"), delay, fv("timingFunction"))
-	}
-	// gradient: type, stops
-	if hasKeys(m, "type", "stops") {
-		return fmt.Sprintf("%s-gradient(...)", fv("type"))
-	}
-	// typography: fontFamily fontSize fontWeight lineHeight
-	if hasKeys(m, "fontFamily") {
-		parts := []string{}
-		if _, ok := m["fontWeight"]; ok {
-			parts = append(parts, fv("fontWeight"))
-		}
-		if _, ok := m["fontSize"]; ok {
-			parts = append(parts, fv("fontSize"))
-		}
-		if _, ok := m["lineHeight"]; ok {
-			parts = append(parts, fmt.Sprintf("/ %s", fv("lineHeight")))
-		}
-		parts = append(parts, fv("fontFamily"))
-		return strings.Join(parts, " ")
-	}
-	// fallback: key: value pairs
-	parts := make([]string, 0, len(m))
-	for k := range m {
-		parts = append(parts, fmt.Sprintf("%s: %s", k, fv(k)))
-	}
-	sort.Strings(parts)
-	return strings.Join(parts, "; ")
-}
-
-// hasKeys returns true if the map contains all specified keys.
-func hasKeys(m map[string]any, keys ...string) bool {
-	for _, k := range keys {
-		if _, ok := m[k]; !ok {
-			return false
-		}
-	}
-	return true
-}
 
 // NameToCSSVar converts a token name to a CSS variable name.
 // e.g., "color-primary" with prefix "rh" → "--rh-color-primary"
