@@ -1,4 +1,4 @@
-.PHONY: all test lint clean install
+.PHONY: all test lint clean install release
 .PHONY: linux-x64 linux-arm64 darwin-x64 darwin-arm64 win32-x64 win32-arm64
 
 BINARY_NAME := asimonim
@@ -29,6 +29,18 @@ test:
 
 lint:
 	go vet ./...
+
+release:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Error: VERSION or bump type is required"; \
+		echo "Usage: make release VERSION=<version|patch|minor|major>"; \
+		echo "  make release VERSION=v0.1.0  - Release explicit version"; \
+		echo "  make release VERSION=patch   - Bump patch version (0.0.x)"; \
+		echo "  make release VERSION=minor   - Bump minor version (0.x.0)"; \
+		echo "  make release VERSION=major   - Bump major version (x.0.0)"; \
+		exit 1; \
+	fi
+	@./scripts/release.sh $(VERSION)
 
 # Cross-compilation targets (CGO_ENABLED=0 for pure Go)
 linux-x64:
