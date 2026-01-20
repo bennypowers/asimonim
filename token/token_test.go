@@ -156,7 +156,7 @@ func TestToken_DisplayValue(t *testing.T) {
 				},
 				SchemaVersion: schema.V2025_10,
 			},
-			expected: "color(srgb 1 0.5 0.25)",
+			expected: "#FF8040", // sRGB auto-converts to hex
 		},
 		{
 			name: "resolved structured color",

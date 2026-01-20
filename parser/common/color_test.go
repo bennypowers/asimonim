@@ -99,7 +99,7 @@ func TestParseColorValue_V2025_10(t *testing.T) {
 				"colorSpace": "srgb",
 				"components": []any{1.0, 0.5, 0.25},
 			},
-			expected: "color(srgb 1 0.5 0.25)",
+			expected: "#FF8040", // sRGB auto-converts to hex
 		},
 		{
 			name: "srgb with alpha",
@@ -117,7 +117,7 @@ func TestParseColorValue_V2025_10(t *testing.T) {
 				"components": []any{1.0, 0.5, 0.25},
 				"alpha":      1.0,
 			},
-			expected: "color(srgb 1 0.5 0.25)",
+			expected: "#FF8040", // sRGB with full alpha auto-converts to hex
 		},
 		{
 			name: "display-p3 color",
@@ -133,7 +133,7 @@ func TestParseColorValue_V2025_10(t *testing.T) {
 				"colorSpace": "oklch",
 				"components": []any{0.7, 0.15, 180.0},
 			},
-			expected: "color(oklch 0.7 0.15 180)",
+			expected: "oklch(0.7 0.15 180)", // native CSS function
 		},
 		{
 			name: "oklab color",
@@ -141,7 +141,7 @@ func TestParseColorValue_V2025_10(t *testing.T) {
 				"colorSpace": "oklab",
 				"components": []any{0.6, 0.1, -0.1},
 			},
-			expected: "color(oklab 0.6 0.1 -0.1)",
+			expected: "oklab(0.6 0.1 -0.1)", // native CSS function
 		},
 		{
 			name: "lab color",
@@ -149,7 +149,7 @@ func TestParseColorValue_V2025_10(t *testing.T) {
 				"colorSpace": "lab",
 				"components": []any{50.0, 25.0, -25.0},
 			},
-			expected: "color(lab 50 25 -25)",
+			expected: "lab(50 25 -25)", // native CSS function
 		},
 		{
 			name: "lch color",
@@ -157,7 +157,7 @@ func TestParseColorValue_V2025_10(t *testing.T) {
 				"colorSpace": "lch",
 				"components": []any{50.0, 30.0, 270.0},
 			},
-			expected: "color(lch 50 30 270)",
+			expected: "lch(50 30 270)", // native CSS function
 		},
 		{
 			name: "a98-rgb color",
@@ -247,7 +247,7 @@ func TestParseColorValue_V2025_10(t *testing.T) {
 				"colorSpace": "oklch",
 				"components": []any{0.7, "none", 180.0},
 			},
-			expected: "color(oklch 0.7 none 180)",
+			expected: "oklch(0.7 none 180)", // native CSS function with none
 		},
 	}
 

@@ -79,6 +79,11 @@ func (o *ObjectColorValue) ToCSS() string {
 		return *o.Hex
 	}
 
+	// For sRGB without hex field, convert to hex format
+	if o.ColorSpace == "srgb" && o.canConvertToHex() {
+		return o.toHex()
+	}
+
 	// Build components string using strings.Builder
 	var sb strings.Builder
 	for i, comp := range o.Components {
@@ -98,9 +103,9 @@ func (o *ObjectColorValue) ToCSS() string {
 
 	hasAlpha := o.Alpha != nil && *o.Alpha < AlphaThreshold
 
-	// hsl and hwb use native functions, not color()
+	// Color spaces that have native CSS functions (more widely supported than color())
 	switch o.ColorSpace {
-	case "hsl", "hwb":
+	case "hsl", "hwb", "lab", "lch", "oklab", "oklch":
 		if hasAlpha {
 			return fmt.Sprintf("%s(%s / %.4g)", o.ColorSpace, compStr, *o.Alpha)
 		}
@@ -112,6 +117,47 @@ func (o *ObjectColorValue) ToCSS() string {
 		}
 		return fmt.Sprintf("color(%s %s)", o.ColorSpace, compStr)
 	}
+}
+
+// canConvertToHex returns true if this sRGB color can be converted to hex.
+// Requires exactly 3 numeric components in 0-1 range and alpha >= threshold.
+func (o *ObjectColorValue) canConvertToHex() bool {
+	if len(o.Components) != 3 {
+		return false
+	}
+
+	// Check for alpha that would require rgba format
+	if o.Alpha != nil && *o.Alpha < AlphaThreshold {
+		return false
+	}
+
+	// All components must be numeric (not "none")
+	for _, comp := range o.Components {
+		if _, ok := comp.(float64); !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+// toHex converts sRGB components to hex format (#RRGGBB).
+func (o *ObjectColorValue) toHex() string {
+	r := clamp(int(o.Components[0].(float64)*255+0.5), 0, 255)
+	g := clamp(int(o.Components[1].(float64)*255+0.5), 0, 255)
+	b := clamp(int(o.Components[2].(float64)*255+0.5), 0, 255)
+	return fmt.Sprintf("#%02X%02X%02X", r, g, b)
+}
+
+// clamp restricts a value to the given range.
+func clamp(value, min, max int) int {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }
 
 // Version returns the schema version for this color.
