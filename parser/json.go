@@ -61,6 +61,15 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 		positionData = data
 	}
 
+	// Auto-detect schema version if not explicitly set
+	if opts.SchemaVersion == schema.Unknown {
+		if detected, err := schema.DetectVersion(data, nil); err == nil {
+			opts.SchemaVersion = detected
+		} else {
+			opts.SchemaVersion = schema.Draft
+		}
+	}
+
 	// Extract tokens using the single extraction path
 	result := []*token.Token{}
 	p.extractTokens(raw, []string{}, "", "", opts, &result)
@@ -404,3 +413,4 @@ func (p *JSONParser) ParseFile(filesystem fs.FileSystem, path string, opts Optio
 
 	return tokens, nil
 }
+

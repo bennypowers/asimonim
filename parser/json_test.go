@@ -139,6 +139,60 @@ func TestJSONParser_ParseYAML(t *testing.T) {
 	}
 }
 
+func TestJSONParser_AutoDetectSchema(t *testing.T) {
+	t.Run("detects v2025.10 from $schema field", func(t *testing.T) {
+		mfs := testutil.NewFixtureFS(t, "fixtures/v2025_10/structured-colors", "/test")
+
+		p := parser.NewJSONParser()
+		// Don't set SchemaVersion - let it auto-detect
+		tokens, err := p.ParseFile(mfs, "/test/tokens.json", parser.Options{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		for _, tok := range tokens {
+			if tok.SchemaVersion != schema.V2025_10 {
+				t.Errorf("expected token %s to have schema version v2025.10, got %s", tok.Name, tok.SchemaVersion)
+			}
+		}
+	})
+
+	t.Run("explicit SchemaVersion overrides auto-detection", func(t *testing.T) {
+		mfs := testutil.NewFixtureFS(t, "fixtures/v2025_10/structured-colors", "/test")
+
+		p := parser.NewJSONParser()
+		// Explicitly set Draft - should override the $schema field
+		tokens, err := p.ParseFile(mfs, "/test/tokens.json", parser.Options{
+			SchemaVersion: schema.Draft,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		for _, tok := range tokens {
+			if tok.SchemaVersion != schema.Draft {
+				t.Errorf("expected token %s to have schema version draft (override), got %s", tok.Name, tok.SchemaVersion)
+			}
+		}
+	})
+
+	t.Run("defaults to draft when no $schema field", func(t *testing.T) {
+		mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
+
+		p := parser.NewJSONParser()
+		tokens, err := p.ParseFile(mfs, "/test/tokens.json", parser.Options{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		for _, tok := range tokens {
+			if tok.SchemaVersion != schema.Draft {
+				t.Errorf("expected token %s to have schema version draft, got %s", tok.Name, tok.SchemaVersion)
+			}
+		}
+	})
+}
+
 func TestJSONParser_SkipPositions(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
 	data, err := mfs.ReadFile("/test/tokens.json")
