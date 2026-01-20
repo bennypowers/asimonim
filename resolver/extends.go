@@ -299,19 +299,19 @@ func resolveExtension(ext groupExtension, tokens []*token.Token, terminalNames m
 		newName := strings.ReplaceAll(t.Name, basePrefix, newPrefix)
 
 		inherited = append(inherited, &token.Token{
-			Name:              newName,
-			Value:             t.Value,
-			Type:              t.Type,
-			Description:       t.Description,
-			Extensions:        t.Extensions,
-			Deprecated:        t.Deprecated,
+			Name:               newName,
+			Value:              t.Value,
+			Type:               t.Type,
+			Description:        t.Description,
+			Extensions:         deepCopyMap(t.Extensions),
+			Deprecated:         t.Deprecated,
 			DeprecationMessage: t.DeprecationMessage,
-			FilePath:          t.FilePath,
-			Prefix:            t.Prefix,
-			Path:              newPath,
-			Reference:         "{" + strings.Join(newPath, ".") + "}",
-			SchemaVersion:     t.SchemaVersion,
-			RawValue:          t.RawValue,
+			FilePath:           t.FilePath,
+			Prefix:             t.Prefix,
+			Path:               newPath,
+			Reference:          "{" + strings.Join(newPath, ".") + "}",
+			SchemaVersion:      t.SchemaVersion,
+			RawValue:           deepCopyAny(t.RawValue),
 			// Inherited tokens start unresolved
 			IsResolved: false,
 		})
@@ -331,4 +331,46 @@ func tokenBelongsToGroup(t *token.Token, groupPath []string) bool {
 		}
 	}
 	return true
+}
+
+// deepCopyMap creates a deep copy of a map[string]any.
+// Returns nil if the input is nil.
+func deepCopyMap(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	result := make(map[string]any, len(m))
+	for k, v := range m {
+		result[k] = deepCopyAny(v)
+	}
+	return result
+}
+
+// deepCopyAny creates a deep copy of an arbitrary value.
+// Handles maps, slices, and primitive types.
+func deepCopyAny(v any) any {
+	if v == nil {
+		return nil
+	}
+	switch val := v.(type) {
+	case map[string]any:
+		return deepCopyMap(val)
+	case []any:
+		return deepCopySlice(val)
+	default:
+		// Primitive types (string, int, float64, bool) are copied by value
+		return v
+	}
+}
+
+// deepCopySlice creates a deep copy of a []any slice.
+func deepCopySlice(s []any) []any {
+	if s == nil {
+		return nil
+	}
+	result := make([]any, len(s))
+	for i, v := range s {
+		result[i] = deepCopyAny(v)
+	}
+	return result
 }
