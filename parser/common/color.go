@@ -120,7 +120,8 @@ func (o *ObjectColorValue) ToCSS() string {
 }
 
 // canConvertToHex returns true if this sRGB color can be converted to hex.
-// Requires exactly 3 numeric components in 0-1 range and alpha >= threshold.
+// Requires exactly 3 numeric components and alpha >= threshold.
+// Out-of-range component values will be clamped during conversion.
 func (o *ObjectColorValue) canConvertToHex() bool {
 	if len(o.Components) != 3 {
 		return false
