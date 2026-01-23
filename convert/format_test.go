@@ -272,7 +272,7 @@ func TestFormatTokens_CTS(t *testing.T) {
 func TestValidFormats(t *testing.T) {
 	formats := convert.ValidFormats()
 
-	expected := []string{"dtcg", "json", "android", "swift", "typescript", "cts", "scss", "css", "typescript-map"}
+	expected := []string{"dtcg", "json", "android", "swift", "typescript", "cts", "scss", "css", "typescript-map", "vscode-snippets"}
 	if len(formats) != len(expected) {
 		t.Errorf("expected %d formats, got %d", len(expected), len(formats))
 	}

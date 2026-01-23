@@ -20,6 +20,7 @@ import (
 	"bennypowers.dev/asimonim/convert/formatter/swift"
 	"bennypowers.dev/asimonim/convert/formatter/typescript"
 	"bennypowers.dev/asimonim/convert/formatter/typescriptmap"
+	"bennypowers.dev/asimonim/convert/formatter/vscode"
 	"bennypowers.dev/asimonim/token"
 )
 
@@ -54,6 +55,9 @@ const (
 
 	// FormatTypeScriptMap outputs a TypeScript module with a typed TokenMap class.
 	FormatTypeScriptMap Format = "typescript-map"
+
+	// FormatVSCodeSnippets outputs VSCode snippets JSON.
+	FormatVSCodeSnippets Format = "vscode-snippets"
 )
 
 // ValidFormats returns all valid format strings.
@@ -68,6 +72,7 @@ func ValidFormats() []string {
 		string(FormatSCSS),
 		string(FormatCSS),
 		string(FormatTypeScriptMap),
+		string(FormatVSCodeSnippets),
 	}
 }
 
@@ -92,6 +97,8 @@ func ParseFormat(s string) (Format, error) {
 		return FormatCSS, nil
 	case "typescript-map", "ts-map":
 		return FormatTypeScriptMap, nil
+	case "vscode-snippets", "vscode":
+		return FormatVSCodeSnippets, nil
 	default:
 		return "", fmt.Errorf("unknown format: %s (valid: %s)", s, strings.Join(ValidFormats(), ", "))
 	}
@@ -130,6 +137,8 @@ func FormatTokens(tokens []*token.Token, format Format, opts Options) ([]byte, e
 		})
 	case FormatTypeScriptMap:
 		f = typescriptmap.New()
+	case FormatVSCodeSnippets:
+		f = vscode.New()
 	default:
 		return nil, fmt.Errorf("unsupported format: %s", format)
 	}
