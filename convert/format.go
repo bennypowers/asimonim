@@ -12,6 +12,7 @@ import (
 
 	"bennypowers.dev/asimonim/convert/formatter"
 	"bennypowers.dev/asimonim/convert/formatter/android"
+	"bennypowers.dev/asimonim/convert/formatter/css"
 	"bennypowers.dev/asimonim/convert/formatter/cts"
 	"bennypowers.dev/asimonim/convert/formatter/dtcg"
 	"bennypowers.dev/asimonim/convert/formatter/flatjson"
@@ -45,6 +46,12 @@ const (
 
 	// FormatSCSS outputs SCSS variables with kebab-case names.
 	FormatSCSS Format = "scss"
+
+	// FormatCSS outputs CSS custom properties with :root selector.
+	FormatCSS Format = "css"
+
+	// FormatLitCSS outputs CSS custom properties wrapped in Lit's css template tag.
+	FormatLitCSS Format = "lit-css"
 )
 
 // ValidFormats returns all valid format strings.
@@ -57,6 +64,8 @@ func ValidFormats() []string {
 		string(FormatTypeScript),
 		string(FormatCTS),
 		string(FormatSCSS),
+		string(FormatCSS),
+		string(FormatLitCSS),
 	}
 }
 
@@ -77,6 +86,10 @@ func ParseFormat(s string) (Format, error) {
 		return FormatCTS, nil
 	case "scss", "sass":
 		return FormatSCSS, nil
+	case "css":
+		return FormatCSS, nil
+	case "lit-css", "lit":
+		return FormatLitCSS, nil
 	default:
 		return "", fmt.Errorf("unknown format: %s (valid: %s)", s, strings.Join(ValidFormats(), ", "))
 	}
@@ -107,9 +120,49 @@ func FormatTokens(tokens []*token.Token, format Format, opts Options) ([]byte, e
 		f = cts.New()
 	case FormatSCSS:
 		f = scss.New()
+	case FormatCSS:
+		f = css.NewWithOptions(css.Options{
+			Options:   fmtOpts,
+			Flavor:    css.FlavorPlain,
+			LightDark: buildLightDarkConfig(opts),
+		})
+	case FormatLitCSS:
+		f = css.NewWithOptions(css.Options{
+			Options:   fmtOpts,
+			Flavor:    css.FlavorLit,
+			LightDark: buildLightDarkConfig(opts),
+		})
 	default:
 		return nil, fmt.Errorf("unsupported format: %s", format)
 	}
 
 	return f.Format(tokens, fmtOpts)
+}
+
+// buildLightDarkConfig constructs a css.LightDarkConfig from Options.
+func buildLightDarkConfig(opts Options) css.LightDarkConfig {
+	config := css.LightDarkConfig{
+		Enabled: opts.CSSLightDark,
+	}
+
+	if !config.Enabled {
+		return config
+	}
+
+	// Parse patterns from string pairs (e.g., "on-light on-dark")
+	if len(opts.CSSLightDarkPatterns) > 0 {
+		for _, patternStr := range opts.CSSLightDarkPatterns {
+			parts := strings.Fields(patternStr)
+			if len(parts) == 2 {
+				config.Patterns = append(config.Patterns, [2]string{parts[0], parts[1]})
+			}
+		}
+	}
+
+	// Use defaults if no patterns specified
+	if len(config.Patterns) == 0 {
+		config.Patterns = css.DefaultLightDarkPatterns()
+	}
+
+	return config
 }

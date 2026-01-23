@@ -30,6 +30,35 @@ type Config struct {
 	// Schema forces a specific schema version (optional).
 	// Valid values: "draft", "v2025.10"
 	Schema string `yaml:"schema" json:"schema"`
+
+	// Formats contains format-specific configuration.
+	Formats FormatsConfig `yaml:"formats" json:"formats"`
+
+	// Header is the file header to prepend to output.
+	Header string `yaml:"header" json:"header"`
+}
+
+// FormatsConfig contains format-specific configuration.
+type FormatsConfig struct {
+	// CSS contains CSS-specific output configuration.
+	CSS CSSConfig `yaml:"css" json:"css"`
+}
+
+// CSSConfig contains CSS-specific output configuration.
+type CSSConfig struct {
+	// LightDark configures light-dark() CSS function generation.
+	LightDark LightDarkConfig `yaml:"lightDark" json:"lightDark"`
+}
+
+// LightDarkConfig configures light-dark() CSS function generation.
+type LightDarkConfig struct {
+	// Enabled controls whether light-dark() output is generated.
+	Enabled bool `yaml:"enabled" json:"enabled"`
+
+	// Patterns are pairs of suffixes that indicate light/dark variants.
+	// Each pattern is a [light, dark] pair.
+	// Example: [["on-light", "on-dark"], ["light", "dark"]]
+	Patterns [][]string `yaml:"patterns" json:"patterns"`
 }
 
 // FileSpec represents a token file specification.
