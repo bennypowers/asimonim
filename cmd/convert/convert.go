@@ -87,6 +87,7 @@ func init() {
 	Cmd.Flags().BoolP("in-place", "i", false, "Overwrite input files with converted output")
 	Cmd.Flags().StringArray("outputs", nil, "Multiple outputs as format:path pairs (repeatable, supports {group} template)")
 	Cmd.Flags().String("split-by", "topLevel", "Split strategy: topLevel (default), type, or path[N]")
+	Cmd.Flags().String("header", "", "Header to prepend to output (use @path to read from file)")
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -98,6 +99,7 @@ func run(cmd *cobra.Command, args []string) error {
 	schemaFlag, _ := cmd.Flags().GetString("schema")
 	outputsFlag, _ := cmd.Flags().GetStringArray("outputs")
 	splitByFlag, _ := cmd.Flags().GetString("split-by")
+	headerFlag, _ := cmd.Flags().GetString("header")
 
 	// Parse format
 	format, err := convertlib.ParseFormat(formatFlag)
@@ -188,7 +190,12 @@ func run(cmd *cobra.Command, args []string) error {
 		return runInPlace(filesystem, jsonParser, cfg, resolvedFiles, targetSchema)
 	}
 
-	// Determine outputs: CLI flag takes precedence over config
+	// Resolve header content
+	header, err := resolveHeader(filesystem, headerFlag, cfg.Header)
+	if err != nil {
+		return fmt.Errorf("error resolving header: %w", err)
+	}
+
 	outputs := cliOutputs
 	if len(outputs) == 0 && len(cfg.Outputs) > 0 && output == "" {
 		// Use config outputs only if no single output is specified
@@ -197,10 +204,34 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Multi-output mode
 	if len(outputs) > 0 {
-		return runMultiOutput(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, outputs)
+		return runMultiOutput(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, outputs, header)
 	}
 
-	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter)
+	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter, header)
+}
+
+// resolveHeader resolves the header content from a flag value or config.
+// If headerFlag is empty, uses cfgHeader. If headerFlag starts with @, reads from file.
+func resolveHeader(filesystem fs.FileSystem, headerFlag, cfgHeader string) (string, error) {
+	header := headerFlag
+	if header == "" {
+		header = cfgHeader
+	}
+
+	if header == "" {
+		return "", nil
+	}
+
+	// Check if header is a file reference
+	if path, hasPrefix := strings.CutPrefix(header, "@"); hasPrefix {
+		data, err := filesystem.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("failed to read header file %s: %w", path, err)
+		}
+		return string(data), nil
+	}
+
+	return header, nil
 }
 
 func runInPlace(
@@ -286,6 +317,7 @@ func runCombined(
 	format convertlib.Format,
 	flatten bool,
 	delimiter string,
+	header string,
 ) error {
 	// Parse all files and resolve aliases
 	allTokens, detectedVersion, err := parseAndResolveTokens(filesystem, jsonParser, cfg, resolvedFiles)
@@ -313,6 +345,7 @@ func runCombined(
 		Delimiter:    delimiter,
 		Format:       format,
 		Prefix:       prefix,
+		Header:       header,
 	}
 
 	outputBytes, err := convertlib.FormatTokens(allTokens, format, opts)
@@ -348,6 +381,7 @@ func runMultiOutput(
 	resolvedFiles []*specifier.ResolvedFile,
 	targetSchema schema.Version,
 	outputs []config.OutputSpec,
+	header string,
 ) error {
 	// Parse all files and resolve aliases
 	allTokens, detectedVersion, err := parseAndResolveTokens(filesystem, jsonParser, cfg, resolvedFiles)
@@ -391,7 +425,7 @@ func runMultiOutput(
 
 		// Check if this is a split output (path contains {group})
 		if strings.Contains(out.Path, "{group}") {
-			if err := generateSplitOutput(filesystem, allTokens, out, format, outPrefix, delimiter, detectedVersion, outputSchema); err != nil {
+			if err := generateSplitOutput(filesystem, allTokens, out, format, outPrefix, delimiter, detectedVersion, outputSchema, header); err != nil {
 				fmt.Fprintf(os.Stderr, "Error generating split output %s: %v\n", out.Path, err)
 				failures++
 			}
@@ -406,6 +440,7 @@ func runMultiOutput(
 			Delimiter:    delimiter,
 			Format:       format,
 			Prefix:       outPrefix,
+			Header:       header,
 		}
 
 		outputBytes, err := convertlib.FormatTokens(allTokens, format, opts)
@@ -452,6 +487,7 @@ func generateSplitOutput(
 	delimiter string,
 	inputSchema schema.Version,
 	outputSchema schema.Version,
+	header string,
 ) error {
 	// Group tokens by split key
 	groups := groupTokens(allTokens, out.SplitBy)
@@ -471,6 +507,7 @@ func generateSplitOutput(
 			Delimiter:    delimiter,
 			Format:       format,
 			Prefix:       prefix,
+			Header:       header,
 		}
 
 		outputBytes, err := convertlib.FormatTokens(tokens, format, opts)
