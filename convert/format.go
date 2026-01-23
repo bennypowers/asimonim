@@ -18,6 +18,7 @@ import (
 	"bennypowers.dev/asimonim/convert/formatter/scss"
 	"bennypowers.dev/asimonim/convert/formatter/swift"
 	"bennypowers.dev/asimonim/convert/formatter/typescript"
+	"bennypowers.dev/asimonim/convert/formatter/typescriptmap"
 	"bennypowers.dev/asimonim/token"
 )
 
@@ -45,6 +46,9 @@ const (
 
 	// FormatSCSS outputs SCSS variables with kebab-case names.
 	FormatSCSS Format = "scss"
+
+	// FormatTypeScriptMap outputs a TypeScript module with a typed TokenMap class.
+	FormatTypeScriptMap Format = "typescript-map"
 )
 
 // ValidFormats returns all valid format strings.
@@ -57,6 +61,7 @@ func ValidFormats() []string {
 		string(FormatTypeScript),
 		string(FormatCTS),
 		string(FormatSCSS),
+		string(FormatTypeScriptMap),
 	}
 }
 
@@ -77,6 +82,8 @@ func ParseFormat(s string) (Format, error) {
 		return FormatCTS, nil
 	case "scss", "sass":
 		return FormatSCSS, nil
+	case "typescript-map", "ts-map":
+		return FormatTypeScriptMap, nil
 	default:
 		return "", fmt.Errorf("unknown format: %s (valid: %s)", s, strings.Join(ValidFormats(), ", "))
 	}
@@ -107,6 +114,8 @@ func FormatTokens(tokens []*token.Token, format Format, opts Options) ([]byte, e
 		f = cts.New()
 	case FormatSCSS:
 		f = scss.New()
+	case FormatTypeScriptMap:
+		f = typescriptmap.New()
 	default:
 		return nil, fmt.Errorf("unsupported format: %s", format)
 	}
