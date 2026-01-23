@@ -30,6 +30,39 @@ type Config struct {
 	// Schema forces a specific schema version (optional).
 	// Valid values: "draft", "v2025.10"
 	Schema string `yaml:"schema" json:"schema"`
+
+	// Outputs specifies multiple output files to generate.
+	// When set, the convert command will generate all specified outputs in a single pass.
+	Outputs []OutputSpec `yaml:"outputs" json:"outputs"`
+}
+
+// OutputSpec represents a single output file specification.
+type OutputSpec struct {
+	// Format is the output format (required).
+	// Valid values: dtcg, json, android, swift, typescript, cts, scss
+	Format string `yaml:"format" json:"format"`
+
+	// Path is the output file path (required).
+	// Supports template variables: {group} for split key.
+	// Example: "js/{group}.ts" generates "js/color.ts", "js/animation.ts", etc.
+	Path string `yaml:"path" json:"path"`
+
+	// Prefix overrides the global prefix for this output.
+	Prefix string `yaml:"prefix" json:"prefix"`
+
+	// Flatten produces a shallow structure with delimiter-separated keys.
+	Flatten bool `yaml:"flatten" json:"flatten"`
+
+	// Delimiter is the separator for flattened keys.
+	Delimiter string `yaml:"delimiter" json:"delimiter"`
+
+	// SplitBy specifies how to split tokens into separate files.
+	// Valid values:
+	//   - "topLevel" or "" (default): split by first path segment
+	//   - "type": split by token $type
+	//   - "path[N]": split by Nth path segment (0-indexed)
+	// Only applies when Path contains {group} template.
+	SplitBy string `yaml:"splitBy" json:"splitBy"`
 }
 
 // FileSpec represents a token file specification.
