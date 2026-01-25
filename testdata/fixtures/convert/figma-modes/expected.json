@@ -1,0 +1,55 @@
+{
+  "color": {
+    "accent": {
+      "primary-on-dark": {
+        "$extensions": {
+          "com.figma": {
+            "mode": "on-dark",
+            "modes": ["on-light", "on-dark"]
+          }
+        },
+        "$type": "color",
+        "$value": "#4da6ff"
+      },
+      "primary-on-light": {
+        "$extensions": {
+          "com.figma": {
+            "mode": "on-light",
+            "modes": ["on-light", "on-dark"]
+          }
+        },
+        "$type": "color",
+        "$value": "#0066cc"
+      }
+    },
+    "surface": {
+      "on-dark": {
+        "$extensions": {
+          "com.figma": {
+            "mode": "on-dark",
+            "modes": ["on-light", "on-dark"]
+          }
+        },
+        "$type": "color",
+        "$value": "#1a1a1a"
+      },
+      "on-light": {
+        "$extensions": {
+          "com.figma": {
+            "mode": "on-light",
+            "modes": ["on-light", "on-dark"]
+          }
+        },
+        "$type": "color",
+        "$value": "#ffffff"
+      }
+    },
+    "text": {
+      "default": {
+        "$description": "Token without mode pair",
+        "$type": "color",
+        "$value": "#333333"
+      }
+    }
+  }
+}

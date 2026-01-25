@@ -19,6 +19,16 @@ import (
 	"bennypowers.dev/asimonim/token"
 )
 
+// FigmaModesConfig configures Figma mode detection for DTCG output.
+type FigmaModesConfig struct {
+	// Enabled activates Figma mode detection.
+	Enabled bool
+
+	// Patterns defines mode suffix pairs to detect.
+	// Each pair is [lightSuffix, darkSuffix], e.g., ["on-light", "on-dark"].
+	Patterns [][2]string
+}
+
 // Options configures token serialization behavior.
 type Options struct {
 	// InputSchema is the schema version of the input tokens.
@@ -41,6 +51,9 @@ type Options struct {
 
 	// Prefix is added to output variable names.
 	Prefix string
+
+	// FigmaModes configures mode detection for Figma-compatible DTCG output.
+	FigmaModes FigmaModesConfig
 }
 
 // DefaultOptions returns options with sensible defaults.
@@ -68,6 +81,11 @@ func Serialize(tokens []*token.Token, opts Options) map[string]any {
 	}
 	if opts.OutputSchema == schema.Unknown {
 		opts.OutputSchema = opts.InputSchema
+	}
+
+	// Apply Figma modes to tokens if configured
+	if opts.FigmaModes.Enabled && len(opts.FigmaModes.Patterns) > 0 {
+		applyFigmaModes(tokens, opts.FigmaModes.Patterns)
 	}
 
 	if opts.Flatten {
@@ -383,4 +401,77 @@ func convertStructuredColorToString(colorObj map[string]any) string {
 
 	// Fallback - return empty if we can't convert
 	return ""
+}
+
+// applyFigmaModes detects sibling token pairs matching mode patterns and adds
+// Figma mode extensions to both tokens. The mode names are preserved as they
+// appear in the token names (e.g., "on-light", "on-dark").
+func applyFigmaModes(tokens []*token.Token, patterns [][2]string) {
+	// Build a map of token names for quick lookup
+	tokenMap := make(map[string]*token.Token)
+	for _, tok := range tokens {
+		tokenMap[tok.Name] = tok
+	}
+
+	// Track which tokens have been assigned modes
+	assigned := make(map[string]bool)
+
+	for _, pattern := range patterns {
+		lightSuffix := pattern[0]
+		darkSuffix := pattern[1]
+
+		for _, tok := range tokens {
+			// Check if this token ends with the light suffix
+			if !strings.HasSuffix(tok.Name, "-"+lightSuffix) {
+				continue
+			}
+
+			// Check if already processed
+			if assigned[tok.Name] {
+				continue
+			}
+
+			// Derive the base name and dark sibling name
+			baseName := strings.TrimSuffix(tok.Name, "-"+lightSuffix)
+			darkName := baseName + "-" + darkSuffix
+
+			// Check if dark sibling exists
+			darkTok, hasDark := tokenMap[darkName]
+			if !hasDark {
+				continue
+			}
+
+			// Both exist - add Figma mode extensions to both
+			modes := []string{lightSuffix, darkSuffix}
+
+			addFigmaMode(tok, lightSuffix, modes)
+			addFigmaMode(darkTok, darkSuffix, modes)
+
+			assigned[tok.Name] = true
+			assigned[darkName] = true
+		}
+	}
+}
+
+// addFigmaMode adds $extensions.com.figma with mode info to a token.
+func addFigmaMode(tok *token.Token, modeName string, allModes []string) {
+	if tok.Extensions == nil {
+		tok.Extensions = make(map[string]any)
+	}
+
+	// Get or create com.figma extension
+	figmaExt, ok := tok.Extensions["com.figma"].(map[string]any)
+	if !ok {
+		figmaExt = make(map[string]any)
+	}
+
+	// Set the mode for this token
+	figmaExt["mode"] = modeName
+
+	// Set available modes list if not present
+	if _, hasAllModes := figmaExt["modes"]; !hasAllModes {
+		figmaExt["modes"] = allModes
+	}
+
+	tok.Extensions["com.figma"] = figmaExt
 }

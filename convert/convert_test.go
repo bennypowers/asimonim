@@ -414,3 +414,109 @@ func TestSerialize_DefaultOptions(t *testing.T) {
 		t.Error("expected non-nil result with default options")
 	}
 }
+
+func TestSerialize_FigmaModes(t *testing.T) {
+	mfs := testutil.NewFixtureFS(t, "fixtures/convert/figma-modes", "/test")
+
+	p := parser.NewJSONParser()
+	tokens, err := p.ParseFile(mfs, "/test/tokens.json", parser.Options{
+		SchemaVersion: schema.Draft,
+		SkipPositions: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to parse: %v", err)
+	}
+
+	if err := resolver.ResolveAliases(tokens, schema.Draft); err != nil {
+		t.Fatalf("failed to resolve aliases: %v", err)
+	}
+
+	result := convert.Serialize(tokens, convert.Options{
+		InputSchema:  schema.Draft,
+		OutputSchema: schema.Draft,
+		FigmaModes: convert.FigmaModesConfig{
+			Enabled:  true,
+			Patterns: [][2]string{{"on-light", "on-dark"}},
+		},
+	})
+
+	got, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		t.Fatalf("failed to marshal result: %v", err)
+	}
+
+	expected := testutil.LoadFixtureFile(t, "fixtures/convert/figma-modes/expected.json")
+
+	// Parse both for comparison
+	var gotMap, expectedMap map[string]any
+	if err := json.Unmarshal(got, &gotMap); err != nil {
+		t.Fatalf("failed to unmarshal got: %v", err)
+	}
+	if err := json.Unmarshal(expected, &expectedMap); err != nil {
+		t.Fatalf("failed to unmarshal expected: %v", err)
+	}
+
+	// Check that tokens with mode pairs have $extensions.com.figma
+	colorGroup := gotMap["color"].(map[string]any)
+	surfaceGroup := colorGroup["surface"].(map[string]any)
+	accentGroup := colorGroup["accent"].(map[string]any)
+	textGroup := colorGroup["text"].(map[string]any)
+
+	// Check surface on-light has Figma extension
+	surfaceOnLight := surfaceGroup["on-light"].(map[string]any)
+	if exts, ok := surfaceOnLight["$extensions"].(map[string]any); !ok {
+		t.Error("expected $extensions on surface.on-light")
+	} else if figma, ok := exts["com.figma"].(map[string]any); !ok {
+		t.Error("expected com.figma extension on surface.on-light")
+	} else {
+		if figma["mode"] != "on-light" {
+			t.Errorf("expected mode 'on-light', got %v", figma["mode"])
+		}
+	}
+
+	// Check accent primary-on-dark has Figma extension
+	accentDark := accentGroup["primary-on-dark"].(map[string]any)
+	if exts, ok := accentDark["$extensions"].(map[string]any); !ok {
+		t.Error("expected $extensions on accent.primary-on-dark")
+	} else if figma, ok := exts["com.figma"].(map[string]any); !ok {
+		t.Error("expected com.figma extension on accent.primary-on-dark")
+	} else {
+		if figma["mode"] != "on-dark" {
+			t.Errorf("expected mode 'on-dark', got %v", figma["mode"])
+		}
+	}
+
+	// Check text.default does NOT have Figma extension (no pair)
+	textDefault := textGroup["default"].(map[string]any)
+	if _, ok := textDefault["$extensions"]; ok {
+		t.Error("unexpected $extensions on text.default (no mode pair)")
+	}
+}
+
+func TestSerialize_FigmaModesDisabled(t *testing.T) {
+	mfs := testutil.NewFixtureFS(t, "fixtures/convert/figma-modes", "/test")
+
+	p := parser.NewJSONParser()
+	tokens, err := p.ParseFile(mfs, "/test/tokens.json", parser.Options{
+		SchemaVersion: schema.Draft,
+		SkipPositions: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to parse: %v", err)
+	}
+
+	// Serialize WITHOUT Figma modes
+	result := convert.Serialize(tokens, convert.Options{
+		InputSchema:  schema.Draft,
+		OutputSchema: schema.Draft,
+	})
+
+	colorGroup := result["color"].(map[string]any)
+	surfaceGroup := colorGroup["surface"].(map[string]any)
+
+	// Check that surface on-light does NOT have Figma extension
+	surfaceOnLight := surfaceGroup["on-light"].(map[string]any)
+	if _, ok := surfaceOnLight["$extensions"]; ok {
+		t.Error("unexpected $extensions when Figma modes disabled")
+	}
+}

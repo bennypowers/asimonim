@@ -69,6 +69,7 @@ func init() {
 	Cmd.Flags().Bool("flatten", false, "Flatten to shallow structure (dtcg/json formats only)")
 	Cmd.Flags().StringP("delimiter", "d", "-", "Delimiter for flattened keys")
 	Cmd.Flags().BoolP("in-place", "i", false, "Overwrite input files with converted output")
+	Cmd.Flags().StringSlice("figma-modes", nil, "Mode suffix pairs for Figma extensions (e.g., \"on-light:on-dark\")")
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -78,6 +79,10 @@ func run(cmd *cobra.Command, args []string) error {
 	delimiter, _ := cmd.Flags().GetString("delimiter")
 	inPlace, _ := cmd.Flags().GetBool("in-place")
 	schemaFlag, _ := cmd.Flags().GetString("schema")
+	figmaModesFlag, _ := cmd.Flags().GetStringSlice("figma-modes")
+
+	// Parse figma-modes into pattern pairs
+	figmaModes := parseFigmaModePatterns(figmaModesFlag)
 
 	// Parse format
 	format, err := convertlib.ParseFormat(formatFlag)
@@ -148,7 +153,31 @@ func run(cmd *cobra.Command, args []string) error {
 		return runInPlace(filesystem, jsonParser, cfg, resolvedFiles, targetSchema)
 	}
 
-	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter)
+	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter, figmaModes)
+}
+
+// parseFigmaModePatterns parses "suffix1:suffix2" strings into pattern pairs.
+func parseFigmaModePatterns(patterns []string) convertlib.FigmaModesConfig {
+	if len(patterns) == 0 {
+		return convertlib.FigmaModesConfig{}
+	}
+
+	var pairs [][2]string
+	for _, p := range patterns {
+		parts := strings.SplitN(p, ":", 2)
+		if len(parts) == 2 {
+			pairs = append(pairs, [2]string{parts[0], parts[1]})
+		}
+	}
+
+	if len(pairs) == 0 {
+		return convertlib.FigmaModesConfig{}
+	}
+
+	return convertlib.FigmaModesConfig{
+		Enabled:  true,
+		Patterns: pairs,
+	}
 }
 
 func runInPlace(
@@ -234,6 +263,7 @@ func runCombined(
 	format convertlib.Format,
 	flatten bool,
 	delimiter string,
+	figmaModes convertlib.FigmaModesConfig,
 ) error {
 	var allTokens []*token.Token
 	var detectedVersion schema.Version
@@ -298,6 +328,7 @@ func runCombined(
 		Delimiter:    delimiter,
 		Format:       format,
 		Prefix:       prefix,
+		FigmaModes:   figmaModes,
 	}
 
 	outputBytes, err := convertlib.FormatTokens(allTokens, format, opts)
