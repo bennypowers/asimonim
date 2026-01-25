@@ -27,7 +27,14 @@ func New() *Formatter {
 func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byte, error) {
 	var sb strings.Builder
 	sb.WriteString(`<?xml version="1.0" encoding="utf-8"?>`)
-	sb.WriteString("\n<resources>\n")
+	sb.WriteString("\n")
+
+	// Add header if provided
+	if opts.Header != "" {
+		sb.WriteString(formatter.FormatHeader(opts.Header, formatter.XMLComments))
+	}
+
+	sb.WriteString("<resources>\n")
 
 	sorted := formatter.SortTokens(tokens)
 

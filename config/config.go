@@ -31,6 +31,10 @@ type Config struct {
 	// Valid values: "draft", "v2025.10"
 	Schema string `yaml:"schema" json:"schema"`
 
+	// Header is the file header to prepend to output.
+	// Can be a string or a file path prefixed with "@" (e.g., "@LICENSE_HEADER.txt").
+	Header string `yaml:"header" json:"header"`
+
 	// Outputs specifies multiple output files to generate.
 	// When set, the convert command will generate all specified outputs in a single pass.
 	Outputs []OutputSpec `yaml:"outputs" json:"outputs"`

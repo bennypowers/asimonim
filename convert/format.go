@@ -94,6 +94,7 @@ func FormatTokens(tokens []*token.Token, format Format, opts Options) ([]byte, e
 	fmtOpts := formatter.Options{
 		Prefix:    opts.Prefix,
 		Delimiter: opts.Delimiter,
+		Header:    opts.Header,
 	}
 
 	var f formatter.Formatter
