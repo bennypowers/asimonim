@@ -48,17 +48,18 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 	return []byte(sb.String()), nil
 }
 
-// buildTokenName constructs a token name from its path, respecting opts.Delimiter and opts.Prefix.
-func buildTokenName(tok *token.Token, opts formatter.Options) string {
-	delimiter := opts.Delimiter
-	if delimiter == "" {
-		delimiter = "-"
-	}
-	name := strings.Join(tok.Path, delimiter)
+// buildCSSVarName constructs a CSS variable name like --rh-color-blue.
+func buildCSSVarName(tok *token.Token, opts formatter.Options) string {
+	name := strings.Join(tok.Path, "-")
 	if opts.Prefix != "" {
-		name = opts.Prefix + delimiter + name
+		name = opts.Prefix + "-" + name
 	}
-	return name
+	return "--" + name
+}
+
+// buildDotPath constructs a dot-separated path like color.blue (no prefix).
+func buildDotPath(tok *token.Token) string {
+	return strings.Join(tok.Path, ".")
 }
 
 // writeTypeDefinitions writes the common type interfaces.
@@ -93,9 +94,9 @@ export interface DesignToken<V> {
 `)
 }
 
-// writeTokenNameType writes the TokenName union type.
+// writeTokenNameType writes the TokenName union type with both CSS var and dot-path keys.
 func writeTokenNameType(sb *strings.Builder, tokens []*token.Token, opts formatter.Options) {
-	sb.WriteString("/**\n * Union type of all token names.\n */\n")
+	sb.WriteString("/**\n * Union type of all token names (CSS variable or dot-path).\n */\n")
 
 	if len(tokens) == 0 {
 		sb.WriteString("export type TokenName = never;\n")
@@ -104,11 +105,13 @@ func writeTokenNameType(sb *strings.Builder, tokens []*token.Token, opts formatt
 
 	sb.WriteString("export type TokenName =\n")
 	for i, tok := range tokens {
-		name := buildTokenName(tok, opts)
+		cssVar := buildCSSVarName(tok, opts)
+		dotPath := buildDotPath(tok)
+		fmt.Fprintf(sb, "  | \"%s\"\n", cssVar)
 		if i == len(tokens)-1 {
-			fmt.Fprintf(sb, "  | \"%s\";\n", name)
+			fmt.Fprintf(sb, "  | \"%s\";\n", dotPath)
 		} else {
-			fmt.Fprintf(sb, "  | \"%s\"\n", name)
+			fmt.Fprintf(sb, "  | \"%s\"\n", dotPath)
 		}
 	}
 }
@@ -116,30 +119,34 @@ func writeTokenNameType(sb *strings.Builder, tokens []*token.Token, opts formatt
 // writeTokenMap writes the TokenMap class with typed get() overloads.
 func writeTokenMap(sb *strings.Builder, tokens []*token.Token, opts formatter.Options) {
 	// Write .get() overloads
-	sb.WriteString("/**\n * Typed map for accessing design tokens.\n */\n")
+	sb.WriteString("/**\n * Typed map for accessing design tokens by CSS variable name or dot-path.\n */\n")
 	sb.WriteString("export class TokenMap {\n")
 	sb.WriteString("  private readonly tokens: Map<TokenName, DesignToken<unknown>>;\n\n")
 	sb.WriteString("  constructor() {\n")
 	sb.WriteString("    this.tokens = new Map();\n")
 
-	// Populate the map
+	// Populate the map with both CSS var and dot-path keys
 	for _, tok := range tokens {
-		name := buildTokenName(tok, opts)
+		cssVar := buildCSSVarName(tok, opts)
+		dotPath := buildDotPath(tok)
 		value := formatValue(tok)
-		fmt.Fprintf(sb, "    this.tokens.set(\"%s\", %s);\n", name, value)
+		fmt.Fprintf(sb, "    this.tokens.set(\"%s\", %s);\n", cssVar, value)
+		fmt.Fprintf(sb, "    this.tokens.set(\"%s\", this.tokens.get(\"%s\")!);\n", dotPath, cssVar)
 	}
 
 	sb.WriteString("  }\n\n")
 
-	// Write typed get() overloads
+	// Write typed get() overloads for both key types
 	for _, tok := range tokens {
-		name := buildTokenName(tok, opts)
+		cssVar := buildCSSVarName(tok, opts)
+		dotPath := buildDotPath(tok)
 		valueType := inferValueType(tok)
 
 		if tok.Description != "" {
 			sb.WriteString(typescript.FormatJSDoc(tok.Description))
 		}
-		fmt.Fprintf(sb, "  get(name: \"%s\"): DesignToken<%s>;\n", name, valueType)
+		fmt.Fprintf(sb, "  get(name: \"%s\"): DesignToken<%s>;\n", cssVar, valueType)
+		fmt.Fprintf(sb, "  get(name: \"%s\"): DesignToken<%s>;\n", dotPath, valueType)
 	}
 
 	// Generic fallback overload
