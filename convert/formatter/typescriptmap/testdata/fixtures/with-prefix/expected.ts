@@ -39,18 +39,18 @@ export type TokenName =
 /**
  * Typed map for accessing design tokens by CSS variable name or dot-path.
  */
-class TokenMap {
-  #map: Map<TokenName, DesignToken<unknown>>;
+export class TokenMap<T extends Record<string, DesignToken<unknown>>> {
+  #map: Map<string, DesignToken<unknown>>;
 
   get size(): number { return this.#map.size; }
   [Symbol.iterator]() { return this.#map[Symbol.iterator](); }
 
   constructor(
-    entries: Record<string, DesignToken<unknown>>,
+    entries: T,
     prefix = "",
     delimiter = "-"
   ) {
-    this.#map = new Map(Object.entries(entries)) as Map<TokenName, DesignToken<unknown>>;
+    this.#map = new Map(Object.entries(entries));
     // Add dot-path aliases
     for (const [key, value] of this.#map) {
       if (key.startsWith("--")) {
@@ -59,27 +59,25 @@ class TokenMap {
           path = path.slice(prefix.length + delimiter.length);
         }
         const dotPath = path.split(delimiter).join(".");
-        this.#map.set(dotPath as TokenName, value);
+        this.#map.set(dotPath, value);
       }
     }
   }
 
-  get(name: "--rh-color-primary"): DesignToken<Color>;
-  get(name: "color.primary"): DesignToken<Color>;
-  get(name: TokenName): DesignToken<unknown>;
-  get(name: string): undefined;
-  get(name: TokenName): DesignToken<unknown> | undefined {
-    return this.#map.get(name as TokenName);
+  get<K extends keyof T>(name: K): T[K];
+  get(name: string): DesignToken<unknown> | undefined;
+  get(name: string): DesignToken<unknown> | undefined {
+    return this.#map.get(name);
   }
 
-  has(name: TokenName): true;
-  has(name: string): false;
-  has(name: string): boolean { return this.#map.has(name as TokenName); }
+  has<K extends keyof T>(name: K): true;
+  has(name: string): boolean;
+  has(name: string): boolean { return this.#map.has(name); }
 
   keys() { return this.#map.keys(); }
   values() { return this.#map.values(); }
   entries() { return this.#map.entries(); }
-  forEach(fn: (value: DesignToken<unknown>, key: TokenName, map: TokenMap) => void, thisArg?: unknown): void {
+  forEach(fn: (value: DesignToken<unknown>, key: string, map: TokenMap<T>) => void, thisArg?: unknown): void {
     this.#map.forEach((v, k) => { fn.call(thisArg, v, k, this); });
   }
 }
@@ -91,5 +89,5 @@ export const tokens = new TokenMap({
   "--rh-color-primary": {
       "$type": "color",
       "$value": "#FF6B35"
-    },
+    } as DesignToken<Color>,
 }, "rh", "-");

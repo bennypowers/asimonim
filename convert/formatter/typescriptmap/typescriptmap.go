@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"bennypowers.dev/asimonim/convert/formatter"
-	"bennypowers.dev/asimonim/convert/formatter/typescript"
 	"bennypowers.dev/asimonim/parser/common"
 	"bennypowers.dev/asimonim/token"
 )
@@ -139,20 +138,20 @@ func writeTokenNameType(sb *strings.Builder, tokens []*token.Token, opts formatt
 	}
 }
 
-// writeTokenMap writes the TokenMap class with typed get() overloads.
+// writeTokenMap writes the generic TokenMap class.
 func writeTokenMap(sb *strings.Builder, tokens []*token.Token, opts formatter.Options) {
-	// Write TokenMap class with private field and constructor taking entries
+	// Write generic TokenMap class - type safety comes from entries object
 	sb.WriteString("/**\n * Typed map for accessing design tokens by CSS variable name or dot-path.\n */\n")
-	sb.WriteString("class TokenMap {\n")
-	sb.WriteString("  #map: Map<TokenName, DesignToken<unknown>>;\n\n")
+	sb.WriteString("export class TokenMap<T extends Record<string, DesignToken<unknown>>> {\n")
+	sb.WriteString("  #map: Map<string, DesignToken<unknown>>;\n\n")
 	sb.WriteString("  get size(): number { return this.#map.size; }\n")
 	sb.WriteString("  [Symbol.iterator]() { return this.#map[Symbol.iterator](); }\n\n")
 	sb.WriteString("  constructor(\n")
-	sb.WriteString("    entries: Record<string, DesignToken<unknown>>,\n")
+	sb.WriteString("    entries: T,\n")
 	sb.WriteString("    prefix = \"\",\n")
 	sb.WriteString("    delimiter = \"-\"\n")
 	sb.WriteString("  ) {\n")
-	sb.WriteString("    this.#map = new Map(Object.entries(entries)) as Map<TokenName, DesignToken<unknown>>;\n")
+	sb.WriteString("    this.#map = new Map(Object.entries(entries));\n")
 	sb.WriteString("    // Add dot-path aliases\n")
 	sb.WriteString("    for (const [key, value] of this.#map) {\n")
 	sb.WriteString("      if (key.startsWith(\"--\")) {\n")
@@ -161,53 +160,40 @@ func writeTokenMap(sb *strings.Builder, tokens []*token.Token, opts formatter.Op
 	sb.WriteString("          path = path.slice(prefix.length + delimiter.length);\n")
 	sb.WriteString("        }\n")
 	sb.WriteString("        const dotPath = path.split(delimiter).join(\".\");\n")
-	sb.WriteString("        this.#map.set(dotPath as TokenName, value);\n")
+	sb.WriteString("        this.#map.set(dotPath, value);\n")
 	sb.WriteString("      }\n")
 	sb.WriteString("    }\n")
 	sb.WriteString("  }\n\n")
 
-	// Write typed get() overloads for both key types
-	for _, tok := range tokens {
-		cssVar := escapeTS(buildCSSVarName(tok, opts))
-		dotPath := escapeTS(buildDotPath(tok))
-		valueType := inferValueType(tok)
-
-		if tok.Description != "" {
-			sb.WriteString(typescript.FormatJSDoc(tok.Description))
-		}
-		fmt.Fprintf(sb, "  get(name: \"%s\"): DesignToken<%s>;\n", cssVar, valueType)
-		fmt.Fprintf(sb, "  get(name: \"%s\"): DesignToken<%s>;\n", dotPath, valueType)
-	}
-
-	// Generic fallback overload
-	sb.WriteString("  get(name: TokenName): DesignToken<unknown>;\n")
-	sb.WriteString("  get(name: string): undefined;\n")
-	sb.WriteString("  get(name: TokenName): DesignToken<unknown> | undefined {\n")
-	sb.WriteString("    return this.#map.get(name as TokenName);\n")
+	// Generic get/has methods - type inference from T
+	sb.WriteString("  get<K extends keyof T>(name: K): T[K];\n")
+	sb.WriteString("  get(name: string): DesignToken<unknown> | undefined;\n")
+	sb.WriteString("  get(name: string): DesignToken<unknown> | undefined {\n")
+	sb.WriteString("    return this.#map.get(name);\n")
 	sb.WriteString("  }\n\n")
 
-	// Add has() method with overloads
-	sb.WriteString("  has(name: TokenName): true;\n")
-	sb.WriteString("  has(name: string): false;\n")
-	sb.WriteString("  has(name: string): boolean { return this.#map.has(name as TokenName); }\n\n")
+	sb.WriteString("  has<K extends keyof T>(name: K): true;\n")
+	sb.WriteString("  has(name: string): boolean;\n")
+	sb.WriteString("  has(name: string): boolean { return this.#map.has(name); }\n\n")
 
 	// Add iterator methods
 	sb.WriteString("  keys() { return this.#map.keys(); }\n")
 	sb.WriteString("  values() { return this.#map.values(); }\n")
 	sb.WriteString("  entries() { return this.#map.entries(); }\n")
-	sb.WriteString("  forEach(fn: (value: DesignToken<unknown>, key: TokenName, map: TokenMap) => void, thisArg?: unknown): void {\n")
+	sb.WriteString("  forEach(fn: (value: DesignToken<unknown>, key: string, map: TokenMap<T>) => void, thisArg?: unknown): void {\n")
 	sb.WriteString("    this.#map.forEach((v, k) => { fn.call(thisArg, v, k, this); });\n")
 	sb.WriteString("  }\n")
 
 	sb.WriteString("}\n\n")
 
-	// Build token entries object
+	// Build token entries object with type annotations for inference
 	sb.WriteString("/**\n * Default token map instance.\n */\n")
 	sb.WriteString("export const tokens = new TokenMap({\n")
 	for _, tok := range tokens {
 		cssVar := escapeTS(buildCSSVarName(tok, opts))
 		value := formatValue(tok)
-		fmt.Fprintf(sb, "  \"%s\": %s,\n", cssVar, value)
+		valueType := inferValueType(tok)
+		fmt.Fprintf(sb, "  \"%s\": %s as DesignToken<%s>,\n", cssVar, value, valueType)
 	}
 	// Pass prefix and delimiter to constructor
 	prefix := escapeTS(opts.Prefix)
