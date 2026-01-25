@@ -62,6 +62,29 @@ func buildDotPath(tok *token.Token) string {
 	return strings.Join(tok.Path, ".")
 }
 
+// escapeTS escapes a string for use in a TypeScript double-quoted string literal.
+// It escapes backslashes, double quotes, and control characters.
+func escapeTS(s string) string {
+	var sb strings.Builder
+	for _, r := range s {
+		switch r {
+		case '\\':
+			sb.WriteString(`\\`)
+		case '"':
+			sb.WriteString(`\"`)
+		case '\n':
+			sb.WriteString(`\n`)
+		case '\r':
+			sb.WriteString(`\r`)
+		case '\t':
+			sb.WriteString(`\t`)
+		default:
+			sb.WriteRune(r)
+		}
+	}
+	return sb.String()
+}
+
 // writeTypeDefinitions writes the common type interfaces.
 func writeTypeDefinitions(sb *strings.Builder) {
 	sb.WriteString(`/**
@@ -105,8 +128,8 @@ func writeTokenNameType(sb *strings.Builder, tokens []*token.Token, opts formatt
 
 	sb.WriteString("export type TokenName =\n")
 	for i, tok := range tokens {
-		cssVar := buildCSSVarName(tok, opts)
-		dotPath := buildDotPath(tok)
+		cssVar := escapeTS(buildCSSVarName(tok, opts))
+		dotPath := escapeTS(buildDotPath(tok))
 		fmt.Fprintf(sb, "  | \"%s\"\n", cssVar)
 		if i == len(tokens)-1 {
 			fmt.Fprintf(sb, "  | \"%s\";\n", dotPath)
@@ -118,28 +141,35 @@ func writeTokenNameType(sb *strings.Builder, tokens []*token.Token, opts formatt
 
 // writeTokenMap writes the TokenMap class with typed get() overloads.
 func writeTokenMap(sb *strings.Builder, tokens []*token.Token, opts formatter.Options) {
-	// Write .get() overloads
+	// Write TokenMap class with private field and constructor taking entries
 	sb.WriteString("/**\n * Typed map for accessing design tokens by CSS variable name or dot-path.\n */\n")
-	sb.WriteString("export class TokenMap {\n")
-	sb.WriteString("  private readonly tokens: Map<TokenName, DesignToken<unknown>>;\n\n")
-	sb.WriteString("  constructor() {\n")
-	sb.WriteString("    this.tokens = new Map();\n")
-
-	// Populate the map with both CSS var and dot-path keys
-	for _, tok := range tokens {
-		cssVar := buildCSSVarName(tok, opts)
-		dotPath := buildDotPath(tok)
-		value := formatValue(tok)
-		fmt.Fprintf(sb, "    this.tokens.set(\"%s\", %s);\n", cssVar, value)
-		fmt.Fprintf(sb, "    this.tokens.set(\"%s\", this.tokens.get(\"%s\")!);\n", dotPath, cssVar)
-	}
-
+	sb.WriteString("class TokenMap {\n")
+	sb.WriteString("  #map: Map<TokenName, DesignToken<unknown>>;\n\n")
+	sb.WriteString("  get size(): number { return this.#map.size; }\n")
+	sb.WriteString("  [Symbol.iterator]() { return this.#map[Symbol.iterator](); }\n\n")
+	sb.WriteString("  constructor(\n")
+	sb.WriteString("    entries: Record<string, DesignToken<unknown>>,\n")
+	sb.WriteString("    prefix = \"\",\n")
+	sb.WriteString("    delimiter = \"-\"\n")
+	sb.WriteString("  ) {\n")
+	sb.WriteString("    this.#map = new Map(Object.entries(entries)) as Map<TokenName, DesignToken<unknown>>;\n")
+	sb.WriteString("    // Add dot-path aliases\n")
+	sb.WriteString("    for (const [key, value] of this.#map) {\n")
+	sb.WriteString("      if (key.startsWith(\"--\")) {\n")
+	sb.WriteString("        let path = key.slice(2);\n")
+	sb.WriteString("        if (prefix && path.startsWith(prefix + delimiter)) {\n")
+	sb.WriteString("          path = path.slice(prefix.length + delimiter.length);\n")
+	sb.WriteString("        }\n")
+	sb.WriteString("        const dotPath = path.split(delimiter).join(\".\");\n")
+	sb.WriteString("        this.#map.set(dotPath as TokenName, value);\n")
+	sb.WriteString("      }\n")
+	sb.WriteString("    }\n")
 	sb.WriteString("  }\n\n")
 
 	// Write typed get() overloads for both key types
 	for _, tok := range tokens {
-		cssVar := buildCSSVarName(tok, opts)
-		dotPath := buildDotPath(tok)
+		cssVar := escapeTS(buildCSSVarName(tok, opts))
+		dotPath := escapeTS(buildDotPath(tok))
 		valueType := inferValueType(tok)
 
 		if tok.Description != "" {
@@ -151,29 +181,41 @@ func writeTokenMap(sb *strings.Builder, tokens []*token.Token, opts formatter.Op
 
 	// Generic fallback overload
 	sb.WriteString("  get(name: TokenName): DesignToken<unknown>;\n")
-	sb.WriteString("  get(name: TokenName): DesignToken<unknown> {\n")
-	sb.WriteString("    const token = this.tokens.get(name);\n")
-	sb.WriteString("    if (!token) {\n")
-	sb.WriteString("      throw new Error(`Token \"${name}\" not found`);\n")
-	sb.WriteString("    }\n")
-	sb.WriteString("    return token;\n")
+	sb.WriteString("  get(name: string): undefined;\n")
+	sb.WriteString("  get(name: TokenName): DesignToken<unknown> | undefined {\n")
+	sb.WriteString("    return this.#map.get(name as TokenName);\n")
 	sb.WriteString("  }\n\n")
 
-	// Add has() method
-	sb.WriteString("  has(name: TokenName): boolean {\n")
-	sb.WriteString("    return this.tokens.has(name);\n")
-	sb.WriteString("  }\n\n")
+	// Add has() method with overloads
+	sb.WriteString("  has(name: TokenName): true;\n")
+	sb.WriteString("  has(name: string): false;\n")
+	sb.WriteString("  has(name: string): boolean { return this.#map.has(name as TokenName); }\n\n")
 
-	// Add keys() method
-	sb.WriteString("  keys(): IterableIterator<TokenName> {\n")
-	sb.WriteString("    return this.tokens.keys();\n")
+	// Add iterator methods
+	sb.WriteString("  keys() { return this.#map.keys(); }\n")
+	sb.WriteString("  values() { return this.#map.values(); }\n")
+	sb.WriteString("  entries() { return this.#map.entries(); }\n")
+	sb.WriteString("  forEach(fn: (value: DesignToken<unknown>, key: TokenName, map: TokenMap) => void, thisArg?: unknown): void {\n")
+	sb.WriteString("    this.#map.forEach((v, k) => { fn.call(thisArg, v, k, this); });\n")
 	sb.WriteString("  }\n")
 
 	sb.WriteString("}\n\n")
 
-	// Export a default instance
+	// Build token entries object
 	sb.WriteString("/**\n * Default token map instance.\n */\n")
-	sb.WriteString("export const tokens = new TokenMap();\n")
+	sb.WriteString("export const tokens = new TokenMap({\n")
+	for _, tok := range tokens {
+		cssVar := escapeTS(buildCSSVarName(tok, opts))
+		value := formatValue(tok)
+		fmt.Fprintf(sb, "  \"%s\": %s,\n", cssVar, value)
+	}
+	// Pass prefix and delimiter to constructor
+	prefix := escapeTS(opts.Prefix)
+	delimiter := opts.Delimiter
+	if delimiter == "" {
+		delimiter = "-"
+	}
+	fmt.Fprintf(sb, "}, \"%s\", \"%s\");\n", prefix, escapeTS(delimiter))
 }
 
 // formatValue formats a token value for TypeScript output.
