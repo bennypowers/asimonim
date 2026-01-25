@@ -15,7 +15,6 @@ import (
 	"bennypowers.dev/asimonim/convert/formatter"
 	"bennypowers.dev/asimonim/convert/formatter/typescript"
 	"bennypowers.dev/asimonim/parser/common"
-	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/token"
 )
 
@@ -47,6 +46,19 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 	writeTokenMap(&sb, sorted, opts)
 
 	return []byte(sb.String()), nil
+}
+
+// buildTokenName constructs a token name from its path, respecting opts.Delimiter and opts.Prefix.
+func buildTokenName(tok *token.Token, opts formatter.Options) string {
+	delimiter := opts.Delimiter
+	if delimiter == "" {
+		delimiter = "-"
+	}
+	name := strings.Join(tok.Path, delimiter)
+	if opts.Prefix != "" {
+		name = opts.Prefix + delimiter + name
+	}
+	return name
 }
 
 // writeTypeDefinitions writes the common type interfaces.
@@ -84,14 +96,15 @@ export interface DesignToken<V> {
 // writeTokenNameType writes the TokenName union type.
 func writeTokenNameType(sb *strings.Builder, tokens []*token.Token, opts formatter.Options) {
 	sb.WriteString("/**\n * Union type of all token names.\n */\n")
+
+	if len(tokens) == 0 {
+		sb.WriteString("export type TokenName = never;\n")
+		return
+	}
+
 	sb.WriteString("export type TokenName =\n")
-
 	for i, tok := range tokens {
-		name := strings.Join(tok.Path, "-")
-		if opts.Prefix != "" {
-			name = opts.Prefix + "-" + name
-		}
-
+		name := buildTokenName(tok, opts)
 		if i == len(tokens)-1 {
 			fmt.Fprintf(sb, "  | \"%s\";\n", name)
 		} else {
@@ -111,10 +124,7 @@ func writeTokenMap(sb *strings.Builder, tokens []*token.Token, opts formatter.Op
 
 	// Populate the map
 	for _, tok := range tokens {
-		name := strings.Join(tok.Path, "-")
-		if opts.Prefix != "" {
-			name = opts.Prefix + "-" + name
-		}
+		name := buildTokenName(tok, opts)
 		value := formatValue(tok)
 		fmt.Fprintf(sb, "    this.tokens.set(\"%s\", %s);\n", name, value)
 	}
@@ -123,10 +133,7 @@ func writeTokenMap(sb *strings.Builder, tokens []*token.Token, opts formatter.Op
 
 	// Write typed get() overloads
 	for _, tok := range tokens {
-		name := strings.Join(tok.Path, "-")
-		if opts.Prefix != "" {
-			name = opts.Prefix + "-" + name
-		}
+		name := buildTokenName(tok, opts)
 		valueType := inferValueType(tok)
 
 		if tok.Description != "" {
@@ -229,7 +236,7 @@ func inferValueType(tok *token.Token) string {
 	case token.TypeColor:
 		// Check if it's a structured color
 		value := formatter.ResolvedValue(tok)
-		if _, err := common.ParseColorValue(value, schema.V2025_10); err == nil {
+		if _, err := common.ParseColorValue(value, tok.SchemaVersion); err == nil {
 			return "Color"
 		}
 		if _, ok := value.(map[string]any); ok {

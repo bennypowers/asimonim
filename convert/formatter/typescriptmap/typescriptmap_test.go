@@ -210,3 +210,78 @@ func TestFormat_CubicBezier(t *testing.T) {
 		t.Error("expected tuple type for cubicBezier")
 	}
 }
+
+func TestFormat_EmptyTokens(t *testing.T) {
+	tokens := []*token.Token{}
+
+	f := typescriptmap.New()
+	result, err := f.Format(tokens, formatter.Options{})
+	if err != nil {
+		t.Fatalf("Format() error = %v", err)
+	}
+
+	output := string(result)
+
+	// Empty tokens should produce valid TypeScript with never type
+	if !strings.Contains(output, "export type TokenName = never;") {
+		t.Error("expected TokenName = never for empty tokens")
+	}
+	// Should still have class definition
+	if !strings.Contains(output, "export class TokenMap") {
+		t.Error("expected TokenMap class even with empty tokens")
+	}
+}
+
+func TestFormat_CustomDelimiter(t *testing.T) {
+	tokens := []*token.Token{
+		{
+			Name:  "color-primary",
+			Path:  []string{"color", "primary"},
+			Type:  token.TypeColor,
+			Value: "#FF6B35",
+		},
+	}
+
+	f := typescriptmap.New()
+	result, err := f.Format(tokens, formatter.Options{Delimiter: "."})
+	if err != nil {
+		t.Fatalf("Format() error = %v", err)
+	}
+
+	output := string(result)
+
+	// Check delimiter is applied
+	if !strings.Contains(output, `| "color.primary"`) {
+		t.Error("expected dot delimiter in TokenName")
+	}
+	if !strings.Contains(output, `get(name: "color.primary")`) {
+		t.Error("expected dot delimiter in get() overload")
+	}
+}
+
+func TestFormat_PrefixWithCustomDelimiter(t *testing.T) {
+	tokens := []*token.Token{
+		{
+			Name:  "color-primary",
+			Path:  []string{"color", "primary"},
+			Type:  token.TypeColor,
+			Value: "#FF6B35",
+		},
+	}
+
+	f := typescriptmap.New()
+	result, err := f.Format(tokens, formatter.Options{Prefix: "rh", Delimiter: "."})
+	if err != nil {
+		t.Fatalf("Format() error = %v", err)
+	}
+
+	output := string(result)
+
+	// Check prefix with custom delimiter
+	if !strings.Contains(output, `| "rh.color.primary"`) {
+		t.Error("expected prefix with dot delimiter in TokenName")
+	}
+	if !strings.Contains(output, `get(name: "rh.color.primary")`) {
+		t.Error("expected prefix with dot delimiter in get() overload")
+	}
+}
