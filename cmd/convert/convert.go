@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -286,47 +287,10 @@ func runCombined(
 	flatten bool,
 	delimiter string,
 ) error {
-	var allTokens []*token.Token
-	var detectedVersion schema.Version
-
-	// Phase 1: Parse all files
-	for _, rf := range resolvedFiles {
-		data, err := filesystem.ReadFile(rf.Path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", rf.Specifier, err)
-			continue
-		}
-
-		version, err := schema.DetectVersion(data, nil)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error detecting schema for %s: %v\n", rf.Specifier, err)
-			continue
-		}
-		if detectedVersion == schema.Unknown {
-			detectedVersion = version
-		}
-
-		opts := cfg.OptionsForFile(rf.Specifier)
-		opts.SkipPositions = true
-		if version != schema.Unknown {
-			opts.SchemaVersion = version
-		}
-
-		tokens, err := jsonParser.ParseFile(filesystem, rf.Path, opts)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", rf.Specifier, err)
-			continue
-		}
-
-		allTokens = append(allTokens, tokens...)
-	}
-
-	// Phase 2: Resolve aliases across all tokens
-	if detectedVersion == schema.Unknown {
-		detectedVersion = schema.Draft
-	}
-	if err := resolver.ResolveAliases(allTokens, detectedVersion); err != nil {
-		return fmt.Errorf("error resolving aliases: %w", err)
+	// Parse all files and resolve aliases
+	allTokens, detectedVersion, err := parseAndResolveTokens(filesystem, jsonParser, cfg, resolvedFiles)
+	if err != nil {
+		return err
 	}
 
 	// Determine output schema
@@ -385,47 +349,10 @@ func runMultiOutput(
 	targetSchema schema.Version,
 	outputs []config.OutputSpec,
 ) error {
-	var allTokens []*token.Token
-	var detectedVersion schema.Version
-
-	// Phase 1: Parse all files
-	for _, rf := range resolvedFiles {
-		data, err := filesystem.ReadFile(rf.Path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", rf.Specifier, err)
-			continue
-		}
-
-		version, err := schema.DetectVersion(data, nil)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error detecting schema for %s: %v\n", rf.Specifier, err)
-			continue
-		}
-		if detectedVersion == schema.Unknown {
-			detectedVersion = version
-		}
-
-		opts := cfg.OptionsForFile(rf.Specifier)
-		opts.SkipPositions = true
-		if version != schema.Unknown {
-			opts.SchemaVersion = version
-		}
-
-		tokens, err := jsonParser.ParseFile(filesystem, rf.Path, opts)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", rf.Specifier, err)
-			continue
-		}
-
-		allTokens = append(allTokens, tokens...)
-	}
-
-	// Phase 2: Resolve aliases across all tokens
-	if detectedVersion == schema.Unknown {
-		detectedVersion = schema.Draft
-	}
-	if err := resolver.ResolveAliases(allTokens, detectedVersion); err != nil {
-		return fmt.Errorf("error resolving aliases: %w", err)
+	// Parse all files and resolve aliases
+	allTokens, detectedVersion, err := parseAndResolveTokens(filesystem, jsonParser, cfg, resolvedFiles)
+	if err != nil {
+		return err
 	}
 
 	// Determine output schema
@@ -493,6 +420,13 @@ func runMultiOutput(
 			outputBytes = append(outputBytes, '\n')
 		}
 
+		// Ensure parent directory exists
+		if err := ensureDir(out.Path); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating directory for %s: %v\n", out.Path, err)
+			failures++
+			continue
+		}
+
 		if err := filesystem.WriteFile(out.Path, outputBytes, 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing to %s: %v\n", out.Path, err)
 			failures++
@@ -524,8 +458,11 @@ func generateSplitOutput(
 
 	var failures int
 	for groupName, tokens := range groups {
-		// Expand path template
-		path := strings.ReplaceAll(out.Path, "{group}", groupName)
+		// Sanitize group name to prevent path traversal
+		safeName := sanitizeGroupName(groupName)
+
+		// Expand path template with sanitized name
+		path := strings.ReplaceAll(out.Path, "{group}", safeName)
 
 		opts := convertlib.Options{
 			InputSchema:  inputSchema,
@@ -546,6 +483,13 @@ func generateSplitOutput(
 		// Append newline for proper file formatting (if not already present)
 		if len(outputBytes) > 0 && outputBytes[len(outputBytes)-1] != '\n' {
 			outputBytes = append(outputBytes, '\n')
+		}
+
+		// Ensure parent directory exists
+		if err := ensureDir(path); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating directory for %s: %v\n", path, err)
+			failures++
+			continue
 		}
 
 		if err := filesystem.WriteFile(path, outputBytes, 0644); err != nil {
@@ -606,4 +550,90 @@ func getSplitKey(tok *token.Token, splitBy string) string {
 		}
 		return "other"
 	}
+}
+
+// sanitizeGroupName sanitizes a group name for use in file paths.
+// It prevents path traversal attacks by replacing unsafe characters.
+func sanitizeGroupName(name string) string {
+	// Replace path separators and parent directory references
+	name = strings.ReplaceAll(name, "/", "_")
+	name = strings.ReplaceAll(name, "\\", "_")
+	name = strings.ReplaceAll(name, "..", "_")
+
+	// Filter to safe characters: alphanumerics, dot, dash, underscore
+	var sb strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z',
+			r >= 'A' && r <= 'Z',
+			r >= '0' && r <= '9',
+			r == '.',
+			r == '-',
+			r == '_':
+			sb.WriteRune(r)
+		default:
+			sb.WriteRune('_')
+		}
+	}
+	return sb.String()
+}
+
+// ensureDir creates the parent directory for a file path if it doesn't exist.
+func ensureDir(path string) error {
+	dir := filepath.Dir(path)
+	if dir == "" || dir == "." {
+		return nil
+	}
+	return os.MkdirAll(dir, 0755)
+}
+
+// parseAndResolveTokens parses all files and resolves aliases.
+func parseAndResolveTokens(
+	filesystem fs.FileSystem,
+	jsonParser *parser.JSONParser,
+	cfg *config.Config,
+	resolvedFiles []*specifier.ResolvedFile,
+) ([]*token.Token, schema.Version, error) {
+	var allTokens []*token.Token
+	var detectedVersion schema.Version
+
+	for _, rf := range resolvedFiles {
+		data, err := filesystem.ReadFile(rf.Path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", rf.Specifier, err)
+			continue
+		}
+
+		version, err := schema.DetectVersion(data, nil)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error detecting schema for %s: %v\n", rf.Specifier, err)
+			continue
+		}
+		if detectedVersion == schema.Unknown {
+			detectedVersion = version
+		}
+
+		opts := cfg.OptionsForFile(rf.Specifier)
+		opts.SkipPositions = true
+		if version != schema.Unknown {
+			opts.SchemaVersion = version
+		}
+
+		tokens, err := jsonParser.ParseFile(filesystem, rf.Path, opts)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", rf.Specifier, err)
+			continue
+		}
+
+		allTokens = append(allTokens, tokens...)
+	}
+
+	if detectedVersion == schema.Unknown {
+		detectedVersion = schema.Draft
+	}
+	if err := resolver.ResolveAliases(allTokens, detectedVersion); err != nil {
+		return nil, schema.Unknown, fmt.Errorf("error resolving aliases: %w", err)
+	}
+
+	return allTokens, detectedVersion, nil
 }
