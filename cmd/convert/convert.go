@@ -421,7 +421,7 @@ func runMultiOutput(
 		}
 
 		// Ensure parent directory exists
-		if err := ensureDir(out.Path); err != nil {
+		if err := ensureDir(filesystem, out.Path); err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating directory for %s: %v\n", out.Path, err)
 			failures++
 			continue
@@ -486,7 +486,7 @@ func generateSplitOutput(
 		}
 
 		// Ensure parent directory exists
-		if err := ensureDir(path); err != nil {
+		if err := ensureDir(filesystem, path); err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating directory for %s: %v\n", path, err)
 			failures++
 			continue
@@ -579,12 +579,12 @@ func sanitizeGroupName(name string) string {
 }
 
 // ensureDir creates the parent directory for a file path if it doesn't exist.
-func ensureDir(path string) error {
+func ensureDir(filesystem fs.FileSystem, path string) error {
 	dir := filepath.Dir(path)
 	if dir == "" || dir == "." {
 		return nil
 	}
-	return os.MkdirAll(dir, 0755)
+	return filesystem.MkdirAll(dir, 0755)
 }
 
 // parseAndResolveTokens parses all files and resolves aliases.
@@ -596,17 +596,20 @@ func parseAndResolveTokens(
 ) ([]*token.Token, schema.Version, error) {
 	var allTokens []*token.Token
 	var detectedVersion schema.Version
+	var failures int
 
 	for _, rf := range resolvedFiles {
 		data, err := filesystem.ReadFile(rf.Path)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", rf.Specifier, err)
+			failures++
 			continue
 		}
 
 		version, err := schema.DetectVersion(data, nil)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error detecting schema for %s: %v\n", rf.Specifier, err)
+			failures++
 			continue
 		}
 		if detectedVersion == schema.Unknown {
@@ -622,10 +625,15 @@ func parseAndResolveTokens(
 		tokens, err := jsonParser.ParseFile(filesystem, rf.Path, opts)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", rf.Specifier, err)
+			failures++
 			continue
 		}
 
 		allTokens = append(allTokens, tokens...)
+	}
+
+	if len(allTokens) == 0 && failures > 0 {
+		return nil, schema.Unknown, fmt.Errorf("failed to parse %d file(s), no tokens generated", failures)
 	}
 
 	if detectedVersion == schema.Unknown {
