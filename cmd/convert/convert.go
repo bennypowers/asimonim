@@ -69,11 +69,6 @@ func init() {
 	Cmd.Flags().Bool("flatten", false, "Flatten to shallow structure (dtcg/json formats only)")
 	Cmd.Flags().StringP("delimiter", "d", "-", "Delimiter for flattened keys")
 	Cmd.Flags().BoolP("in-place", "i", false, "Overwrite input files with converted output")
-
-	// CSS-specific flags
-	Cmd.Flags().Bool("css-light-dark", false, "Generate CSS light-dark() for themed tokens")
-	Cmd.Flags().StringSlice("css-light-dark-patterns", nil,
-		`Light/dark suffix patterns (e.g., "on-light on-dark")`)
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -83,8 +78,6 @@ func run(cmd *cobra.Command, args []string) error {
 	delimiter, _ := cmd.Flags().GetString("delimiter")
 	inPlace, _ := cmd.Flags().GetBool("in-place")
 	schemaFlag, _ := cmd.Flags().GetString("schema")
-	cssLightDark, _ := cmd.Flags().GetBool("css-light-dark")
-	cssLightDarkPatterns, _ := cmd.Flags().GetStringSlice("css-light-dark-patterns")
 
 	// Parse format
 	format, err := convertlib.ParseFormat(formatFlag)
@@ -155,7 +148,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return runInPlace(filesystem, jsonParser, cfg, resolvedFiles, targetSchema)
 	}
 
-	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter, cssLightDark, cssLightDarkPatterns)
+	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter)
 }
 
 func runInPlace(
@@ -241,8 +234,6 @@ func runCombined(
 	format convertlib.Format,
 	flatten bool,
 	delimiter string,
-	cssLightDark bool,
-	cssLightDarkPatterns []string,
 ) error {
 	var allTokens []*token.Token
 	var detectedVersion schema.Version
@@ -299,27 +290,14 @@ func runCombined(
 		prefix = cfg.Prefix
 	}
 
-	// Merge CSS light-dark config from config file and CLI flags
-	effectiveLightDark := cssLightDark || cfg.Formats.CSS.LightDark.Enabled
-	effectivePatterns := cssLightDarkPatterns
-	if len(effectivePatterns) == 0 && len(cfg.Formats.CSS.LightDark.Patterns) > 0 {
-		for _, p := range cfg.Formats.CSS.LightDark.Patterns {
-			if len(p) == 2 {
-				effectivePatterns = append(effectivePatterns, p[0]+" "+p[1])
-			}
-		}
-	}
-
 	// Phase 3: Serialize tokens to requested format
 	opts := convertlib.Options{
-		InputSchema:          detectedVersion,
-		OutputSchema:         outputSchema,
-		Flatten:              flatten,
-		Delimiter:            delimiter,
-		Format:               format,
-		Prefix:               prefix,
-		CSSLightDark:         effectiveLightDark,
-		CSSLightDarkPatterns: effectivePatterns,
+		InputSchema:  detectedVersion,
+		OutputSchema: outputSchema,
+		Flatten:      flatten,
+		Delimiter:    delimiter,
+		Format:       format,
+		Prefix:       prefix,
 	}
 
 	outputBytes, err := convertlib.FormatTokens(allTokens, format, opts)

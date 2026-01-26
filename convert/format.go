@@ -122,47 +122,17 @@ func FormatTokens(tokens []*token.Token, format Format, opts Options) ([]byte, e
 		f = scss.New()
 	case FormatCSS:
 		f = css.NewWithOptions(css.Options{
-			Options:   fmtOpts,
-			Flavor:    css.FlavorPlain,
-			LightDark: buildLightDarkConfig(opts),
+			Options: fmtOpts,
+			Flavor:  css.FlavorPlain,
 		})
 	case FormatLitCSS:
 		f = css.NewWithOptions(css.Options{
-			Options:   fmtOpts,
-			Flavor:    css.FlavorLit,
-			LightDark: buildLightDarkConfig(opts),
+			Options: fmtOpts,
+			Flavor:  css.FlavorLit,
 		})
 	default:
 		return nil, fmt.Errorf("unsupported format: %s", format)
 	}
 
 	return f.Format(tokens, fmtOpts)
-}
-
-// buildLightDarkConfig constructs a css.LightDarkConfig from Options.
-func buildLightDarkConfig(opts Options) css.LightDarkConfig {
-	config := css.LightDarkConfig{
-		Enabled: opts.CSSLightDark,
-	}
-
-	if !config.Enabled {
-		return config
-	}
-
-	// Parse patterns from string pairs (e.g., "on-light on-dark")
-	if len(opts.CSSLightDarkPatterns) > 0 {
-		for _, patternStr := range opts.CSSLightDarkPatterns {
-			parts := strings.Fields(patternStr)
-			if len(parts) == 2 {
-				config.Patterns = append(config.Patterns, [2]string{parts[0], parts[1]})
-			}
-		}
-	}
-
-	// Use defaults if no patterns specified
-	if len(config.Patterns) == 0 {
-		config.Patterns = css.DefaultLightDarkPatterns()
-	}
-
-	return config
 }

@@ -46,19 +46,7 @@ type FormatsConfig struct {
 
 // CSSConfig contains CSS-specific output configuration.
 type CSSConfig struct {
-	// LightDark configures light-dark() CSS function generation.
-	LightDark LightDarkConfig `yaml:"lightDark" json:"lightDark"`
-}
-
-// LightDarkConfig configures light-dark() CSS function generation.
-type LightDarkConfig struct {
-	// Enabled controls whether light-dark() output is generated.
-	Enabled bool `yaml:"enabled" json:"enabled"`
-
-	// Patterns are pairs of suffixes that indicate light/dark variants.
-	// Each pattern is a [light, dark] pair.
-	// Example: [["on-light", "on-dark"], ["light", "dark"]]
-	Patterns [][]string `yaml:"patterns" json:"patterns"`
+	// Placeholder for future CSS-specific options.
 }
 
 // FileSpec represents a token file specification.

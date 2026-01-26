@@ -41,13 +41,6 @@ type Options struct {
 
 	// Prefix is added to output variable names.
 	Prefix string
-
-	// CSSLightDark enables CSS light-dark() function generation.
-	CSSLightDark bool
-
-	// CSSLightDarkPatterns are pairs of suffixes for light/dark detection.
-	// Each entry should be "light dark" (space-separated pair).
-	CSSLightDarkPatterns []string
 }
 
 // DefaultOptions returns options with sensible defaults.

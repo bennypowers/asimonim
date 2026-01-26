@@ -28,34 +28,12 @@ const (
 	FlavorHost
 )
 
-// LightDarkConfig configures light-dark() CSS function generation.
-type LightDarkConfig struct {
-	// Enabled controls whether light-dark() output is generated.
-	Enabled bool
-
-	// Patterns are pairs of suffixes that indicate light/dark variants.
-	// Each pattern is a [light, dark] pair.
-	// Example: [["on-light", "on-dark"], ["light", "dark"]]
-	Patterns [][2]string
-}
-
 // Options configures the CSS formatter.
 type Options struct {
 	formatter.Options
 
 	// Flavor controls the output style (plain, lit, host).
 	Flavor Flavor
-
-	// LightDark configures light-dark() generation.
-	LightDark LightDarkConfig
-}
-
-// DefaultLightDarkPatterns returns the default light/dark suffix patterns.
-func DefaultLightDarkPatterns() [][2]string {
-	return [][2]string{
-		{"on-light", "on-dark"},
-		{"light", "dark"},
-	}
 }
 
 // secondsDurationPattern matches duration values like "2s", "0.5s", "-1.5s".
@@ -83,22 +61,6 @@ func NewWithFlavor(flavor Flavor) *Formatter {
 
 // Format converts tokens to CSS custom properties.
 func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byte, error) {
-	// Build token index for light-dark detection
-	tokenIndex := buildTokenIndex(tokens, opts.Prefix)
-
-	// Detect themed token pairs
-	var themePairs []themePair
-	var themeRoots map[string]bool
-
-	if f.opts.LightDark.Enabled && len(f.opts.LightDark.Patterns) > 0 {
-		themePairs, themeRoots = detectThemePairs(tokens, tokenIndex, f.opts.LightDark.Patterns, opts.Prefix)
-
-		// Validate no nested light-dark references
-		if err := validateNoNestedLightDark(themePairs, themeRoots, tokens); err != nil {
-			return nil, err
-		}
-	}
-
 	var sb strings.Builder
 
 	switch f.opts.Flavor {
@@ -118,24 +80,10 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 
 	sorted := formatter.SortTokens(tokens)
 
-	// Track which tokens are theme roots (emitted as light-dark)
-	emittedThemeRoots := make(map[string]bool)
-
 	for _, tok := range sorted {
 		baseName := formatter.ToKebabCase(strings.Join(tok.Path, "-"))
 		name := formatter.ApplyPrefix(baseName, opts.Prefix, "-")
 
-		// Check if this token is part of a theme pair
-		if themeRoots != nil && themeRoots[name] {
-			// This is a theme root - emit the light-dark() version
-			if !emittedThemeRoots[name] {
-				writeLightDarkProperty(&sb, tok, name, themePairs)
-				emittedThemeRoots[name] = true
-			}
-			continue
-		}
-
-		// Regular token output
 		value := formatter.ResolvedValue(tok)
 		cssValue := ToCSSValue(tok.Type, value)
 
@@ -145,16 +93,6 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 		fmt.Fprintf(&sb, "  --%s: %s;\n", name, cssValue)
 	}
 
-	// Emit theme root variables with light-dark()
-	for _, pair := range themePairs {
-		if emittedThemeRoots[pair.rootName] {
-			continue
-		}
-		fmt.Fprintf(&sb, "  --%s: light-dark(var(--%s), var(--%s));\n",
-			pair.rootName, pair.lightName, pair.darkName)
-		emittedThemeRoots[pair.rootName] = true
-	}
-
 	sb.WriteString("}\n")
 
 	if f.opts.Flavor == FlavorLit {
@@ -162,144 +100,6 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 	}
 
 	return []byte(sb.String()), nil
-}
-
-// themePair represents a detected light/dark token pair.
-type themePair struct {
-	rootName   string // The base name without light/dark suffix
-	lightName  string // Full name of light variant
-	darkName   string // Full name of dark variant
-	lightToken *token.Token
-	darkToken  *token.Token
-}
-
-// buildTokenIndex creates a map of token names to tokens for fast lookup.
-func buildTokenIndex(tokens []*token.Token, prefix string) map[string]*token.Token {
-	index := make(map[string]*token.Token, len(tokens))
-	for _, tok := range tokens {
-		baseName := formatter.ToKebabCase(strings.Join(tok.Path, "-"))
-		name := formatter.ApplyPrefix(baseName, prefix, "-")
-		index[name] = tok
-	}
-	return index
-}
-
-// detectThemePairs finds token pairs that match light/dark patterns.
-func detectThemePairs(
-	tokens []*token.Token,
-	tokenIndex map[string]*token.Token,
-	patterns [][2]string,
-	prefix string,
-) ([]themePair, map[string]bool) {
-	var pairs []themePair
-	themeRoots := make(map[string]bool)
-	processed := make(map[string]bool)
-
-	for _, tok := range tokens {
-		baseName := formatter.ToKebabCase(strings.Join(tok.Path, "-"))
-		name := formatter.ApplyPrefix(baseName, prefix, "-")
-
-		if processed[name] {
-			continue
-		}
-
-		// Check each pattern
-		for _, pattern := range patterns {
-			lightSuffix := pattern[0]
-			darkSuffix := pattern[1]
-
-			// Check if this token ends with the light suffix
-			if strings.HasSuffix(name, "-"+lightSuffix) {
-				rootName := strings.TrimSuffix(name, "-"+lightSuffix)
-				darkName := rootName + "-" + darkSuffix
-
-				// Check if dark variant exists
-				if darkTok, exists := tokenIndex[darkName]; exists {
-					pairs = append(pairs, themePair{
-						rootName:   rootName,
-						lightName:  name,
-						darkName:   darkName,
-						lightToken: tok,
-						darkToken:  darkTok,
-					})
-					themeRoots[rootName] = true
-					processed[name] = true
-					processed[darkName] = true
-					break
-				}
-			}
-
-			// Check if this token ends with the dark suffix
-			if strings.HasSuffix(name, "-"+darkSuffix) {
-				rootName := strings.TrimSuffix(name, "-"+darkSuffix)
-				lightName := rootName + "-" + lightSuffix
-
-				// Check if light variant exists (and we haven't already processed from light side)
-				if lightTok, exists := tokenIndex[lightName]; exists && !processed[lightName] {
-					pairs = append(pairs, themePair{
-						rootName:   rootName,
-						lightName:  lightName,
-						darkName:   name,
-						lightToken: lightTok,
-						darkToken:  tok,
-					})
-					themeRoots[rootName] = true
-					processed[name] = true
-					processed[lightName] = true
-					break
-				}
-			}
-		}
-	}
-
-	return pairs, themeRoots
-}
-
-// validateNoNestedLightDark checks that no theme root references another theme root.
-func validateNoNestedLightDark(pairs []themePair, themeRoots map[string]bool, _ []*token.Token) error {
-	for _, pair := range pairs {
-		// Check light token's resolution chain
-		if err := checkResolutionChain(pair.lightToken, pair.rootName, themeRoots); err != nil {
-			return err
-		}
-		// Check dark token's resolution chain
-		if err := checkResolutionChain(pair.darkToken, pair.rootName, themeRoots); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// checkResolutionChain checks if a token references any theme root tokens.
-func checkResolutionChain(tok *token.Token, currentRoot string, themeRoots map[string]bool) error {
-	for _, refName := range tok.ResolutionChain {
-		// Normalize the reference name
-		refName = strings.ReplaceAll(refName, ".", "-")
-		if themeRoots[refName] && refName != currentRoot {
-			return fmt.Errorf(
-				"nested light-dark() not allowed in CSS: token %q references %q, "+
-					"both would generate light-dark() calls. See CSS Color Level 4 section 7.1",
-				currentRoot, refName,
-			)
-		}
-	}
-	return nil
-}
-
-// writeLightDarkProperty writes a property that is a theme root (not the light-dark itself).
-func writeLightDarkProperty(sb *strings.Builder, tok *token.Token, name string, pairs []themePair) {
-	// Find the pair for this root
-	for _, pair := range pairs {
-		if pair.rootName == name {
-			// Emit the light-dark version
-			if tok.Description != "" {
-				fmt.Fprintf(sb, "  /* %s */\n", tok.Description)
-			}
-			fmt.Fprintf(sb, "  --%s: light-dark(var(--%s), var(--%s));\n",
-				name, pair.lightName, pair.darkName)
-			return
-		}
-	}
 }
 
 // ToCSSValue converts a token value to a CSS-compatible string.
