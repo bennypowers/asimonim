@@ -45,6 +45,14 @@ type Options struct {
 	// Header is the content to prepend to the output.
 	// Formatters wrap this in appropriate comment syntax.
 	Header string
+
+	// CSSSelector specifies the CSS selector for custom properties.
+	// Valid values: ":root" (default), ":host"
+	CSSSelector string
+
+	// CSSModule specifies the JavaScript module wrapper for CSS output.
+	// Valid values: "" (plain CSS, default), "lit" (Lit css tagged template)
+	CSSModule string
 }
 
 // DefaultOptions returns options with sensible defaults.

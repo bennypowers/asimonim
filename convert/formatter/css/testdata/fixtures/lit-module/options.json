@@ -1,0 +1,4 @@
+{
+  "cssSelector": ":host",
+  "cssModule": "lit"
+}

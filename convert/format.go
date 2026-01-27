@@ -48,11 +48,9 @@ const (
 	// FormatSCSS outputs SCSS variables with kebab-case names.
 	FormatSCSS Format = "scss"
 
-	// FormatCSS outputs CSS custom properties with :root selector.
+	// FormatCSS outputs CSS custom properties.
+	// Use CSSSelector and CSSModule options to customize output.
 	FormatCSS Format = "css"
-
-	// FormatLitCSS outputs CSS custom properties wrapped in Lit's css template tag.
-	FormatLitCSS Format = "lit-css"
 
 	// FormatTypeScriptMap outputs a TypeScript module with a typed TokenMap class.
 	FormatTypeScriptMap Format = "typescript-map"
@@ -69,7 +67,6 @@ func ValidFormats() []string {
 		string(FormatCTS),
 		string(FormatSCSS),
 		string(FormatCSS),
-		string(FormatLitCSS),
 		string(FormatTypeScriptMap),
 	}
 }
@@ -93,8 +90,6 @@ func ParseFormat(s string) (Format, error) {
 		return FormatSCSS, nil
 	case "css":
 		return FormatCSS, nil
-	case "lit-css", "lit":
-		return FormatLitCSS, nil
 	case "typescript-map", "ts-map":
 		return FormatTypeScriptMap, nil
 	default:
@@ -130,13 +125,9 @@ func FormatTokens(tokens []*token.Token, format Format, opts Options) ([]byte, e
 		f = scss.New()
 	case FormatCSS:
 		f = css.NewWithOptions(css.Options{
-			Options: fmtOpts,
-			Flavor:  css.FlavorPlain,
-		})
-	case FormatLitCSS:
-		f = css.NewWithOptions(css.Options{
-			Options: fmtOpts,
-			Flavor:  css.FlavorLit,
+			Options:  fmtOpts,
+			Selector: css.Selector(opts.CSSSelector),
+			Module:   css.Module(opts.CSSModule),
 		})
 	case FormatTypeScriptMap:
 		f = typescriptmap.New()
