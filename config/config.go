@@ -31,6 +31,9 @@ type Config struct {
 	// Valid values: "draft", "v2025.10"
 	Schema string `yaml:"schema" json:"schema"`
 
+	// Formats contains format-specific configuration.
+	Formats FormatsConfig `yaml:"formats" json:"formats"`
+
 	// Header is the file header to prepend to output.
 	// Can be a string or a file path prefixed with "@" (e.g., "@LICENSE_HEADER.txt").
 	Header string `yaml:"header" json:"header"`
@@ -40,10 +43,21 @@ type Config struct {
 	Outputs []OutputSpec `yaml:"outputs" json:"outputs"`
 }
 
+// FormatsConfig contains format-specific configuration.
+type FormatsConfig struct {
+	// CSS contains CSS-specific output configuration.
+	CSS CSSConfig `yaml:"css" json:"css"`
+}
+
+// CSSConfig contains CSS-specific output configuration.
+type CSSConfig struct {
+	// Placeholder for future CSS-specific options.
+}
+
 // OutputSpec represents a single output file specification.
 type OutputSpec struct {
 	// Format is the output format (required).
-	// Valid values: dtcg, json, android, swift, typescript, cts, scss
+	// Valid values: dtcg, json, android, swift, typescript, cts, scss, css, lit-css
 	Format string `yaml:"format" json:"format"`
 
 	// Path is the output file path (required).

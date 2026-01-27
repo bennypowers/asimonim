@@ -12,6 +12,7 @@ import (
 
 	"bennypowers.dev/asimonim/convert/formatter"
 	"bennypowers.dev/asimonim/convert/formatter/android"
+	"bennypowers.dev/asimonim/convert/formatter/css"
 	"bennypowers.dev/asimonim/convert/formatter/cts"
 	"bennypowers.dev/asimonim/convert/formatter/dtcg"
 	"bennypowers.dev/asimonim/convert/formatter/flatjson"
@@ -47,6 +48,10 @@ const (
 	// FormatSCSS outputs SCSS variables with kebab-case names.
 	FormatSCSS Format = "scss"
 
+	// FormatCSS outputs CSS custom properties.
+	// Use CSSSelector and CSSModule options to customize output.
+	FormatCSS Format = "css"
+
 	// FormatTypeScriptMap outputs a TypeScript module with a typed TokenMap class.
 	FormatTypeScriptMap Format = "typescript-map"
 )
@@ -61,6 +66,7 @@ func ValidFormats() []string {
 		string(FormatTypeScript),
 		string(FormatCTS),
 		string(FormatSCSS),
+		string(FormatCSS),
 		string(FormatTypeScriptMap),
 	}
 }
@@ -82,6 +88,8 @@ func ParseFormat(s string) (Format, error) {
 		return FormatCTS, nil
 	case "scss", "sass":
 		return FormatSCSS, nil
+	case "css":
+		return FormatCSS, nil
 	case "typescript-map", "ts-map":
 		return FormatTypeScriptMap, nil
 	default:
@@ -115,6 +123,11 @@ func FormatTokens(tokens []*token.Token, format Format, opts Options) ([]byte, e
 		f = cts.New()
 	case FormatSCSS:
 		f = scss.New()
+	case FormatCSS:
+		f = css.NewWithOptions(css.Options{
+			Selector: css.Selector(opts.CSSSelector),
+			Module:   css.Module(opts.CSSModule),
+		})
 	case FormatTypeScriptMap:
 		f = typescriptmap.New()
 	default:
