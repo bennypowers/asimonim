@@ -1,26 +1,13 @@
 {
-  "color-text-dark": {
+  "color-text": {
     "scope": "css,scss,less,stylus,postcss",
     "prefix": [
-      "color-text-dark",
-      "colorTextDark",
-      "color_text_dark",
-      "ffffff"
+      "color-text",
+      "colorText",
+      "color_text"
     ],
     "body": [
-      "var(--color-text-dark)"
-    ]
-  },
-  "color-text-light": {
-    "scope": "css,scss,less,stylus,postcss",
-    "prefix": [
-      "color-text-light",
-      "colorTextLight",
-      "color_text_light",
-      "000000"
-    ],
-    "body": [
-      "var(--color-text-light)"
+      "var(--color-text, light-dark(\n  var(--color-text-light, #000000),\n  var(--color-text-dark, #ffffff)\n))"
     ]
   }
 }

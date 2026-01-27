@@ -167,7 +167,7 @@ Flags:
 | `cts`        | `.cts`             | TypeScript CommonJS module with `as const` exports |
 | `scss`       | `.scss`            | SCSS variables with kebab-case names               |
 | `css`        | `.css`             | CSS custom properties                              |
-| `snippets`   | `.code-snippets`   | Editor snippets (VSCode or TextMate)               |
+| `snippets`   | `.code-snippets`, `.tmSnippet`, `.json` | Editor snippets (VSCode, TextMate, or Zed) |
 
 **Examples:**
 

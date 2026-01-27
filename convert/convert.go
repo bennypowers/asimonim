@@ -55,7 +55,7 @@ type Options struct {
 	CSSModule string
 
 	// SnippetType specifies the snippet output format.
-	// Valid values: "vscode" (default), "textmate"
+	// Valid values: "vscode" (default), "textmate", "zed"
 	SnippetType string
 }
 

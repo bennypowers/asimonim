@@ -102,8 +102,9 @@ func (f *Formatter) formatVSCode(tokens []*token.Token, opts formatter.Options) 
 		if group := findLightDarkGroup(tok, tokenIndex); group != nil {
 			// Only emit the combined snippet for the root token
 			if isRootToken(tok, group) {
-				snippet := buildLightDarkSnippet(group, name, opts)
-				snippetMap[name] = snippet
+				rootName := getRootName(group, opts.Prefix)
+				snippet := buildLightDarkSnippet(group, rootName, opts)
+				snippetMap[rootName] = snippet
 			}
 			// Skip individual snippets for light/dark children
 			continue
@@ -141,8 +142,28 @@ func (f *Formatter) formatTextMate(tokens []*token.Token, opts formatter.Options
 
 	sorted := formatter.SortTokens(tokens)
 
+	// Build token index for light-dark detection
+	tokenIndex := buildTokenIndex(sorted, opts.Prefix)
+
 	for _, tok := range sorted {
 		name := buildTokenName(tok.Path, opts.Prefix)
+
+		// Check if this token is part of a light-dark group
+		if group := findLightDarkGroup(tok, tokenIndex); group != nil {
+			// Only emit the combined snippet for the root token
+			if isRootToken(tok, group) {
+				rootName := getRootName(group, opts.Prefix)
+				lightName := buildTokenName(group.Light.Path, opts.Prefix)
+				darkName := buildTokenName(group.Dark.Path, opts.Prefix)
+				lightValue := getColorValue(group.Light)
+				darkValue := getColorValue(group.Dark)
+				body := buildLightDarkBody(rootName, lightName, darkName, lightValue, darkValue)
+				fmt.Fprintf(&sb, textMateSnippetTemplate, rootName, rootName, body)
+			}
+			// Skip individual snippets for light/dark children
+			continue
+		}
+
 		cssVar := fmt.Sprintf("var(--%s)", name)
 		fmt.Fprintf(&sb, textMateSnippetTemplate, name, name, cssVar)
 	}
@@ -169,8 +190,9 @@ func (f *Formatter) formatZed(tokens []*token.Token, opts formatter.Options) ([]
 		if group := findLightDarkGroup(tok, tokenIndex); group != nil {
 			// Only emit the combined snippet for the root token
 			if isRootToken(tok, group) {
-				snippet := buildZedLightDarkSnippet(group, name, opts)
-				snippetMap[name] = snippet
+				rootName := getRootName(group, opts.Prefix)
+				snippet := buildZedLightDarkSnippet(group, rootName, opts)
+				snippetMap[rootName] = snippet
 			}
 			// Skip individual snippets for light/dark children
 			continue
@@ -213,8 +235,11 @@ func buildZedLightDarkSnippet(group *lightDarkGroup, name string, opts formatter
 		Body:   []string{body},
 	}
 
-	if group.Root.Description != "" {
+	// Use description from real root if available, otherwise from light token
+	if group.Root != group.Light && group.Root.Description != "" {
 		snippet.Description = group.Root.Description
+	} else if group.Light.Description != "" {
+		snippet.Description = group.Light.Description
 	}
 
 	return snippet
@@ -270,9 +295,9 @@ func buildLightDarkBody(name, lightName, darkName, lightValue, darkValue string)
 // findLightDarkGroup checks if a token is part of a light-dark group.
 // Returns the group if found, nil otherwise.
 //
-// Detection rules:
+// Detection rules (convention-based):
+// - A color token ending in ".light" that has a sibling ".dark" token
 // - A color token with a Reference field that points to a ".light" child
-// - Must have both ".light" and ".dark" children
 func findLightDarkGroup(tok *token.Token, index map[string]*tokenIndexEntry) *lightDarkGroup {
 	if tok.Type != token.TypeColor {
 		return nil
@@ -300,7 +325,7 @@ func findLightDarkGroup(tok *token.Token, index map[string]*tokenIndexEntry) *li
 		}
 	}
 
-	// Check if this token is a light/dark child
+	// Check if this token is a light/dark child (convention-based detection)
 	if len(tok.Path) < 2 {
 		return nil
 	}
@@ -310,20 +335,10 @@ func findLightDarkGroup(tok *token.Token, index map[string]*tokenIndexEntry) *li
 		return nil
 	}
 
+	// Build sibling paths
 	parentPath := strings.Join(tok.Path[:len(tok.Path)-1], ".")
-	rootEntry, hasRoot := index[parentPath]
-	if !hasRoot || rootEntry.Token.Type != token.TypeColor {
-		return nil
-	}
-
-	// Verify root references the light variant
 	lightPath := fmt.Sprintf("%s.light", parentPath)
 	darkPath := fmt.Sprintf("%s.dark", parentPath)
-	expectedRef := fmt.Sprintf("{%s}", lightPath)
-
-	if rootEntry.Token.Reference != expectedRef {
-		return nil
-	}
 
 	lightEntry, hasLight := index[lightPath]
 	darkEntry, hasDark := index[darkPath]
@@ -332,16 +347,52 @@ func findLightDarkGroup(tok *token.Token, index map[string]*tokenIndexEntry) *li
 		return nil
 	}
 
+	// Check if there's a root token (optional - may not exist if using $root syntax)
+	rootEntry, hasRoot := index[parentPath]
+
 	return &lightDarkGroup{
-		Root:  rootEntry.Token,
+		Root:  rootTokenOrLight(rootEntry, lightEntry, hasRoot),
 		Light: lightEntry.Token,
 		Dark:  darkEntry.Token,
 	}
 }
 
+// rootTokenOrLight returns the root token if it exists, otherwise the light token.
+// This allows light-dark detection to work even when the parser doesn't emit a root token.
+func rootTokenOrLight(rootEntry, lightEntry *tokenIndexEntry, hasRoot bool) *token.Token {
+	if hasRoot {
+		return rootEntry.Token
+	}
+	return lightEntry.Token
+}
+
 // isRootToken checks if the given token is the root of the light-dark group.
+// When there's no explicit root token, the light token is used as surrogate.
 func isRootToken(tok *token.Token, group *lightDarkGroup) bool {
-	return tok == group.Root
+	if tok == group.Root {
+		return true
+	}
+	// When Root == Light, we're using light as surrogate root
+	// Only emit when processing the light token
+	if group.Root == group.Light {
+		return tok == group.Light
+	}
+	return false
+}
+
+// getRootName returns the CSS custom property name for the root of a light-dark group.
+// When using a surrogate root (light token), derives the parent name.
+func getRootName(group *lightDarkGroup, prefix string) string {
+	// If there's a real root token (different from light), use its path
+	if group.Root != group.Light {
+		return buildTokenName(group.Root.Path, prefix)
+	}
+	// Derive parent name from light token's path (remove ".light" suffix)
+	if len(group.Light.Path) > 1 {
+		parentPath := group.Light.Path[:len(group.Light.Path)-1]
+		return buildTokenName(parentPath, prefix)
+	}
+	return buildTokenName(group.Light.Path, prefix)
 }
 
 // buildLightDarkSnippet creates a snippet with light-dark() pattern.
@@ -354,7 +405,8 @@ func buildLightDarkSnippet(group *lightDarkGroup, name string, opts formatter.Op
 	darkValue := getColorValue(group.Dark)
 
 	body := buildLightDarkBody(name, lightName, darkName, lightValue, darkValue)
-	prefixes := buildPrefixes(group.Root, name)
+	// Use name-only prefixes for combined snippets (no hex values)
+	prefixes := buildNamePrefixes(name)
 
 	snippet := Snippet{
 		Scope:  "css,scss,less,stylus,postcss",
@@ -362,11 +414,31 @@ func buildLightDarkSnippet(group *lightDarkGroup, name string, opts formatter.Op
 		Body:   []string{body},
 	}
 
-	if group.Root.Description != "" {
+	// Use description from real root if available, otherwise from light token
+	if group.Root != group.Light && group.Root.Description != "" {
 		snippet.Description = group.Root.Description
+	} else if group.Light.Description != "" {
+		snippet.Description = group.Light.Description
 	}
 
 	return snippet
+}
+
+// buildNamePrefixes generates prefix array without color hex values.
+func buildNamePrefixes(name string) []string {
+	prefixes := []string{name}
+
+	camelName := formatter.ToCamelCase(name)
+	if camelName != name {
+		prefixes = append(prefixes, camelName)
+	}
+
+	underscoreName := strings.ReplaceAll(name, "-", "_")
+	if underscoreName != name {
+		prefixes = append(prefixes, underscoreName)
+	}
+
+	return prefixes
 }
 
 // getColorValue extracts a CSS color value from a token.

@@ -67,13 +67,14 @@ func runFixtureTest(t *testing.T, fixtureName string, snippetOpts snippets.Optio
 			Prefix string `json:"prefix"`
 			Type   string `json:"type"`
 		}
-		if err := json.Unmarshal(optData, &fileOpts); err == nil {
-			if fileOpts.Prefix != "" {
-				fmtOpts.Prefix = fileOpts.Prefix
-			}
-			if fileOpts.Type != "" {
-				snippetOpts.Type = snippets.Type(fileOpts.Type)
-			}
+		if err := json.Unmarshal(optData, &fileOpts); err != nil {
+			t.Fatalf("invalid options.json: %v", err)
+		}
+		if fileOpts.Prefix != "" {
+			fmtOpts.Prefix = fileOpts.Prefix
+		}
+		if fileOpts.Type != "" {
+			snippetOpts.Type = snippets.Type(fileOpts.Type)
 		}
 	}
 

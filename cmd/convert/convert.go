@@ -44,7 +44,7 @@ Output Formats:
   cts        TypeScript CommonJS module with 'as const' exports
   scss       SCSS variables with kebab-case names
   css        CSS custom properties (use --css-selector and --css-module for options)
-  snippets   Editor snippets (use --snippet-type for vscode or textmate)
+  snippets   Editor snippets (use --snippet-type for vscode, textmate, or zed)
 
 Examples:
   # Flatten to shallow structure
