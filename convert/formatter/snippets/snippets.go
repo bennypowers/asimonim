@@ -9,6 +9,7 @@ package snippets
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"bennypowers.dev/asimonim/convert/formatter"
@@ -95,10 +96,7 @@ func (f *Formatter) formatVSCode(tokens []*token.Token, opts formatter.Options) 
 	tokenIndex := buildTokenIndex(sorted, opts.Prefix)
 
 	for _, tok := range sorted {
-		name := formatter.ToKebabCase(strings.Join(tok.Path, "-"))
-		if opts.Prefix != "" {
-			name = opts.Prefix + "-" + name
-		}
+		name := buildTokenName(tok.Path, opts.Prefix)
 
 		// Check if this token is part of a light-dark group
 		if group := findLightDarkGroup(tok, tokenIndex); group != nil {
@@ -118,36 +116,35 @@ func (f *Formatter) formatVSCode(tokens []*token.Token, opts formatter.Options) 
 	return json.MarshalIndent(snippetMap, "", "  ")
 }
 
-// formatTextMate outputs TextMate plist snippets format.
-func (f *Formatter) formatTextMate(tokens []*token.Token, opts formatter.Options) ([]byte, error) {
-	// TextMate format uses XML plist - for now, return a simple implementation
-	var sb strings.Builder
-	sb.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
+const textMatePlistHeader = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <array>
-`)
+`
+
+const textMateSnippetTemplate = `  <dict>
+    <key>name</key>
+    <string>%s</string>
+    <key>tabTrigger</key>
+    <string>%s</string>
+    <key>content</key>
+    <string>%s</string>
+    <key>scope</key>
+    <string>source.css, source.scss</string>
+  </dict>
+`
+
+// formatTextMate outputs TextMate plist snippets format.
+func (f *Formatter) formatTextMate(tokens []*token.Token, opts formatter.Options) ([]byte, error) {
+	var sb strings.Builder
+	sb.WriteString(textMatePlistHeader)
 
 	sorted := formatter.SortTokens(tokens)
 
 	for _, tok := range sorted {
-		name := formatter.ToKebabCase(strings.Join(tok.Path, "-"))
-		if opts.Prefix != "" {
-			name = opts.Prefix + "-" + name
-		}
-
-		cssVar := "var(--" + name + ")"
-
-		sb.WriteString("  <dict>\n")
-		sb.WriteString("    <key>name</key>\n")
-		sb.WriteString("    <string>" + name + "</string>\n")
-		sb.WriteString("    <key>tabTrigger</key>\n")
-		sb.WriteString("    <string>" + name + "</string>\n")
-		sb.WriteString("    <key>content</key>\n")
-		sb.WriteString("    <string>" + cssVar + "</string>\n")
-		sb.WriteString("    <key>scope</key>\n")
-		sb.WriteString("    <string>source.css, source.scss</string>\n")
-		sb.WriteString("  </dict>\n")
+		name := buildTokenName(tok.Path, opts.Prefix)
+		cssVar := fmt.Sprintf("var(--%s)", name)
+		fmt.Fprintf(&sb, textMateSnippetTemplate, name, name, cssVar)
 	}
 
 	sb.WriteString("</array>\n</plist>\n")
@@ -166,10 +163,7 @@ func (f *Formatter) formatZed(tokens []*token.Token, opts formatter.Options) ([]
 	tokenIndex := buildTokenIndex(sorted, opts.Prefix)
 
 	for _, tok := range sorted {
-		name := formatter.ToKebabCase(strings.Join(tok.Path, "-"))
-		if opts.Prefix != "" {
-			name = opts.Prefix + "-" + name
-		}
+		name := buildTokenName(tok.Path, opts.Prefix)
 
 		// Check if this token is part of a light-dark group
 		if group := findLightDarkGroup(tok, tokenIndex); group != nil {
@@ -191,12 +185,9 @@ func (f *Formatter) formatZed(tokens []*token.Token, opts formatter.Options) ([]
 
 // buildZedSnippet creates a Zed editor snippet from a token.
 func buildZedSnippet(tok *token.Token, name string, _ formatter.Options) ZedSnippet {
-	// CSS variable reference
-	cssVar := "var(--" + name + ")"
-
 	snippet := ZedSnippet{
 		Prefix: name,
-		Body:   []string{cssVar},
+		Body:   []string{fmt.Sprintf("var(--%s)", name)},
 	}
 
 	if tok.Description != "" {
@@ -208,24 +199,14 @@ func buildZedSnippet(tok *token.Token, name string, _ formatter.Options) ZedSnip
 
 // buildZedLightDarkSnippet creates a Zed snippet with light-dark() pattern.
 func buildZedLightDarkSnippet(group *lightDarkGroup, name string, opts formatter.Options) ZedSnippet {
-	lightName := formatter.ToKebabCase(strings.Join(group.Light.Path, "-"))
-	darkName := formatter.ToKebabCase(strings.Join(group.Dark.Path, "-"))
-	if opts.Prefix != "" {
-		lightName = opts.Prefix + "-" + lightName
-		darkName = opts.Prefix + "-" + darkName
-	}
+	lightName := buildTokenName(group.Light.Path, opts.Prefix)
+	darkName := buildTokenName(group.Dark.Path, opts.Prefix)
 
 	// Get resolved color values for fallbacks
 	lightValue := getColorValue(group.Light)
 	darkValue := getColorValue(group.Dark)
 
-	// Build the light-dark() pattern with fallbacks
-	var body string
-	if lightValue != "" && darkValue != "" {
-		body = "var(--" + name + ", light-dark(\n  var(--" + lightName + ", " + lightValue + "),\n  var(--" + darkName + ", " + darkValue + ")\n))"
-	} else {
-		body = "var(--" + name + ", light-dark(\n  var(--" + lightName + "),\n  var(--" + darkName + ")\n))"
-	}
+	body := buildLightDarkBody(name, lightName, darkName, lightValue, darkValue)
 
 	snippet := ZedSnippet{
 		Prefix: name,
@@ -252,18 +233,38 @@ type tokenIndexEntry struct {
 	Name  string
 }
 
+// buildTokenName creates a CSS custom property name from a token path.
+func buildTokenName(path []string, prefix string) string {
+	name := formatter.ToKebabCase(strings.Join(path, "-"))
+	if prefix != "" {
+		return fmt.Sprintf("%s-%s", prefix, name)
+	}
+	return name
+}
+
 // buildTokenIndex creates a map from token path to token for efficient lookup.
 func buildTokenIndex(tokens []*token.Token, prefix string) map[string]*tokenIndexEntry {
 	index := make(map[string]*tokenIndexEntry, len(tokens))
 	for _, tok := range tokens {
 		path := strings.Join(tok.Path, ".")
-		name := formatter.ToKebabCase(strings.Join(tok.Path, "-"))
-		if prefix != "" {
-			name = prefix + "-" + name
-		}
+		name := buildTokenName(tok.Path, prefix)
 		index[path] = &tokenIndexEntry{Token: tok, Name: name}
 	}
 	return index
+}
+
+// buildLightDarkBody creates the CSS light-dark() function body.
+func buildLightDarkBody(name, lightName, darkName, lightValue, darkValue string) string {
+	if lightValue != "" && darkValue != "" {
+		return fmt.Sprintf(
+			"var(--%s, light-dark(\n  var(--%s, %s),\n  var(--%s, %s)\n))",
+			name, lightName, lightValue, darkName, darkValue,
+		)
+	}
+	return fmt.Sprintf(
+		"var(--%s, light-dark(\n  var(--%s),\n  var(--%s)\n))",
+		name, lightName, darkName,
+	)
 }
 
 // findLightDarkGroup checks if a token is part of a light-dark group.
@@ -281,10 +282,10 @@ func findLightDarkGroup(tok *token.Token, index map[string]*tokenIndexEntry) *li
 
 	// Check if this token IS the root (has Reference pointing to light child)
 	if tok.Reference != "" {
-		lightPath := tokPath + ".light"
-		darkPath := tokPath + ".dark"
+		lightPath := fmt.Sprintf("%s.light", tokPath)
+		darkPath := fmt.Sprintf("%s.dark", tokPath)
 
-		expectedRef := "{" + lightPath + "}"
+		expectedRef := fmt.Sprintf("{%s}", lightPath)
 		if tok.Reference == expectedRef {
 			lightEntry, hasLight := index[lightPath]
 			darkEntry, hasDark := index[darkPath]
@@ -316,9 +317,9 @@ func findLightDarkGroup(tok *token.Token, index map[string]*tokenIndexEntry) *li
 	}
 
 	// Verify root references the light variant
-	lightPath := parentPath + ".light"
-	darkPath := parentPath + ".dark"
-	expectedRef := "{" + lightPath + "}"
+	lightPath := fmt.Sprintf("%s.light", parentPath)
+	darkPath := fmt.Sprintf("%s.dark", parentPath)
+	expectedRef := fmt.Sprintf("{%s}", lightPath)
 
 	if rootEntry.Token.Reference != expectedRef {
 		return nil
@@ -345,25 +346,14 @@ func isRootToken(tok *token.Token, group *lightDarkGroup) bool {
 
 // buildLightDarkSnippet creates a snippet with light-dark() pattern.
 func buildLightDarkSnippet(group *lightDarkGroup, name string, opts formatter.Options) Snippet {
-	lightName := formatter.ToKebabCase(strings.Join(group.Light.Path, "-"))
-	darkName := formatter.ToKebabCase(strings.Join(group.Dark.Path, "-"))
-	if opts.Prefix != "" {
-		lightName = opts.Prefix + "-" + lightName
-		darkName = opts.Prefix + "-" + darkName
-	}
+	lightName := buildTokenName(group.Light.Path, opts.Prefix)
+	darkName := buildTokenName(group.Dark.Path, opts.Prefix)
 
 	// Get resolved color values for fallbacks
 	lightValue := getColorValue(group.Light)
 	darkValue := getColorValue(group.Dark)
 
-	// Build the light-dark() pattern with fallbacks
-	var body string
-	if lightValue != "" && darkValue != "" {
-		body = "var(--" + name + ", light-dark(\n  var(--" + lightName + ", " + lightValue + "),\n  var(--" + darkName + ", " + darkValue + ")\n))"
-	} else {
-		body = "var(--" + name + ", light-dark(\n  var(--" + lightName + "),\n  var(--" + darkName + ")\n))"
-	}
-
+	body := buildLightDarkBody(name, lightName, darkName, lightValue, darkValue)
 	prefixes := buildPrefixes(group.Root, name)
 
 	snippet := Snippet{
@@ -396,16 +386,12 @@ func getColorValue(tok *token.Token) string {
 
 // buildSnippet creates a VSCode snippet from a token.
 func buildSnippet(tok *token.Token, name string, _ formatter.Options) Snippet {
-	// Build prefixes: token name, camelCase version, and value for colors
 	prefixes := buildPrefixes(tok, name)
-
-	// CSS variable reference
-	cssVar := "var(--" + name + ")"
 
 	snippet := Snippet{
 		Scope:  "css,scss,less,stylus,postcss",
 		Prefix: prefixes,
-		Body:   []string{cssVar},
+		Body:   []string{fmt.Sprintf("var(--%s)", name)},
 	}
 
 	if tok.Description != "" {
