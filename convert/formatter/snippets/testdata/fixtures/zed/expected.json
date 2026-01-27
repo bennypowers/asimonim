@@ -1,0 +1,15 @@
+{
+  "color-primary": {
+    "prefix": "color-primary",
+    "body": [
+      "var(--color-primary)"
+    ],
+    "description": "Primary brand color"
+  },
+  "spacing-small": {
+    "prefix": "spacing-small",
+    "body": [
+      "var(--spacing-small)"
+    ]
+  }
+}

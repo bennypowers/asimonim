@@ -91,7 +91,10 @@ Examples:
   asimonim convert --format snippets -o tokens.code-snippets tokens/*.yaml
 
   # Generate TextMate snippets
-  asimonim convert --format snippets --snippet-type textmate -o tokens.tmSnippet tokens/*.yaml`,
+  asimonim convert --format snippets --snippet-type textmate -o tokens.tmSnippet tokens/*.yaml
+
+  # Generate Zed editor snippets
+  asimonim convert --format snippets --snippet-type zed -o css.json tokens/*.yaml`,
 	Args: cobra.ArbitraryArgs,
 	RunE: run,
 }
@@ -107,7 +110,7 @@ func init() {
 	Cmd.Flags().String("header", "", "Header to prepend to output (use @path to read from file)")
 	Cmd.Flags().String("css-selector", ":root", "CSS selector for custom properties: :root (default), :host")
 	Cmd.Flags().String("css-module", "", "JavaScript module wrapper for CSS: lit (Lit css tagged template), or empty for plain CSS")
-	Cmd.Flags().String("snippet-type", "vscode", "Snippet output format: vscode (default), textmate")
+	Cmd.Flags().String("snippet-type", "vscode", "Snippet output format: vscode (default), textmate, zed")
 }
 
 func run(cmd *cobra.Command, args []string) error {

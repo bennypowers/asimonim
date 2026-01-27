@@ -25,6 +25,9 @@ const (
 
 	// TypeTextMate outputs TextMate/plist snippets format.
 	TypeTextMate Type = "textmate"
+
+	// TypeZed outputs Zed editor snippets format.
+	TypeZed Type = "zed"
 )
 
 // Options configures the snippets formatter.
@@ -40,6 +43,14 @@ type Options struct {
 type Snippet struct {
 	Scope       string   `json:"scope"`
 	Prefix      []string `json:"prefix"`
+	Body        []string `json:"body"`
+	Description string   `json:"description,omitempty"`
+}
+
+// ZedSnippet represents a Zed editor snippet entry.
+// Zed uses a single prefix string (only first recognized) and no scope field.
+type ZedSnippet struct {
+	Prefix      string   `json:"prefix,omitempty"`
 	Body        []string `json:"body"`
 	Description string   `json:"description,omitempty"`
 }
@@ -67,6 +78,8 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 	switch f.opts.Type {
 	case TypeTextMate:
 		return f.formatTextMate(tokens, opts)
+	case TypeZed:
+		return f.formatZed(tokens, opts)
 	default:
 		return f.formatVSCode(tokens, opts)
 	}
@@ -140,6 +153,90 @@ func (f *Formatter) formatTextMate(tokens []*token.Token, opts formatter.Options
 	sb.WriteString("</array>\n</plist>\n")
 
 	return []byte(sb.String()), nil
+}
+
+// formatZed outputs Zed editor JSON snippets format.
+// Zed snippets use a single prefix string and no scope field.
+func (f *Formatter) formatZed(tokens []*token.Token, opts formatter.Options) ([]byte, error) {
+	snippetMap := make(map[string]ZedSnippet)
+
+	sorted := formatter.SortTokens(tokens)
+
+	// Build token index for light-dark detection
+	tokenIndex := buildTokenIndex(sorted, opts.Prefix)
+
+	for _, tok := range sorted {
+		name := formatter.ToKebabCase(strings.Join(tok.Path, "-"))
+		if opts.Prefix != "" {
+			name = opts.Prefix + "-" + name
+		}
+
+		// Check if this token is part of a light-dark group
+		if group := findLightDarkGroup(tok, tokenIndex); group != nil {
+			// Only emit the combined snippet for the root token
+			if isRootToken(tok, group) {
+				snippet := buildZedLightDarkSnippet(group, name, opts)
+				snippetMap[name] = snippet
+			}
+			// Skip individual snippets for light/dark children
+			continue
+		}
+
+		snippet := buildZedSnippet(tok, name, opts)
+		snippetMap[name] = snippet
+	}
+
+	return json.MarshalIndent(snippetMap, "", "  ")
+}
+
+// buildZedSnippet creates a Zed editor snippet from a token.
+func buildZedSnippet(tok *token.Token, name string, _ formatter.Options) ZedSnippet {
+	// CSS variable reference
+	cssVar := "var(--" + name + ")"
+
+	snippet := ZedSnippet{
+		Prefix: name,
+		Body:   []string{cssVar},
+	}
+
+	if tok.Description != "" {
+		snippet.Description = tok.Description
+	}
+
+	return snippet
+}
+
+// buildZedLightDarkSnippet creates a Zed snippet with light-dark() pattern.
+func buildZedLightDarkSnippet(group *lightDarkGroup, name string, opts formatter.Options) ZedSnippet {
+	lightName := formatter.ToKebabCase(strings.Join(group.Light.Path, "-"))
+	darkName := formatter.ToKebabCase(strings.Join(group.Dark.Path, "-"))
+	if opts.Prefix != "" {
+		lightName = opts.Prefix + "-" + lightName
+		darkName = opts.Prefix + "-" + darkName
+	}
+
+	// Get resolved color values for fallbacks
+	lightValue := getColorValue(group.Light)
+	darkValue := getColorValue(group.Dark)
+
+	// Build the light-dark() pattern with fallbacks
+	var body string
+	if lightValue != "" && darkValue != "" {
+		body = "var(--" + name + ", light-dark(\n  var(--" + lightName + ", " + lightValue + "),\n  var(--" + darkName + ", " + darkValue + ")\n))"
+	} else {
+		body = "var(--" + name + ", light-dark(\n  var(--" + lightName + "),\n  var(--" + darkName + ")\n))"
+	}
+
+	snippet := ZedSnippet{
+		Prefix: name,
+		Body:   []string{body},
+	}
+
+	if group.Root.Description != "" {
+		snippet.Description = group.Root.Description
+	}
+
+	return snippet
 }
 
 // lightDarkGroup represents a detected light-dark token group.

@@ -36,6 +36,10 @@ func TestFormat_TextMate(t *testing.T) {
 	runFixtureTest(t, "textmate", snippets.Options{Type: snippets.TypeTextMate})
 }
 
+func TestFormat_Zed(t *testing.T) {
+	runFixtureTest(t, "zed", snippets.Options{Type: snippets.TypeZed})
+}
+
 // runFixtureTest runs a fixture-based test for the snippets formatter.
 func runFixtureTest(t *testing.T, fixtureName string, snippetOpts snippets.Options) {
 	t.Helper()
@@ -60,15 +64,15 @@ func runFixtureTest(t *testing.T, fixtureName string, snippetOpts snippets.Optio
 	fmtOpts := formatter.Options{}
 	if optData, err := mfs.ReadFile("/test/options.json"); err == nil {
 		var fileOpts struct {
-			Prefix      string `json:"prefix"`
-			SnippetType string `json:"snippetType"`
+			Prefix string `json:"prefix"`
+			Type   string `json:"type"`
 		}
 		if err := json.Unmarshal(optData, &fileOpts); err == nil {
 			if fileOpts.Prefix != "" {
 				fmtOpts.Prefix = fileOpts.Prefix
 			}
-			if fileOpts.SnippetType != "" {
-				snippetOpts.Type = snippets.Type(fileOpts.SnippetType)
+			if fileOpts.Type != "" {
+				snippetOpts.Type = snippets.Type(fileOpts.Type)
 			}
 		}
 	}

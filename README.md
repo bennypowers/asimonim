@@ -213,6 +213,9 @@ asimonim convert --format snippets -o tokens.code-snippets tokens/*.yaml
 
 # Generate TextMate snippets
 asimonim convert --format snippets --snippet-type textmate -o tokens.tmSnippet tokens/*.yaml
+
+# Generate Zed editor snippets
+asimonim convert --format snippets --snippet-type zed -o css.json tokens/*.yaml
 ```
 
 ### `asimonim version`
@@ -306,6 +309,7 @@ asimonim convert --format snippets -o tokens.code-snippets tokens/*.yaml
 | ---------- | ----------------- | ---------------------------------------- |
 | `vscode`   | `.code-snippets`  | VSCode/compatible editors (default)      |
 | `textmate` | `.tmSnippet`      | TextMate/Sublime Text plist format       |
+| `zed`      | `.json`           | Zed editor snippets                      |
 
 Use `--snippet-type` to select the output format:
 
@@ -315,6 +319,9 @@ asimonim convert --format snippets -o tokens.code-snippets tokens/*.yaml
 
 # TextMate snippets
 asimonim convert --format snippets --snippet-type textmate -o tokens.tmSnippet tokens/*.yaml
+
+# Zed editor snippets
+asimonim convert --format snippets --snippet-type zed -o css.json tokens/*.yaml
 ```
 
 Each snippet includes multiple prefix triggers:
