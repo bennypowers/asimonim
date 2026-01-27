@@ -1,0 +1,26 @@
+{
+  "color-primary": {
+    "scope": "css,scss,less,stylus,postcss",
+    "prefix": [
+      "color-primary",
+      "colorPrimary",
+      "color_primary",
+      "FF6B35"
+    ],
+    "body": [
+      "var(--color-primary)"
+    ],
+    "description": "Primary brand color"
+  },
+  "spacing-small": {
+    "scope": "css,scss,less,stylus,postcss",
+    "prefix": [
+      "spacing-small",
+      "spacingSmall",
+      "spacing_small"
+    ],
+    "body": [
+      "var(--spacing-small)"
+    ]
+  }
+}
