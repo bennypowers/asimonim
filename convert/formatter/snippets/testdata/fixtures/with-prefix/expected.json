@@ -1,0 +1,14 @@
+{
+  "rh-color-primary": {
+    "scope": "css,scss,less,stylus,postcss",
+    "prefix": [
+      "rh-color-primary",
+      "rhColorPrimary",
+      "rh_color_primary",
+      "FF6B35"
+    ],
+    "body": [
+      "var(--rh-color-primary)"
+    ]
+  }
+}

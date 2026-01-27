@@ -157,15 +157,17 @@ Flags:
 
 **Output Formats:**
 
-| Format       | Extension | Description                                        |
-| ------------ | --------- | -------------------------------------------------- |
-| `dtcg`       | `.json`   | DTCG-compliant JSON (default)                      |
-| `json`       | `.json`   | Flat key-value JSON                                |
-| `android`    | `.xml`    | Android-style XML resources                        |
-| `swift`      | `.swift`  | iOS Swift constants with native SwiftUI Color      |
-| `typescript` | `.ts`     | TypeScript ESM module with `as const` exports      |
-| `cts`        | `.cts`    | TypeScript CommonJS module with `as const` exports |
-| `scss`       | `.scss`   | SCSS variables with kebab-case names               |
+| Format       | Extension          | Description                                        |
+| ------------ | ------------------ | -------------------------------------------------- |
+| `dtcg`       | `.json`            | DTCG-compliant JSON (default)                      |
+| `json`       | `.json`            | Flat key-value JSON                                |
+| `android`    | `.xml`             | Android-style XML resources                        |
+| `swift`      | `.swift`           | iOS Swift constants with native SwiftUI Color      |
+| `typescript` | `.ts`              | TypeScript ESM module with `as const` exports      |
+| `cts`        | `.cts`             | TypeScript CommonJS module with `as const` exports |
+| `scss`       | `.scss`            | SCSS variables with kebab-case names               |
+| `css`        | `.css`             | CSS custom properties                              |
+| `snippets`   | `.code-snippets`, `.tmSnippet`, `.json` | Editor snippets (VSCode, TextMate, or Zed) |
 
 **Examples:**
 
@@ -196,6 +198,24 @@ asimonim convert --format android -o values/tokens.xml tokens/*.yaml
 
 # Generate iOS Swift constants
 asimonim convert --format swift -o DesignTokens.swift tokens/*.yaml
+
+# Generate CSS custom properties
+asimonim convert --format css -o tokens.css tokens/*.yaml
+
+# Generate CSS with :host selector (for shadow DOM)
+asimonim convert --format css --css-selector :host -o tokens.css tokens/*.yaml
+
+# Generate Lit CSS module
+asimonim convert --format css --css-module lit -o tokens.css.ts tokens/*.yaml
+
+# Generate VSCode snippets
+asimonim convert --format snippets -o tokens.code-snippets tokens/*.yaml
+
+# Generate TextMate snippets
+asimonim convert --format snippets --snippet-type textmate -o tokens.tmSnippet tokens/*.yaml
+
+# Generate Zed editor snippets
+asimonim convert --format snippets --snippet-type zed -o css.json tokens/*.yaml
 ```
 
 ### `asimonim version`
@@ -249,6 +269,66 @@ The Editor's Draft schema has no built-in way for a token to also act as a group
 This produces `--prefix-color` (from DEFAULT) and `--prefix-color-light`. The v2025.10 stable schema uses `$root` instead, so `groupMarkers` is ignored for that schema.
 
 This configuration is also consumed by [dtls](https://github.com/bennypowers/design-tokens-language-server) and [cem](https://github.com/bennypowers/cem).
+
+## CSS Output
+
+The `css` format generates CSS custom properties from tokens:
+
+```bash
+asimonim convert --format css -o tokens.css tokens/*.yaml
+```
+
+**Options:**
+
+| Flag             | Default  | Description                                      |
+| ---------------- | -------- | ------------------------------------------------ |
+| `--css-selector` | `:root`  | CSS selector wrapping properties (`:root`, `:host`) |
+| `--css-module`   | (none)   | JavaScript module wrapper (`lit` for Lit CSS)   |
+
+**Examples:**
+
+```bash
+# Shadow DOM components
+asimonim convert --format css --css-selector :host -o tokens.css tokens/*.yaml
+
+# Lit CSS tagged template literal
+asimonim convert --format css --css-module lit -o tokens.css.ts tokens/*.yaml
+```
+
+## Editor Snippets
+
+The `snippets` format generates editor snippets for autocompleting CSS custom properties:
+
+```bash
+asimonim convert --format snippets -o tokens.code-snippets tokens/*.yaml
+```
+
+**Snippet Types:**
+
+| Type       | Extension         | Description                              |
+| ---------- | ----------------- | ---------------------------------------- |
+| `vscode`   | `.code-snippets`  | VSCode/compatible editors (default)      |
+| `textmate` | `.tmSnippet`      | TextMate/Sublime Text plist format       |
+| `zed`      | `.json`           | Zed editor snippets                      |
+
+Use `--snippet-type` to select the output format:
+
+```bash
+# VSCode snippets (default)
+asimonim convert --format snippets -o tokens.code-snippets tokens/*.yaml
+
+# TextMate snippets
+asimonim convert --format snippets --snippet-type textmate -o tokens.tmSnippet tokens/*.yaml
+
+# Zed editor snippets
+asimonim convert --format snippets --snippet-type zed -o css.json tokens/*.yaml
+```
+
+Each snippet includes multiple prefix triggers:
+- Kebab-case: `color-primary`
+- CamelCase: `colorPrimary`
+- Snake_case: `color_primary`
+- Value (for colors): `FF6B35`
 
 ## Schema Versions
 

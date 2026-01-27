@@ -44,6 +44,7 @@ Output Formats:
   cts        TypeScript CommonJS module with 'as const' exports
   scss       SCSS variables with kebab-case names
   css        CSS custom properties (use --css-selector and --css-module for options)
+  snippets   Editor snippets (use --snippet-type for vscode, textmate, or zed)
 
 Examples:
   # Flatten to shallow structure
@@ -84,7 +85,16 @@ Examples:
   asimonim convert --outputs "scss:css/{group}.scss" --split-by type tokens/*.yaml
 
   # Use outputs from config file (.config/design-tokens.yaml)
-  asimonim convert  # reads outputs from config`,
+  asimonim convert  # reads outputs from config
+
+  # Generate VSCode snippets
+  asimonim convert --format snippets -o tokens.code-snippets tokens/*.yaml
+
+  # Generate TextMate snippets
+  asimonim convert --format snippets --snippet-type textmate -o tokens.tmSnippet tokens/*.yaml
+
+  # Generate Zed editor snippets
+  asimonim convert --format snippets --snippet-type zed -o css.json tokens/*.yaml`,
 	Args: cobra.ArbitraryArgs,
 	RunE: run,
 }
@@ -100,6 +110,7 @@ func init() {
 	Cmd.Flags().String("header", "", "Header to prepend to output (use @path to read from file)")
 	Cmd.Flags().String("css-selector", ":root", "CSS selector for custom properties: :root (default), :host")
 	Cmd.Flags().String("css-module", "", "JavaScript module wrapper for CSS: lit (Lit css tagged template), or empty for plain CSS")
+	Cmd.Flags().String("snippet-type", "vscode", "Snippet output format: vscode (default), textmate, zed")
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -114,6 +125,7 @@ func run(cmd *cobra.Command, args []string) error {
 	headerFlag, _ := cmd.Flags().GetString("header")
 	cssSelector, _ := cmd.Flags().GetString("css-selector")
 	cssModule, _ := cmd.Flags().GetString("css-module")
+	snippetType, _ := cmd.Flags().GetString("snippet-type")
 
 	// Parse format
 	format, err := convertlib.ParseFormat(formatFlag)
@@ -218,10 +230,10 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Multi-output mode
 	if len(outputs) > 0 {
-		return runMultiOutput(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, outputs, header, cssSelector, cssModule)
+		return runMultiOutput(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, outputs, header, cssSelector, cssModule, snippetType)
 	}
 
-	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter, header, cssSelector, cssModule)
+	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter, header, cssSelector, cssModule, snippetType)
 }
 
 // resolveHeader resolves the header content from a flag value or config.
@@ -334,6 +346,7 @@ func runCombined(
 	header string,
 	cssSelector string,
 	cssModule string,
+snippetType string,
 ) error {
 	// Parse all files and resolve aliases
 	allTokens, detectedVersion, err := parseAndResolveTokens(filesystem, jsonParser, cfg, resolvedFiles)
@@ -364,6 +377,7 @@ func runCombined(
 		Header:       header,
 		CSSSelector:  cssSelector,
 		CSSModule:    cssModule,
+		SnippetType:  snippetType,
 	}
 
 	outputBytes, err := convertlib.FormatTokens(allTokens, format, opts)
@@ -402,6 +416,7 @@ func runMultiOutput(
 	header string,
 	cssSelector string,
 	cssModule string,
+snippetType string,
 ) error {
 	// Parse all files and resolve aliases
 	allTokens, detectedVersion, err := parseAndResolveTokens(filesystem, jsonParser, cfg, resolvedFiles)
@@ -445,7 +460,7 @@ func runMultiOutput(
 
 		// Check if this is a split output (path contains {group})
 		if strings.Contains(out.Path, "{group}") {
-			if err := generateSplitOutput(filesystem, allTokens, out, format, outPrefix, delimiter, detectedVersion, outputSchema, header, cssSelector, cssModule); err != nil {
+			if err := generateSplitOutput(filesystem, allTokens, out, format, outPrefix, delimiter, detectedVersion, outputSchema, header, cssSelector, cssModule, snippetType); err != nil {
 				fmt.Fprintf(os.Stderr, "Error generating split output %s: %v\n", out.Path, err)
 				failures++
 			}
@@ -463,6 +478,7 @@ func runMultiOutput(
 			Header:       header,
 			CSSSelector:  cssSelector,
 			CSSModule:    cssModule,
+			SnippetType:  snippetType,
 		}
 
 		outputBytes, err := convertlib.FormatTokens(allTokens, format, opts)
@@ -512,6 +528,7 @@ func generateSplitOutput(
 	header string,
 	cssSelector string,
 	cssModule string,
+snippetType string,
 ) error {
 	// Group tokens by split key
 	groups := groupTokens(allTokens, out.SplitBy)
@@ -534,6 +551,7 @@ func generateSplitOutput(
 			Header:       header,
 			CSSSelector:  cssSelector,
 			CSSModule:    cssModule,
+			SnippetType:  snippetType,
 		}
 
 		outputBytes, err := convertlib.FormatTokens(tokens, format, opts)

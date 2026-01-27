@@ -53,6 +53,10 @@ type Options struct {
 	// CSSModule specifies the JavaScript module wrapper for CSS output.
 	// Valid values: "" (plain CSS, default), "lit" (Lit css tagged template)
 	CSSModule string
+
+	// SnippetType specifies the snippet output format.
+	// Valid values: "vscode" (default), "textmate", "zed"
+	SnippetType string
 }
 
 // DefaultOptions returns options with sensible defaults.
@@ -64,6 +68,7 @@ func DefaultOptions() Options {
 		Delimiter:    "-",
 		Format:       FormatDTCG,
 		CSSSelector:  ":root",
+		SnippetType:  "vscode",
 	}
 }
 

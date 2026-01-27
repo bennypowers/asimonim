@@ -1,0 +1,13 @@
+{
+  "color-text": {
+    "scope": "css,scss,less,stylus,postcss",
+    "prefix": [
+      "color-text",
+      "colorText",
+      "color_text"
+    ],
+    "body": [
+      "var(--color-text, light-dark(\n  var(--color-text-light, #000000),\n  var(--color-text-dark, #ffffff)\n))"
+    ]
+  }
+}
