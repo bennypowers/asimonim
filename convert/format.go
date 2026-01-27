@@ -125,7 +125,6 @@ func FormatTokens(tokens []*token.Token, format Format, opts Options) ([]byte, e
 		f = scss.New()
 	case FormatCSS:
 		f = css.NewWithOptions(css.Options{
-			Options:  fmtOpts,
 			Selector: css.Selector(opts.CSSSelector),
 			Module:   css.Module(opts.CSSModule),
 		})

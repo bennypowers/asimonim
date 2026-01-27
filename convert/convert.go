@@ -63,6 +63,7 @@ func DefaultOptions() Options {
 		Flatten:      false,
 		Delimiter:    "-",
 		Format:       FormatDTCG,
+		CSSSelector:  ":root",
 	}
 }
 
