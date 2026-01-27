@@ -41,6 +41,10 @@ type Options struct {
 
 	// Prefix is added to output variable names.
 	Prefix string
+
+	// Header is the content to prepend to the output.
+	// Formatters wrap this in appropriate comment syntax.
+	Header string
 }
 
 // DefaultOptions returns options with sensible defaults.

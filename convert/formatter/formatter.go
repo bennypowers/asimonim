@@ -29,6 +29,10 @@ type Options struct {
 	// Delimiter is the separator for flattened keys.
 	// Zero value is empty string; consuming code should set "-" if needed.
 	Delimiter string
+
+	// Header is the content to prepend to the output.
+	// Formatters wrap this in appropriate comment syntax.
+	Header string
 }
 
 // ResolvedValue returns the resolved value for a token, falling back to raw or original value.
@@ -171,4 +175,111 @@ func EscapeXML(s string) string {
 	s = strings.ReplaceAll(s, "\"", "&quot;")
 	s = strings.ReplaceAll(s, "'", "&apos;")
 	return s
+}
+
+// CommentStyle represents a comment syntax for a format.
+type CommentStyle struct {
+	// LinePrefix is the prefix for single-line comments (e.g., "// ", "# ").
+	LinePrefix string
+	// BlockStart is the opening of a block comment (e.g., "/*").
+	BlockStart string
+	// BlockEnd is the closing of a block comment (e.g., "*/").
+	BlockEnd string
+	// BlockLinePrefix is the prefix for lines inside a block comment (e.g., " * ").
+	// If empty, defaults to " * " for C-style comments.
+	BlockLinePrefix string
+}
+
+// Common comment styles for different formats.
+var (
+	// CStyleComments uses C-style block comments (/* ... */).
+	CStyleComments = CommentStyle{
+		LinePrefix: "// ",
+		BlockStart: "/*",
+		BlockEnd:   "*/",
+	}
+	// HashComments uses hash-style line comments (# ...).
+	HashComments = CommentStyle{
+		LinePrefix: "# ",
+	}
+	// XMLComments uses XML-style block comments (<!-- ... -->).
+	XMLComments = CommentStyle{
+		BlockStart:      "<!--",
+		BlockEnd:        "-->",
+		BlockLinePrefix: "  ",
+	}
+	// SCSSComments uses SCSS-style line comments (// ...).
+	SCSSComments = CommentStyle{
+		LinePrefix: "// ",
+	}
+	// SwiftComments uses Swift-style comments.
+	SwiftComments = CommentStyle{
+		LinePrefix: "// ",
+		BlockStart: "/*",
+		BlockEnd:   "*/",
+	}
+)
+
+// FormatHeader formats a header string using the given comment style.
+// Returns an empty string if header is empty.
+func FormatHeader(header string, style CommentStyle) string {
+	if header == "" {
+		return ""
+	}
+
+	lines := strings.Split(header, "\n")
+
+	// Remove trailing empty lines
+	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+		lines = lines[:len(lines)-1]
+	}
+
+	if len(lines) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+
+	// Use block comments if available and header has multiple lines
+	if style.BlockStart != "" && style.BlockEnd != "" && len(lines) > 1 {
+		// Determine line prefix for block comments
+		linePrefix := style.BlockLinePrefix
+		if linePrefix == "" {
+			linePrefix = " * " // Default to C-style
+		}
+		emptyPrefix := strings.TrimRight(linePrefix, " ")
+
+		sb.WriteString(style.BlockStart)
+		sb.WriteString("\n")
+		for _, line := range lines {
+			if strings.TrimSpace(line) == "" {
+				sb.WriteString(emptyPrefix)
+				sb.WriteString("\n")
+			} else {
+				sb.WriteString(linePrefix)
+				sb.WriteString(line)
+				sb.WriteString("\n")
+			}
+		}
+		sb.WriteString(style.BlockEnd)
+		sb.WriteString("\n\n")
+	} else if style.LinePrefix != "" {
+		// Use line comments
+		for _, line := range lines {
+			sb.WriteString(style.LinePrefix)
+			sb.WriteString(line)
+			sb.WriteString("\n")
+		}
+		sb.WriteString("\n")
+	} else if style.BlockStart != "" && style.BlockEnd != "" {
+		// Single line with block comment
+		sb.WriteString(style.BlockStart)
+		sb.WriteString(" ")
+		sb.WriteString(lines[0])
+		sb.WriteString(" ")
+		sb.WriteString(style.BlockEnd)
+		sb.WriteString("\n\n")
+	}
+
+	return sb.String()
 }

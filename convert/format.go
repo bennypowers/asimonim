@@ -19,6 +19,7 @@ import (
 	"bennypowers.dev/asimonim/convert/formatter/scss"
 	"bennypowers.dev/asimonim/convert/formatter/swift"
 	"bennypowers.dev/asimonim/convert/formatter/typescript"
+	"bennypowers.dev/asimonim/convert/formatter/typescriptmap"
 	"bennypowers.dev/asimonim/token"
 )
 
@@ -52,6 +53,9 @@ const (
 
 	// FormatLitCSS outputs CSS custom properties wrapped in Lit's css template tag.
 	FormatLitCSS Format = "lit-css"
+
+	// FormatTypeScriptMap outputs a TypeScript module with a typed TokenMap class.
+	FormatTypeScriptMap Format = "typescript-map"
 )
 
 // ValidFormats returns all valid format strings.
@@ -66,6 +70,7 @@ func ValidFormats() []string {
 		string(FormatSCSS),
 		string(FormatCSS),
 		string(FormatLitCSS),
+		string(FormatTypeScriptMap),
 	}
 }
 
@@ -90,6 +95,8 @@ func ParseFormat(s string) (Format, error) {
 		return FormatCSS, nil
 	case "lit-css", "lit":
 		return FormatLitCSS, nil
+	case "typescript-map", "ts-map":
+		return FormatTypeScriptMap, nil
 	default:
 		return "", fmt.Errorf("unknown format: %s (valid: %s)", s, strings.Join(ValidFormats(), ", "))
 	}
@@ -100,6 +107,7 @@ func FormatTokens(tokens []*token.Token, format Format, opts Options) ([]byte, e
 	fmtOpts := formatter.Options{
 		Prefix:    opts.Prefix,
 		Delimiter: opts.Delimiter,
+		Header:    opts.Header,
 	}
 
 	var f formatter.Formatter
@@ -130,6 +138,8 @@ func FormatTokens(tokens []*token.Token, format Format, opts Options) ([]byte, e
 			Options: fmtOpts,
 			Flavor:  css.FlavorLit,
 		})
+	case FormatTypeScriptMap:
+		f = typescriptmap.New()
 	default:
 		return nil, fmt.Errorf("unsupported format: %s", format)
 	}
