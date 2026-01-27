@@ -218,7 +218,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Multi-output mode
 	if len(outputs) > 0 {
-		return runMultiOutput(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, outputs, header)
+		return runMultiOutput(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, outputs, header, cssSelector, cssModule)
 	}
 
 	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter, header, cssSelector, cssModule)
@@ -400,6 +400,8 @@ func runMultiOutput(
 	targetSchema schema.Version,
 	outputs []config.OutputSpec,
 	header string,
+	cssSelector string,
+	cssModule string,
 ) error {
 	// Parse all files and resolve aliases
 	allTokens, detectedVersion, err := parseAndResolveTokens(filesystem, jsonParser, cfg, resolvedFiles)
@@ -443,7 +445,7 @@ func runMultiOutput(
 
 		// Check if this is a split output (path contains {group})
 		if strings.Contains(out.Path, "{group}") {
-			if err := generateSplitOutput(filesystem, allTokens, out, format, outPrefix, delimiter, detectedVersion, outputSchema, header); err != nil {
+			if err := generateSplitOutput(filesystem, allTokens, out, format, outPrefix, delimiter, detectedVersion, outputSchema, header, cssSelector, cssModule); err != nil {
 				fmt.Fprintf(os.Stderr, "Error generating split output %s: %v\n", out.Path, err)
 				failures++
 			}
@@ -459,6 +461,8 @@ func runMultiOutput(
 			Format:       format,
 			Prefix:       outPrefix,
 			Header:       header,
+			CSSSelector:  cssSelector,
+			CSSModule:    cssModule,
 		}
 
 		outputBytes, err := convertlib.FormatTokens(allTokens, format, opts)
@@ -506,6 +510,8 @@ func generateSplitOutput(
 	inputSchema schema.Version,
 	outputSchema schema.Version,
 	header string,
+	cssSelector string,
+	cssModule string,
 ) error {
 	// Group tokens by split key
 	groups := groupTokens(allTokens, out.SplitBy)
@@ -526,6 +532,8 @@ func generateSplitOutput(
 			Format:       format,
 			Prefix:       prefix,
 			Header:       header,
+			CSSSelector:  cssSelector,
+			CSSModule:    cssModule,
 		}
 
 		outputBytes, err := convertlib.FormatTokens(tokens, format, opts)
