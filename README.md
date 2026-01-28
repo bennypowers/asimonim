@@ -163,11 +163,18 @@ Flags:
 | `json`       | `.json`            | Flat key-value JSON                                |
 | `android`    | `.xml`             | Android-style XML resources                        |
 | `swift`      | `.swift`           | iOS Swift constants with native SwiftUI Color      |
-| `typescript` | `.ts`              | TypeScript ESM module with `as const` exports      |
-| `cts`        | `.cts`             | TypeScript CommonJS module with `as const` exports |
+| `js`         | `.ts`, `.js`, `.cts`, `.cjs` | JavaScript/TypeScript (see JS options below) |
 | `scss`       | `.scss`            | SCSS variables with kebab-case names               |
 | `css`        | `.css`             | CSS custom properties                              |
 | `snippets`   | `.code-snippets`, `.tmSnippet`, `.json` | Editor snippets (VSCode, TextMate, or Zed) |
+
+**JS Format Options:**
+
+| Flag           | Values                | Default   | Description                              |
+| -------------- | --------------------- | --------- | ---------------------------------------- |
+| `--js-module`  | `esm`, `cjs`          | `esm`     | Module system (ESM or CommonJS)          |
+| `--js-types`   | `ts`, `jsdoc`         | `ts`      | Type system (TypeScript or JSDoc)        |
+| `--js-export`  | `values`, `map`       | `values`  | Export form (simple values or TokenMap)  |
 
 **Examples:**
 
@@ -184,11 +191,17 @@ asimonim convert --in-place --schema v2025.10 tokens/*.yaml
 # Combine multiple files
 asimonim convert colors.yaml spacing.yaml -o combined.json
 
-# Generate TypeScript ESM module
-asimonim convert --format typescript -o tokens.ts tokens/*.yaml
+# Generate TypeScript ESM module (default JS output)
+asimonim convert --format js -o tokens.ts tokens/*.yaml
 
 # Generate TypeScript CommonJS module
-asimonim convert --format cts -o tokens.cts tokens/*.yaml
+asimonim convert --format js --js-module cjs -o tokens.cts tokens/*.yaml
+
+# Generate JavaScript with JSDoc types
+asimonim convert --format js --js-types jsdoc -o tokens.js tokens/*.yaml
+
+# Generate TokenMap class for typed token access
+asimonim convert --format js --js-export map -o tokens.ts tokens/*.yaml
 
 # Generate SCSS variables with prefix
 asimonim convert --format scss --prefix rh -o _tokens.scss tokens/*.yaml
