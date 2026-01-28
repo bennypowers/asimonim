@@ -33,8 +33,10 @@ export interface DesignToken<V> {
  * Union type of all token names (CSS variable or dot-path).
  */
 export type TokenName =
-  | "--rh-color-primary"
-  | "color.primary";
+  | "--color-primary"
+  | "color.primary"
+  | "--spacing-small"
+  | "spacing.small";
 
 /**
  * Typed map for accessing design tokens by CSS variable name or dot-path.
@@ -86,8 +88,12 @@ export class TokenMap<T extends Record<string, DesignToken<unknown>>> {
  * Default token map instance.
  */
 export const tokens = new TokenMap({
-  "--rh-color-primary": {
+  "--color-primary": {
       "$type": "color",
       "$value": "#FF6B35"
     } as DesignToken<Color>,
-}, "rh", "-");
+  "--spacing-small": {
+      "$type": "dimension",
+      "$value": "4px"
+    } as DesignToken<string>,
+}, "", "-");

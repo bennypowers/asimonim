@@ -13,14 +13,12 @@ import (
 	"bennypowers.dev/asimonim/convert/formatter"
 	"bennypowers.dev/asimonim/convert/formatter/android"
 	"bennypowers.dev/asimonim/convert/formatter/css"
-	"bennypowers.dev/asimonim/convert/formatter/cts"
 	"bennypowers.dev/asimonim/convert/formatter/dtcg"
 	"bennypowers.dev/asimonim/convert/formatter/flatjson"
+	"bennypowers.dev/asimonim/convert/formatter/js"
 	"bennypowers.dev/asimonim/convert/formatter/scss"
-	"bennypowers.dev/asimonim/convert/formatter/swift"
-	"bennypowers.dev/asimonim/convert/formatter/typescript"
-	"bennypowers.dev/asimonim/convert/formatter/typescriptmap"
 	"bennypowers.dev/asimonim/convert/formatter/snippets"
+	"bennypowers.dev/asimonim/convert/formatter/swift"
 	"bennypowers.dev/asimonim/token"
 )
 
@@ -40,11 +38,9 @@ const (
 	// FormatSwift outputs iOS Swift constants.
 	FormatSwift Format = "swift"
 
-	// FormatTypeScript outputs a TypeScript ESM module with camelCase exports.
-	FormatTypeScript Format = "typescript"
-
-	// FormatCTS outputs a TypeScript CommonJS module with camelCase exports.
-	FormatCTS Format = "cts"
+	// FormatJS outputs JavaScript/TypeScript modules.
+	// Use JSModule, JSTypes, and JSExport options to customize output.
+	FormatJS Format = "js"
 
 	// FormatSCSS outputs SCSS variables with kebab-case names.
 	FormatSCSS Format = "scss"
@@ -52,9 +48,6 @@ const (
 	// FormatCSS outputs CSS custom properties.
 	// Use CSSSelector and CSSModule options to customize output.
 	FormatCSS Format = "css"
-
-	// FormatTypeScriptMap outputs a TypeScript module with a typed TokenMap class.
-	FormatTypeScriptMap Format = "typescript-map"
 
 	// FormatSnippets outputs editor snippets (VSCode, TextMate, etc).
 	// Use SnippetType option to specify the output format.
@@ -68,16 +61,16 @@ func ValidFormats() []string {
 		string(FormatFlatJSON),
 		string(FormatAndroid),
 		string(FormatSwift),
-		string(FormatTypeScript),
-		string(FormatCTS),
+		string(FormatJS),
 		string(FormatSCSS),
 		string(FormatCSS),
-		string(FormatTypeScriptMap),
 		string(FormatSnippets),
 	}
 }
 
 // ParseFormat converts a string to a Format.
+// Note: For format aliases (typescript, cts, typescript-map), the caller must also
+// set appropriate JSModule, JSTypes, and JSStyle options.
 func ParseFormat(s string) (Format, error) {
 	switch strings.ToLower(s) {
 	case "dtcg", "":
@@ -88,16 +81,12 @@ func ParseFormat(s string) (Format, error) {
 		return FormatAndroid, nil
 	case "swift", "ios":
 		return FormatSwift, nil
-	case "typescript", "ts":
-		return FormatTypeScript, nil
-	case "cts", "commonjs":
-		return FormatCTS, nil
+	case "js", "javascript":
+		return FormatJS, nil
 	case "scss", "sass":
 		return FormatSCSS, nil
 	case "css":
 		return FormatCSS, nil
-	case "typescript-map", "ts-map":
-		return FormatTypeScriptMap, nil
 	case "snippets":
 		return FormatSnippets, nil
 	default:
@@ -125,10 +114,15 @@ func FormatTokens(tokens []*token.Token, format Format, opts Options) ([]byte, e
 		f = android.New()
 	case FormatSwift:
 		f = swift.New()
-	case FormatTypeScript:
-		f = typescript.New()
-	case FormatCTS:
-		f = cts.New()
+	case FormatJS:
+		f = js.NewWithOptions(js.Options{
+			Module:    js.Module(opts.JSModule),
+			Types:     js.Types(opts.JSTypes),
+			Export:    js.Export(opts.JSExport),
+			MapMode:   js.MapMode(opts.JSMapMode),
+			TypesPath: opts.JSMapTypesPath,
+			ClassName: opts.JSMapClassName,
+		})
 	case FormatSCSS:
 		f = scss.New()
 	case FormatCSS:
@@ -136,8 +130,6 @@ func FormatTokens(tokens []*token.Token, format Format, opts Options) ([]byte, e
 			Selector: css.Selector(opts.CSSSelector),
 			Module:   css.Module(opts.CSSModule),
 		})
-	case FormatTypeScriptMap:
-		f = typescriptmap.New()
 	case FormatSnippets:
 		f = snippets.NewWithOptions(snippets.Options{
 			Type: snippets.Type(opts.SnippetType),

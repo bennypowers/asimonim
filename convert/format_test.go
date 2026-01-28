@@ -51,13 +51,17 @@ func TestParseFormat(t *testing.T) {
 		{"android", convert.FormatAndroid, false},
 		{"swift", convert.FormatSwift, false},
 		{"ios", convert.FormatSwift, false},
-		{"typescript", convert.FormatTypeScript, false},
-		{"ts", convert.FormatTypeScript, false},
-		{"cts", convert.FormatCTS, false},
-		{"commonjs", convert.FormatCTS, false},
+		{"js", convert.FormatJS, false},
+		{"javascript", convert.FormatJS, false},
 		{"scss", convert.FormatSCSS, false},
 		{"sass", convert.FormatSCSS, false},
 		{"invalid", "", true},
+		{"typescript", "", true},
+		{"ts", "", true},
+		{"cts", "", true},
+		{"commonjs", "", true},
+		{"typescript-map", "", true},
+		{"ts-map", "", true},
 	}
 
 	for _, tt := range tests {
@@ -165,18 +169,18 @@ func TestFormatTokens_Swift(t *testing.T) {
 	}
 }
 
-func TestFormatTokens_TypeScript(t *testing.T) {
+func TestFormatTokens_JS(t *testing.T) {
 	tokens := loadTestTokens(t)
 	opts := convert.DefaultOptions()
 
-	output, err := convert.FormatTokens(tokens, convert.FormatTypeScript, opts)
+	output, err := convert.FormatTokens(tokens, convert.FormatJS, opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	result := string(output)
 
-	// Check TypeScript structure
+	// Check TypeScript structure (default for JS format)
 	if !strings.Contains(result, "export const") {
 		t.Error("expected export const")
 	}
@@ -242,20 +246,22 @@ func TestFormatTokens_DTCG(t *testing.T) {
 	}
 }
 
-func TestFormatTokens_CTS(t *testing.T) {
+func TestFormatTokens_JS_CJS(t *testing.T) {
 	tokens := loadTestTokens(t)
 	opts := convert.DefaultOptions()
+	opts.JSModule = "cjs"
 
-	output, err := convert.FormatTokens(tokens, convert.FormatCTS, opts)
+	output, err := convert.FormatTokens(tokens, convert.FormatJS, opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	result := string(output)
 
-	// Check CommonJS TypeScript structure
-	if !strings.Contains(result, "exports.") {
-		t.Error("expected exports. for CommonJS")
+	// TypeScript CJS (.cts) uses export const for proper type narrowing
+	// TypeScript handles CJS transpilation based on file extension
+	if !strings.Contains(result, "export const") {
+		t.Error("expected export const for TypeScript CJS")
 	}
 	if !strings.Contains(result, "colorPrimary =") {
 		t.Error("expected camelCase variable name 'colorPrimary'")
@@ -272,9 +278,9 @@ func TestFormatTokens_CTS(t *testing.T) {
 func TestValidFormats(t *testing.T) {
 	formats := convert.ValidFormats()
 
-	expected := []string{"dtcg", "json", "android", "swift", "typescript", "cts", "scss", "css", "typescript-map", "snippets"}
+	expected := []string{"dtcg", "json", "android", "swift", "js", "scss", "css", "snippets"}
 	if len(formats) != len(expected) {
-		t.Errorf("expected %d formats, got %d", len(expected), len(formats))
+		t.Errorf("expected %d formats, got %d: %v", len(expected), len(formats), formats)
 	}
 
 	for _, exp := range expected {
