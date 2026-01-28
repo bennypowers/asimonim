@@ -32,9 +32,14 @@ export interface DesignToken<V> {
 /**
  * Union type of all token names (CSS variable or dot-path).
  */
+{{- if .TokenNames}}
 export type TokenName =
-  | "--color-back\\slash"
-  | "color.back\\slash";
+{{- range .TokenNames}}
+  | "{{.}}"
+{{- end}};
+{{- else}}
+export type TokenName = never;
+{{- end}}
 
 /**
  * Typed map for accessing design tokens by CSS variable name or dot-path.
@@ -86,8 +91,7 @@ export class TokenMap<T extends Record<string, DesignToken<unknown>>> {
  * Default token map instance.
  */
 export const tokens = new TokenMap({
-  "--color-back\\slash": {
-      "$type": "color",
-      "$value": "#FF6B35"
-    } as DesignToken<Color>,
-}, "", "-");
+{{- range .Entries}}
+  "{{.CSSVar}}": {{.Value}} as DesignToken<{{.ValueType}}>,
+{{- end}}
+}, "{{.Prefix}}", "{{.Delimiter}}");

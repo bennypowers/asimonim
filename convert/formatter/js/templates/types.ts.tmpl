@@ -30,13 +30,6 @@ export interface DesignToken<V> {
 }
 
 /**
- * Union type of all token names (CSS variable or dot-path).
- */
-export type TokenName =
-  | "--color-\"quoted\""
-  | "color.\"quoted\"";
-
-/**
  * Typed map for accessing design tokens by CSS variable name or dot-path.
  */
 export class TokenMap<T extends Record<string, DesignToken<unknown>>> {
@@ -81,13 +74,3 @@ export class TokenMap<T extends Record<string, DesignToken<unknown>>> {
     this.#map.forEach((v, k) => { fn.call(thisArg, v, k, this); });
   }
 }
-
-/**
- * Default token map instance.
- */
-export const tokens = new TokenMap({
-  "--color-\"quoted\"": {
-      "$type": "color",
-      "$value": "#FF6B35"
-    } as DesignToken<Color>,
-}, "", "-");

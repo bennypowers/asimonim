@@ -57,9 +57,36 @@ type Options struct {
 	// SnippetType specifies the snippet output format.
 	// Valid values: "vscode" (default), "textmate", "zed"
 	SnippetType string
+
+	// JSModule specifies the JavaScript module format.
+	// Valid values: "esm" (default), "cjs"
+	JSModule string
+
+	// JSTypes specifies the JavaScript type system.
+	// Valid values: "ts" (default), "jsdoc"
+	JSTypes string
+
+	// JSExport specifies the JavaScript output style.
+	// Valid values: "values" (default), "map"
+	JSExport string
+
+	// JSMapMode specifies the map mode for split file generation.
+	// Valid values: "" (full), "types", "module"
+	// Set internally during split output, not via CLI flag.
+	JSMapMode string
+
+	// JSMapTypesPath is the import path for shared types.
+	// Used when JSMapMode is "module".
+	JSMapTypesPath string
+
+	// JSMapClassName is the class name for extended TokenMap.
+	// Used when JSMapMode is "module".
+	JSMapClassName string
 }
 
 // DefaultOptions returns options with sensible defaults.
+// Note: JS* fields are intentionally not set here; defaults are applied
+// in the js formatter package via NewWithOptions.
 func DefaultOptions() Options {
 	return Options{
 		InputSchema:  schema.Draft,

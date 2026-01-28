@@ -21,6 +21,7 @@ import (
 
 	"bennypowers.dev/asimonim/config"
 	convertlib "bennypowers.dev/asimonim/convert"
+	"bennypowers.dev/asimonim/convert/formatter"
 	"bennypowers.dev/asimonim/fs"
 	"bennypowers.dev/asimonim/parser"
 	"bennypowers.dev/asimonim/resolver"
@@ -40,8 +41,7 @@ Output Formats:
   json       Flat key-value JSON
   android    Android-style XML resources
   swift      iOS Swift constants with native SwiftUI Color
-  typescript TypeScript ESM module with 'as const' exports
-  cts        TypeScript CommonJS module with 'as const' exports
+  js         JavaScript/TypeScript (use --js-module, --js-types, --js-export for options)
   scss       SCSS variables with kebab-case names
   css        CSS custom properties (use --css-selector and --css-module for options)
   snippets   Editor snippets (use --snippet-type for vscode, textmate, or zed)
@@ -50,8 +50,14 @@ Examples:
   # Flatten to shallow structure
   asimonim convert --flatten tokens/*.yaml
 
-  # Convert to TypeScript module
-  asimonim convert --format typescript -o tokens.ts tokens/*.yaml
+  # Convert to TypeScript module (default JS output)
+  asimonim convert --format js -o tokens.ts tokens/*.yaml
+
+  # Convert to JavaScript with JSDoc types
+  asimonim convert --format js --js-types jsdoc -o tokens.js tokens/*.yaml
+
+  # Convert to CommonJS TypeScript
+  asimonim convert --format js --js-module cjs -o tokens.cts tokens/*.yaml
 
   # Convert to SCSS variables
   asimonim convert --format scss -o _tokens.scss tokens/*.yaml
@@ -75,11 +81,14 @@ Examples:
   asimonim convert --in-place --schema v2025.10 tokens/*.yaml
 
   # Multi-output mode: generate multiple formats at once
-  asimonim convert --outputs scss:tokens.scss --outputs typescript:tokens.ts tokens/*.yaml
+  asimonim convert --outputs scss:tokens.scss --outputs js:tokens.ts tokens/*.yaml
 
   # Split by category: generate one file per top-level group
-  asimonim convert --outputs "typescript:js/{group}.ts" tokens/*.yaml
+  asimonim convert --outputs "js:js/{group}.ts" tokens/*.yaml
   # Produces: js/color.ts, js/animation.ts, js/border.ts, etc.
+
+  # Split with TokenMap class export
+  asimonim convert --outputs "js:js/{group}.ts" --js-export map tokens/*.yaml
 
   # Split by token type
   asimonim convert --outputs "scss:css/{group}.scss" --split-by type tokens/*.yaml
@@ -111,6 +120,9 @@ func init() {
 	Cmd.Flags().String("css-selector", ":root", "CSS selector for custom properties: :root (default), :host")
 	Cmd.Flags().String("css-module", "", "JavaScript module wrapper for CSS: lit (Lit css tagged template), or empty for plain CSS")
 	Cmd.Flags().String("snippet-type", "vscode", "Snippet output format: vscode (default), textmate, zed")
+	Cmd.Flags().String("js-module", "esm", "JS module format: esm (default), cjs")
+	Cmd.Flags().String("js-types", "ts", "JS type system: ts (default), jsdoc")
+	Cmd.Flags().String("js-export", "values", "JS export form: values (default), map")
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -126,6 +138,9 @@ func run(cmd *cobra.Command, args []string) error {
 	cssSelector, _ := cmd.Flags().GetString("css-selector")
 	cssModule, _ := cmd.Flags().GetString("css-module")
 	snippetType, _ := cmd.Flags().GetString("snippet-type")
+	jsModule, _ := cmd.Flags().GetString("js-module")
+	jsTypes, _ := cmd.Flags().GetString("js-types")
+	jsExport, _ := cmd.Flags().GetString("js-export")
 
 	// Parse format
 	format, err := convertlib.ParseFormat(formatFlag)
@@ -230,10 +245,10 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Multi-output mode
 	if len(outputs) > 0 {
-		return runMultiOutput(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, outputs, header, cssSelector, cssModule, snippetType)
+		return runMultiOutput(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, outputs, header, cssSelector, cssModule, snippetType, jsModule, jsTypes, jsExport)
 	}
 
-	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter, header, cssSelector, cssModule, snippetType)
+	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter, header, cssSelector, cssModule, snippetType, jsModule, jsTypes, jsExport)
 }
 
 // resolveHeader resolves the header content from a flag value or config.
@@ -346,7 +361,10 @@ func runCombined(
 	header string,
 	cssSelector string,
 	cssModule string,
-snippetType string,
+	snippetType string,
+	jsModule string,
+	jsTypes string,
+	jsExport string,
 ) error {
 	// Parse all files and resolve aliases
 	allTokens, detectedVersion, err := parseAndResolveTokens(filesystem, jsonParser, cfg, resolvedFiles)
@@ -378,6 +396,9 @@ snippetType string,
 		CSSSelector:  cssSelector,
 		CSSModule:    cssModule,
 		SnippetType:  snippetType,
+		JSModule:     jsModule,
+		JSTypes:      jsTypes,
+		JSExport:      jsExport,
 	}
 
 	outputBytes, err := convertlib.FormatTokens(allTokens, format, opts)
@@ -416,7 +437,10 @@ func runMultiOutput(
 	header string,
 	cssSelector string,
 	cssModule string,
-snippetType string,
+	snippetType string,
+	jsModule string,
+	jsTypes string,
+	jsExport string,
 ) error {
 	// Parse all files and resolve aliases
 	allTokens, detectedVersion, err := parseAndResolveTokens(filesystem, jsonParser, cfg, resolvedFiles)
@@ -460,7 +484,7 @@ snippetType string,
 
 		// Check if this is a split output (path contains {group})
 		if strings.Contains(out.Path, "{group}") {
-			if err := generateSplitOutput(filesystem, allTokens, out, format, outPrefix, delimiter, detectedVersion, outputSchema, header, cssSelector, cssModule, snippetType); err != nil {
+			if err := generateSplitOutput(filesystem, allTokens, out, format, outPrefix, delimiter, detectedVersion, outputSchema, header, cssSelector, cssModule, snippetType, jsModule, jsTypes, jsExport); err != nil {
 				fmt.Fprintf(os.Stderr, "Error generating split output %s: %v\n", out.Path, err)
 				failures++
 			}
@@ -479,6 +503,9 @@ snippetType string,
 			CSSSelector:  cssSelector,
 			CSSModule:    cssModule,
 			SnippetType:  snippetType,
+			JSModule:     jsModule,
+			JSTypes:      jsTypes,
+			JSExport:     jsExport,
 		}
 
 		outputBytes, err := convertlib.FormatTokens(allTokens, format, opts)
@@ -528,12 +555,54 @@ func generateSplitOutput(
 	header string,
 	cssSelector string,
 	cssModule string,
-snippetType string,
+	snippetType string,
+	jsModule string,
+	jsTypes string,
+	jsExport string,
 ) error {
 	// Group tokens by split key
 	groups := groupTokens(allTokens, out.SplitBy)
 
 	var failures int
+
+	// For JS with map style, generate shared types file first
+	if format == convertlib.FormatJS && jsExport == "map" {
+		typesPath := computeTypesPath(out.Path)
+
+		opts := convertlib.Options{
+			InputSchema:  inputSchema,
+			OutputSchema: outputSchema,
+			Flatten:      out.Flatten,
+			Delimiter:    delimiter,
+			Format:       format,
+			Prefix:       prefix,
+			Header:       header,
+			JSModule:     jsModule,
+			JSTypes:      jsTypes,
+			JSExport:      jsExport,
+			JSMapMode:    "types",
+		}
+
+		outputBytes, err := convertlib.FormatTokens(nil, format, opts)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error formatting %s: %v\n", typesPath, err)
+			failures++
+		} else {
+			if len(outputBytes) > 0 && outputBytes[len(outputBytes)-1] != '\n' {
+				outputBytes = append(outputBytes, '\n')
+			}
+			if err := ensureDir(filesystem, typesPath); err != nil {
+				fmt.Fprintf(os.Stderr, "Error creating directory for %s: %v\n", typesPath, err)
+				failures++
+			} else if err := filesystem.WriteFile(typesPath, outputBytes, 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "Error writing to %s: %v\n", typesPath, err)
+				failures++
+			} else {
+				fmt.Fprintf(os.Stderr, "Wrote %s\n", typesPath)
+			}
+		}
+	}
+
 	for groupName, tokens := range groups {
 		// Sanitize group name to prevent path traversal
 		safeName := sanitizeGroupName(groupName)
@@ -552,6 +621,16 @@ snippetType string,
 			CSSSelector:  cssSelector,
 			CSSModule:    cssModule,
 			SnippetType:  snippetType,
+			JSModule:     jsModule,
+			JSTypes:      jsTypes,
+			JSExport:      jsExport,
+		}
+
+		// For JS with map style, use module mode with imports
+		if format == convertlib.FormatJS && jsExport == "map" {
+			opts.JSMapMode = "module"
+			opts.JSMapTypesPath = computeSharedTypesImport(path, out.Path)
+			opts.JSMapClassName = formatter.ToPascalCase(groupName) + "TokenMap"
 		}
 
 		outputBytes, err := convertlib.FormatTokens(tokens, format, opts)
@@ -586,6 +665,50 @@ snippetType string,
 		return fmt.Errorf("failed to generate %d split file(s)", failures)
 	}
 	return nil
+}
+
+// computeTypesPath computes the path for the shared types file.
+// Given a path template like "js/{group}.ts", returns "js/types.ts".
+func computeTypesPath(pathTemplate string) string {
+	dir := filepath.Dir(pathTemplate)
+	ext := filepath.Ext(pathTemplate)
+	return filepath.Join(dir, "types"+ext)
+}
+
+// computeSharedTypesImport computes the relative import path to the types file.
+// Both paths are relative to the same base, so we compute the relative path
+// from the generated file to the types file.
+func computeSharedTypesImport(outputPath, pathTemplate string) string {
+	// Derive extension from the path template (e.g., ".ts" from "js/{group}.ts")
+	ext := filepath.Ext(pathTemplate)
+	typesFile := "types" + ext
+
+	// The types file is always in the same directory as the template's directory
+	// Output files may be in subdirectories if the template includes nested paths
+	outputDir := filepath.Dir(outputPath)
+	templateDir := filepath.Dir(pathTemplate)
+
+	// If they're in the same directory, just use "./types"+ext
+	if outputDir == templateDir {
+		return "./" + typesFile
+	}
+
+	// Compute relative path from outputDir to templateDir
+	relPath, err := filepath.Rel(outputDir, templateDir)
+	if err != nil {
+		// Fallback to same-dir import
+		return "./" + typesFile
+	}
+
+	// Convert to URL-style forward slashes for ES module imports
+	relPath = filepath.ToSlash(relPath)
+
+	// Ensure the path starts with "./" for relative imports
+	if !strings.HasPrefix(relPath, ".") {
+		relPath = "./" + relPath
+	}
+
+	return relPath + "/" + typesFile
 }
 
 // groupTokens groups tokens by the specified split strategy.
