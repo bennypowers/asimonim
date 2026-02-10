@@ -253,6 +253,8 @@ func (p *JSONParser) createToken(key, path string, valueMap map[string]any, json
 			// (e.g. fallback comparison) have a string representation.
 			if v, ok := dollarValue.(float64); ok {
 				value = strconv.FormatFloat(v, 'f', -1, 64)
+			} else if v, ok := dollarValue.(int); ok {
+				value = strconv.FormatInt(int64(v), 10)
 			}
 		}
 	} else if dollarRef != nil && opts.SchemaVersion != schema.Draft {
