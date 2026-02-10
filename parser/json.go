@@ -13,6 +13,7 @@ import (
 	"math"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"bennypowers.dev/asimonim/fs"
@@ -248,6 +249,11 @@ func (p *JSONParser) createToken(key, path string, valueMap map[string]any, json
 			rawValue = value
 		} else {
 			rawValue = dollarValue
+			// Populate Value for numeric primitives so downstream consumers
+			// (e.g. fallback comparison) have a string representation.
+			if v, ok := dollarValue.(float64); ok {
+				value = strconv.FormatFloat(v, 'f', -1, 64)
+			}
 		}
 	} else if dollarRef != nil && opts.SchemaVersion != schema.Draft {
 		if strVal, ok := dollarRef.(string); ok {
