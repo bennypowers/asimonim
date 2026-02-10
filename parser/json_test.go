@@ -193,6 +193,52 @@ func TestJSONParser_AutoDetectSchema(t *testing.T) {
 	})
 }
 
+func TestJSONParser_NumericValues(t *testing.T) {
+	mfs := testutil.NewFixtureFS(t, "fixtures/draft/numeric-values", "/test")
+
+	p := parser.NewJSONParser()
+	tokens, err := p.ParseFile(mfs, "/test/tokens.json", parser.Options{
+		SchemaVersion: schema.Draft,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(tokens) != 4 {
+		t.Errorf("expected 4 tokens, got %d", len(tokens))
+	}
+
+	// Build lookup by name
+	tokenByName := make(map[string]string)
+	for _, tok := range tokens {
+		tokenByName[tok.Name] = tok.Value
+	}
+
+	// Numeric $value fields must populate Token.Value as a string
+	tests := []struct {
+		name     string
+		expected string
+	}{
+		{"font-weight-regular", "400"},
+		{"font-weight-medium", "500"},
+		{"font-weight-bold", "700"},
+		{"opacity-half", "0.5"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			val, ok := tokenByName[tt.name]
+			if !ok {
+				t.Fatalf("token %s not found", tt.name)
+			}
+			if val != tt.expected {
+				t.Errorf("Token.Value = %q, want %q", val, tt.expected)
+			}
+		})
+	}
+}
+
 func TestJSONParser_SkipPositions(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
 	data, err := mfs.ReadFile("/test/tokens.json")
