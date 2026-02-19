@@ -16,11 +16,11 @@ import (
 
 // JSRNodeModulesResolver resolves jsr: specifiers via the npm compatibility layer.
 // Packages must be installed via `npx jsr add @scope/pkg`.
+// JSR requires scoped packages (@scope/name).
 //
 // JSR packages installed via the npm compatibility layer appear in node_modules
 // under the @jsr scope with the following naming convention:
 //   - jsr:@scope/pkg → @jsr/scope__pkg
-//   - jsr:pkg → @jsr/pkg
 type JSRNodeModulesResolver struct {
 	fs      asimfs.FileSystem
 	rootDir string
@@ -92,13 +92,7 @@ func (r *JSRNodeModulesResolver) CanResolve(spec string) bool {
 }
 
 // jsrToNPMCompatPackage converts a JSR package name to its npm compatibility layer name.
-// For scoped packages (@scope/pkg), it becomes scope__pkg.
-// For unscoped packages (pkg), it stays as pkg.
+// @scope/pkg → scope__pkg
 func jsrToNPMCompatPackage(pkg string) string {
-	if scopedPkg, ok := strings.CutPrefix(pkg, "@"); ok {
-		// @scope/pkg → scope__pkg
-		// Remove the leading @ and replace / with __
-		return strings.Replace(scopedPkg, "/", "__", 1)
-	}
-	return pkg
+	return strings.Replace(strings.TrimPrefix(pkg, "@"), "/", "__", 1)
 }

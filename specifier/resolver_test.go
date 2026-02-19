@@ -53,8 +53,17 @@ func TestLocalResolver_CanResolve(t *testing.T) {
 	if resolver.CanResolve("npm:pkg/file.json") {
 		t.Error("expected CanResolve to return false for npm specifier")
 	}
-	if resolver.CanResolve("jsr:pkg/file.json") {
+	if resolver.CanResolve("jsr:@scope/pkg/file.json") {
 		t.Error("expected CanResolve to return false for jsr specifier")
+	}
+}
+
+func TestLocalResolver_CanResolve_InvalidJSR(t *testing.T) {
+	resolver := NewLocalResolver()
+
+	// Unscoped jsr: specs are not valid JSR specifiers, so they fall through to local
+	if !resolver.CanResolve("jsr:pkg/file.json") {
+		t.Error("expected CanResolve to return true for invalid jsr specifier (treated as local)")
 	}
 }
 
@@ -188,9 +197,8 @@ func TestJSRNodeModulesResolver_ScopedPackage(t *testing.T) {
 	}
 }
 
-func TestJSRNodeModulesResolver_UnscopedPackage(t *testing.T) {
+func TestJSRNodeModulesResolver_UnscopedPackageRejected(t *testing.T) {
 	mfs := mapfs.New()
-	// JSR unscoped package: jsr:simple-tokens → @jsr/simple-tokens
 	mfs.AddFile("/project/node_modules/@jsr/simple-tokens/colors.json", `{"color":{}}`, 0644)
 
 	resolver, err := NewJSRNodeModulesResolver(mfs, "/project")
@@ -198,14 +206,10 @@ func TestJSRNodeModulesResolver_UnscopedPackage(t *testing.T) {
 		t.Fatalf("failed to create resolver: %v", err)
 	}
 
-	rf, err := resolver.Resolve("jsr:simple-tokens/colors.json")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expectedPath := "/project/node_modules/@jsr/simple-tokens/colors.json"
-	if rf.Path != expectedPath {
-		t.Errorf("Path = %q, want %q", rf.Path, expectedPath)
+	// JSR requires scoped packages; unscoped specs are rejected
+	_, err = resolver.Resolve("jsr:simple-tokens/colors.json")
+	if err == nil {
+		t.Fatal("expected error for unscoped jsr specifier")
 	}
 }
 
