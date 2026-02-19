@@ -167,7 +167,7 @@ func TestLoad_NetworkFallback(t *testing.T) {
 }
 
 func TestLoad_LocalSuccessSkipsNetwork(t *testing.T) {
-	fetcher := &mockFetcher{content: []byte(`{}`)}
+	fetcher := &mockFetcher{}
 	_, err := load.Load(t.Context(), "simple.json", load.Options{
 		Root:    testdataDir(),
 		Fetcher: fetcher,
@@ -190,7 +190,7 @@ func TestLoad_NoFetcherPreservesError(t *testing.T) {
 }
 
 func TestLoad_LocalSpecifierNeverTriggersNetwork(t *testing.T) {
-	fetcher := &mockFetcher{content: []byte(`{}`)}
+	fetcher := &mockFetcher{}
 	_, err := load.Load(t.Context(), "nonexistent.json", load.Options{
 		Root:    testdataDir(),
 		Fetcher: fetcher,

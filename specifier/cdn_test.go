@@ -79,6 +79,12 @@ func TestCDNURL(t *testing.T) {
 			spec:   "npm:@scope/pkg@1.2.3",
 			wantOK: false,
 		},
+		{
+			name:    "npm versioned unscoped package",
+			spec:    "npm:pkg@2.0.0/tokens.json",
+			wantURL: "https://unpkg.com/pkg@2.0.0/tokens.json",
+			wantOK:  true,
+		},
 	}
 
 	for _, tt := range tests {
