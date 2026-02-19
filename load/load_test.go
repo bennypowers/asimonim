@@ -7,6 +7,10 @@ license that can be found in the LICENSE file.
 package load_test
 
 import (
+	"context"
+	_ "embed"
+	"errors"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -15,6 +19,9 @@ import (
 	"bennypowers.dev/asimonim/schema"
 )
 
+//go:embed testdata/cdn-fallback.json
+var cdnFallbackFixture []byte
+
 func testdataDir() string {
 	_, file, _, _ := runtime.Caller(0)
 	return filepath.Join(filepath.Dir(file), "testdata")
@@ -22,7 +29,7 @@ func testdataDir() string {
 
 func TestLoad_SimpleFile(t *testing.T) {
 	root := testdataDir()
-	tokenMap, err := load.Load("simple.json", load.Options{
+	tokenMap, err := load.Load(t.Context(), "simple.json", load.Options{
 		Root: root,
 	})
 	if err != nil {
@@ -54,7 +61,7 @@ func TestLoad_SimpleFile(t *testing.T) {
 
 func TestLoad_WithPrefix(t *testing.T) {
 	root := testdataDir()
-	tokenMap, err := load.Load("simple.json", load.Options{
+	tokenMap, err := load.Load(t.Context(), "simple.json", load.Options{
 		Root:   root,
 		Prefix: "rh",
 	})
@@ -83,7 +90,7 @@ func TestLoad_WithPrefix(t *testing.T) {
 
 func TestLoad_WithSchemaVersion(t *testing.T) {
 	root := testdataDir()
-	tokenMap, err := load.Load("simple.json", load.Options{
+	tokenMap, err := load.Load(t.Context(), "simple.json", load.Options{
 		Root:          root,
 		SchemaVersion: schema.Draft,
 	})
@@ -102,7 +109,7 @@ func TestLoad_WithSchemaVersion(t *testing.T) {
 
 func TestLoad_FileNotFound(t *testing.T) {
 	root := testdataDir()
-	_, err := load.Load("nonexistent.json", load.Options{
+	_, err := load.Load(t.Context(), "nonexistent.json", load.Options{
 		Root: root,
 	})
 	if err == nil {
@@ -114,10 +121,101 @@ func TestLoad_InvalidJSON(t *testing.T) {
 	root := testdataDir()
 
 	// Create an invalid JSON file for this test
-	_, err := load.Load("../load_test.go", load.Options{
+	_, err := load.Load(t.Context(), "../load_test.go", load.Options{
 		Root: root,
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+// mockFetcher implements load.Fetcher for testing.
+type mockFetcher struct {
+	content []byte
+	err     error
+	called  bool
+	url     string
+}
+
+func (m *mockFetcher) Fetch(ctx context.Context, url string) ([]byte, error) {
+	m.called = true
+	m.url = url
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.content, nil
+}
+
+func TestLoad_NetworkFallback(t *testing.T) {
+	fetcher := &mockFetcher{content: cdnFallbackFixture}
+	tokenMap, err := load.Load(t.Context(), "npm:@rhds/tokens/json/rhds.tokens.json", load.Options{
+		Root:    testdataDir(),
+		Fetcher: fetcher,
+	})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if !fetcher.called {
+		t.Fatal("expected fetcher to be called")
+	}
+	if fetcher.url != "https://unpkg.com/@rhds/tokens/json/rhds.tokens.json" {
+		t.Errorf("fetcher.url = %q, want unpkg URL", fetcher.url)
+	}
+	if tokenMap.Len() != 1 {
+		t.Errorf("expected 1 token, got %d", tokenMap.Len())
+	}
+}
+
+func TestLoad_LocalSuccessSkipsNetwork(t *testing.T) {
+	fetcher := &mockFetcher{}
+	_, err := load.Load(t.Context(), "simple.json", load.Options{
+		Root:    testdataDir(),
+		Fetcher: fetcher,
+	})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if fetcher.called {
+		t.Error("expected fetcher not to be called when local resolution succeeds")
+	}
+}
+
+func TestLoad_NoFetcherPreservesError(t *testing.T) {
+	_, err := load.Load(t.Context(), "npm:@nonexistent/pkg/tokens.json", load.Options{
+		Root: testdataDir(),
+	})
+	if err == nil {
+		t.Fatal("expected error when no fetcher and local resolution fails")
+	}
+}
+
+func TestLoad_LocalSpecifierNeverTriggersNetwork(t *testing.T) {
+	fetcher := &mockFetcher{}
+	_, err := load.Load(t.Context(), "nonexistent.json", load.Options{
+		Root:    testdataDir(),
+		Fetcher: fetcher,
+	})
+	if err == nil {
+		t.Fatal("expected error for nonexistent local file")
+	}
+	if fetcher.called {
+		t.Error("expected fetcher not to be called for local specifier")
+	}
+}
+
+func TestLoad_NetworkFallbackError(t *testing.T) {
+	fetcher := &mockFetcher{err: fmt.Errorf("CDN unavailable")}
+	_, err := load.Load(t.Context(), "npm:@rhds/tokens/json/rhds.tokens.json", load.Options{
+		Root:    testdataDir(),
+		Fetcher: fetcher,
+	})
+	if err == nil {
+		t.Fatal("expected error when both local and network fail")
+	}
+	if !errors.Is(err, load.ErrLocalResolution) {
+		t.Errorf("expected ErrLocalResolution in error chain, got: %v", err)
+	}
+	if !errors.Is(err, load.ErrNetworkFallback) {
+		t.Errorf("expected ErrNetworkFallback in error chain, got: %v", err)
 	}
 }
