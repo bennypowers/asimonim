@@ -6,7 +6,10 @@ license that can be found in the LICENSE file.
 
 package specifier
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestCDNURL(t *testing.T) {
 	tests := []struct {
@@ -99,6 +102,20 @@ func TestCDNURL(t *testing.T) {
 			wantOK:  true,
 		},
 		{
+			name:    "esm.run npm unscoped",
+			spec:    "npm:some-tokens/tokens.json",
+			cdn:     CDNEsmRun,
+			wantURL: "https://esm.run/some-tokens/tokens.json",
+			wantOK:  true,
+		},
+		{
+			name:    "esm.run npm versioned",
+			spec:    "npm:@scope/pkg@1.2.3/tokens.json",
+			cdn:     CDNEsmRun,
+			wantURL: "https://esm.run/@scope/pkg@1.2.3/tokens.json",
+			wantOK:  true,
+		},
+		{
 			name:   "esm.run jsr not supported",
 			spec:   "jsr:@scope/pkg/tokens.json",
 			cdn:    CDNEsmRun,
@@ -114,6 +131,20 @@ func TestCDNURL(t *testing.T) {
 			wantOK:  true,
 		},
 		{
+			name:    "jspm npm unscoped",
+			spec:    "npm:some-tokens/tokens.json",
+			cdn:     CDNJspm,
+			wantURL: "https://ga.jspm.io/npm:some-tokens/tokens.json",
+			wantOK:  true,
+		},
+		{
+			name:    "jspm npm versioned",
+			spec:    "npm:@scope/pkg@1.2.3/tokens.json",
+			cdn:     CDNJspm,
+			wantURL: "https://ga.jspm.io/npm:@scope/pkg@1.2.3/tokens.json",
+			wantOK:  true,
+		},
+		{
 			name:   "jspm jsr not supported",
 			spec:   "jsr:@scope/pkg/tokens.json",
 			cdn:    CDNJspm,
@@ -126,6 +157,20 @@ func TestCDNURL(t *testing.T) {
 			spec:    "npm:@rhds/tokens/json/rhds.tokens.json",
 			cdn:     CDNJsdelivr,
 			wantURL: "https://cdn.jsdelivr.net/npm/@rhds/tokens/json/rhds.tokens.json",
+			wantOK:  true,
+		},
+		{
+			name:    "jsdelivr npm unscoped",
+			spec:    "npm:some-tokens/tokens.json",
+			cdn:     CDNJsdelivr,
+			wantURL: "https://cdn.jsdelivr.net/npm/some-tokens/tokens.json",
+			wantOK:  true,
+		},
+		{
+			name:    "jsdelivr npm versioned",
+			spec:    "npm:@scope/pkg@1.2.3/tokens.json",
+			cdn:     CDNJsdelivr,
+			wantURL: "https://cdn.jsdelivr.net/npm/@scope/pkg@1.2.3/tokens.json",
 			wantOK:  true,
 		},
 		{
@@ -222,12 +267,7 @@ func TestParseCDN(t *testing.T) {
 func TestValidCDNs(t *testing.T) {
 	got := ValidCDNs()
 	want := []string{"unpkg", "esm.sh", "esm.run", "jspm", "jsdelivr"}
-	if len(got) != len(want) {
+	if !slices.Equal(got, want) {
 		t.Fatalf("ValidCDNs() = %v, want %v", got, want)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("ValidCDNs()[%d] = %q, want %q", i, got[i], want[i])
-		}
 	}
 }
