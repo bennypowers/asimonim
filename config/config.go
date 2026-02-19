@@ -38,6 +38,11 @@ type Config struct {
 	// Can be a string or a file path prefixed with "@" (e.g., "@LICENSE_HEADER.txt").
 	Header string `yaml:"header" json:"header"`
 
+	// CDN selects the CDN provider for network fallback of package specifiers.
+	// Valid values: "unpkg", "esm.sh", "esm.run", "jspm", "jsdelivr".
+	// Defaults to "unpkg" if empty.
+	CDN string `yaml:"cdn" json:"cdn"`
+
 	// Outputs specifies multiple output files to generate.
 	// When set, the convert command will generate all specified outputs in a single pass.
 	Outputs []OutputSpec `yaml:"outputs" json:"outputs"`

@@ -257,6 +257,7 @@ files:
     prefix: rh
 groupMarkers: ["_", "@", "DEFAULT"]
 schema: draft
+cdn: unpkg  # CDN for network fallback (unpkg, esm.sh, esm.run, jspm, jsdelivr)
 ```
 
 When running commands without file arguments, files from config are used:

@@ -203,6 +203,41 @@ func TestLoad_LocalSpecifierNeverTriggersNetwork(t *testing.T) {
 	}
 }
 
+func TestLoad_NetworkFallback_JSR(t *testing.T) {
+	fetcher := &mockFetcher{content: cdnFallbackFixture}
+	tokenMap, err := load.Load(t.Context(), "jsr:@scope/tokens/tokens.json", load.Options{
+		Root:    testdataDir(),
+		Fetcher: fetcher,
+		CDN:     "esm.sh",
+	})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if !fetcher.called {
+		t.Fatal("expected fetcher to be called")
+	}
+	if fetcher.url != "https://esm.sh/jsr/@scope/tokens/tokens.json" {
+		t.Errorf("fetcher.url = %q, want esm.sh jsr URL", fetcher.url)
+	}
+	if tokenMap.Len() != 1 {
+		t.Errorf("expected 1 token, got %d", tokenMap.Len())
+	}
+}
+
+func TestLoad_NetworkFallback_JSR_UnsupportedCDN(t *testing.T) {
+	fetcher := &mockFetcher{content: cdnFallbackFixture}
+	_, err := load.Load(t.Context(), "jsr:@scope/tokens/tokens.json", load.Options{
+		Root:    testdataDir(),
+		Fetcher: fetcher,
+		CDN:     "unpkg",
+	})
+	if err == nil {
+		t.Fatal("expected error when jsr specifier uses CDN that doesn't support it")
+	}
+	// unpkg doesn't support jsr, so fetcher should not be called with a CDN URL.
+	// The CDNURL returns false, so the original local error is returned.
+}
+
 func TestLoad_NetworkFallbackError(t *testing.T) {
 	fetcher := &mockFetcher{err: fmt.Errorf("CDN unavailable")}
 	_, err := load.Load(t.Context(), "npm:@rhds/tokens/json/rhds.tokens.json", load.Options{
