@@ -9,6 +9,7 @@ package load
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -20,6 +21,14 @@ import (
 	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/specifier"
 	"bennypowers.dev/asimonim/token"
+)
+
+var (
+	// ErrLocalResolution indicates that local filesystem resolution failed.
+	ErrLocalResolution = errors.New("local resolution failed")
+
+	// ErrNetworkFallback indicates that the CDN network fallback also failed.
+	ErrNetworkFallback = errors.New("network fallback failed")
 )
 
 // Options configures how tokens are loaded.
@@ -42,14 +51,14 @@ type Options struct {
 	// Takes precedence over config file if set.
 	SchemaVersion schema.Version
 
-	// Fetcher enables opt-in network fallback for package specifiers.
-	// When set, if local resolution fails for an npm: or jsr: specifier,
-	// Load will attempt to fetch the content from a CDN.
+	// Fetcher enables opt-in network fallback for npm: specifiers.
+	// When set, if local resolution fails for an npm: specifier,
+	// Load will attempt to fetch the content from unpkg.com.
 	// Nil means no network fallback (default).
 	Fetcher Fetcher
 
 	// FetchTimeout is the maximum time to wait for a network fetch.
-	// Defaults to DefaultTimeout when Fetcher is set.
+	// Defaults to DefaultTimeout when zero. Has no effect if Fetcher is nil.
 	FetchTimeout time.Duration
 }
 
@@ -181,7 +190,8 @@ func resolveContent(ctx context.Context, spec, root string, filesystem fs.FileSy
 	// Read file content
 	content, readErr := filesystem.ReadFile(path)
 	if readErr != nil {
-		// File read failed — try CDN fallback
+		// File read failed — try CDN fallback (npm: specifiers only;
+		// non-npm specifiers return localErr unchanged via CDNURL check)
 		localErr := fmt.Errorf("failed to read %s: %w", path, readErr)
 		return fetchFromCDN(ctx, spec, fetcher, fetchTimeout, localErr)
 	}
@@ -207,7 +217,7 @@ func fetchFromCDN(ctx context.Context, spec string, fetcher Fetcher, fetchTimeou
 
 	content, fetchErr := fetcher.Fetch(ctx, cdnURL)
 	if fetchErr != nil {
-		return nil, fmt.Errorf("local resolution failed (%w), network fallback also failed: %w", localErr, fetchErr)
+		return nil, fmt.Errorf("%w (%w), %w: %w", ErrLocalResolution, localErr, ErrNetworkFallback, fetchErr)
 	}
 
 	return content, nil

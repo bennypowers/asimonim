@@ -8,16 +8,19 @@ package load_test
 
 import (
 	"context"
+	_ "embed"
+	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"bennypowers.dev/asimonim/load"
 	"bennypowers.dev/asimonim/schema"
 )
+
+//go:embed testdata/cdn-fallback.json
+var cdnFallbackFixture []byte
 
 func testdataDir() string {
 	_, file, _, _ := runtime.Caller(0)
@@ -144,12 +147,7 @@ func (m *mockFetcher) Fetch(ctx context.Context, url string) ([]byte, error) {
 }
 
 func TestLoad_NetworkFallback(t *testing.T) {
-	tokenJSON, err := os.ReadFile(filepath.Join(testdataDir(), "cdn-fallback.json"))
-	if err != nil {
-		t.Fatalf("reading fixture: %v", err)
-	}
-
-	fetcher := &mockFetcher{content: tokenJSON}
+	fetcher := &mockFetcher{content: cdnFallbackFixture}
 	tokenMap, err := load.Load(t.Context(), "npm:@rhds/tokens/json/rhds.tokens.json", load.Options{
 		Root:    testdataDir(),
 		Fetcher: fetcher,
@@ -214,10 +212,10 @@ func TestLoad_NetworkFallbackError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when both local and network fail")
 	}
-	if !strings.Contains(err.Error(), "local resolution failed") {
-		t.Errorf("expected 'local resolution failed' in error, got: %v", err)
+	if !errors.Is(err, load.ErrLocalResolution) {
+		t.Errorf("expected ErrLocalResolution in error chain, got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "network fallback also failed") {
-		t.Errorf("expected 'network fallback also failed' in error, got: %v", err)
+	if !errors.Is(err, load.ErrNetworkFallback) {
+		t.Errorf("expected ErrNetworkFallback in error chain, got: %v", err)
 	}
 }
