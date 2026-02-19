@@ -7,8 +7,11 @@ license that can be found in the LICENSE file.
 package load_test
 
 import (
+	"context"
+	"fmt"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"bennypowers.dev/asimonim/load"
@@ -119,5 +122,103 @@ func TestLoad_InvalidJSON(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+// mockFetcher implements load.Fetcher for testing.
+type mockFetcher struct {
+	content []byte
+	err     error
+	called  bool
+	url     string
+}
+
+func (m *mockFetcher) Fetch(ctx context.Context, url string) ([]byte, error) {
+	m.called = true
+	m.url = url
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.content, nil
+}
+
+func TestLoad_NetworkFallback(t *testing.T) {
+	tokenJSON := []byte(`{
+		"color": {
+			"$type": "color",
+			"primary": { "$value": "#FF6B35" }
+		}
+	}`)
+
+	fetcher := &mockFetcher{content: tokenJSON}
+	tokenMap, err := load.Load("npm:@rhds/tokens/json/rhds.tokens.json", load.Options{
+		Root:    testdataDir(),
+		Fetcher: fetcher,
+	})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if !fetcher.called {
+		t.Fatal("expected fetcher to be called")
+	}
+	if fetcher.url != "https://unpkg.com/@rhds/tokens/json/rhds.tokens.json" {
+		t.Errorf("fetcher.url = %q, want unpkg URL", fetcher.url)
+	}
+	if tokenMap.Len() != 1 {
+		t.Errorf("expected 1 token, got %d", tokenMap.Len())
+	}
+}
+
+func TestLoad_LocalSuccessSkipsNetwork(t *testing.T) {
+	fetcher := &mockFetcher{content: []byte(`{}`)}
+	_, err := load.Load("simple.json", load.Options{
+		Root:    testdataDir(),
+		Fetcher: fetcher,
+	})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if fetcher.called {
+		t.Error("expected fetcher not to be called when local resolution succeeds")
+	}
+}
+
+func TestLoad_NoFetcherPreservesError(t *testing.T) {
+	_, err := load.Load("npm:@nonexistent/pkg/tokens.json", load.Options{
+		Root: testdataDir(),
+	})
+	if err == nil {
+		t.Fatal("expected error when no fetcher and local resolution fails")
+	}
+}
+
+func TestLoad_LocalSpecifierNeverTriggersNetwork(t *testing.T) {
+	fetcher := &mockFetcher{content: []byte(`{}`)}
+	_, err := load.Load("nonexistent.json", load.Options{
+		Root:    testdataDir(),
+		Fetcher: fetcher,
+	})
+	if err == nil {
+		t.Fatal("expected error for nonexistent local file")
+	}
+	if fetcher.called {
+		t.Error("expected fetcher not to be called for local specifier")
+	}
+}
+
+func TestLoad_NetworkFallbackError(t *testing.T) {
+	fetcher := &mockFetcher{err: fmt.Errorf("CDN unavailable")}
+	_, err := load.Load("npm:@rhds/tokens/json/rhds.tokens.json", load.Options{
+		Root:    testdataDir(),
+		Fetcher: fetcher,
+	})
+	if err == nil {
+		t.Fatal("expected error when both local and network fail")
+	}
+	if !strings.Contains(err.Error(), "local resolution failed") {
+		t.Errorf("expected 'local resolution failed' in error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "network fallback also failed") {
+		t.Errorf("expected 'network fallback also failed' in error, got: %v", err)
 	}
 }

@@ -8,8 +8,10 @@ license that can be found in the LICENSE file.
 package load
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"bennypowers.dev/asimonim/config"
 	"bennypowers.dev/asimonim/fs"
@@ -39,6 +41,16 @@ type Options struct {
 	// SchemaVersion overrides auto-detection from file content.
 	// Takes precedence over config file if set.
 	SchemaVersion schema.Version
+
+	// Fetcher enables opt-in network fallback for package specifiers.
+	// When set, if local resolution fails for an npm: or jsr: specifier,
+	// Load will attempt to fetch the content from a CDN.
+	// Nil means no network fallback (default).
+	Fetcher Fetcher
+
+	// FetchTimeout is the maximum time to wait for a network fetch.
+	// Defaults to DefaultTimeout when Fetcher is set.
+	FetchTimeout time.Duration
 }
 
 // Load loads design tokens from a specifier with full resolution.
@@ -48,10 +60,13 @@ type Options struct {
 //   - npm package: "npm:@scope/pkg/tokens.json" (requires node_modules)
 //   - jsr package: "jsr:@scope/pkg/tokens.json" (requires node_modules)
 //
+// When Options.Fetcher is set, npm: and jsr: specifiers that fail local
+// resolution will fall back to fetching from a CDN.
+//
 // The loading process:
 //  1. Optionally loads config from .config/design-tokens.yaml
 //  2. Applies Options values (they take precedence over config)
-//  3. Resolves specifier to file content via filesystem
+//  3. Resolves specifier to file content via filesystem (with optional CDN fallback)
 //  4. Detects schema version (if not specified)
 //  5. Parses tokens
 //  6. Resolves $extends (v2025.10)
@@ -97,7 +112,11 @@ func Load(spec string, opts Options) (*token.Map, error) {
 	}
 
 	// Resolve specifier to content
-	content, err := resolveContent(spec, root, filesystem)
+	fetchTimeout := opts.FetchTimeout
+	if fetchTimeout == 0 {
+		fetchTimeout = DefaultTimeout
+	}
+	content, err := resolveContent(spec, root, filesystem, opts.Fetcher, fetchTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve specifier %q: %w", spec, err)
 	}
@@ -136,8 +155,10 @@ func Load(spec string, opts Options) (*token.Map, error) {
 	return token.NewMap(tokens, prefix), nil
 }
 
-// resolveContent resolves a specifier to file content via filesystem.
-func resolveContent(spec, root string, filesystem fs.FileSystem) ([]byte, error) {
+// resolveContent resolves a specifier to file content.
+// Tries local resolution first. If that fails and a Fetcher is provided,
+// falls back to CDN for package specifiers (npm:/jsr:).
+func resolveContent(spec, root string, filesystem fs.FileSystem, fetcher Fetcher, fetchTimeout time.Duration) ([]byte, error) {
 	// Create resolver chain
 	res, err := specifier.NewDefaultResolver(filesystem, root)
 	if err != nil {
@@ -147,7 +168,8 @@ func resolveContent(spec, root string, filesystem fs.FileSystem) ([]byte, error)
 	// Resolve specifier to path
 	resolved, err := res.Resolve(spec)
 	if err != nil {
-		return nil, err
+		// Local resolution failed — try CDN fallback
+		return fetchFromCDN(spec, fetcher, fetchTimeout, err)
 	}
 
 	// Make local paths absolute relative to root
@@ -157,9 +179,35 @@ func resolveContent(spec, root string, filesystem fs.FileSystem) ([]byte, error)
 	}
 
 	// Read file content
-	content, err := filesystem.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read %s: %w", path, err)
+	content, readErr := filesystem.ReadFile(path)
+	if readErr != nil {
+		// File read failed — try CDN fallback
+		localErr := fmt.Errorf("failed to read %s: %w", path, readErr)
+		return fetchFromCDN(spec, fetcher, fetchTimeout, localErr)
+	}
+
+	return content, nil
+}
+
+// fetchFromCDN attempts to fetch content from CDN as a fallback.
+// Returns the original localErr if no fetcher is provided or the specifier
+// has no CDN URL.
+func fetchFromCDN(spec string, fetcher Fetcher, fetchTimeout time.Duration, localErr error) ([]byte, error) {
+	if fetcher == nil {
+		return nil, localErr
+	}
+
+	cdnURL, ok := specifier.CDNURL(spec)
+	if !ok {
+		return nil, localErr
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+	defer cancel()
+
+	content, fetchErr := fetcher.Fetch(ctx, cdnURL)
+	if fetchErr != nil {
+		return nil, fmt.Errorf("local resolution failed (%w), network fallback also failed: %w", localErr, fetchErr)
 	}
 
 	return content, nil
