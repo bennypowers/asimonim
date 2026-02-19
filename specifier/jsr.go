@@ -92,12 +92,7 @@ func (r *JSRNodeModulesResolver) CanResolve(spec string) bool {
 }
 
 // jsrToNPMCompatPackage converts a JSR package name to its npm compatibility layer name.
-// Scoped packages (@scope/pkg) become scope__pkg.
+// @scope/pkg → scope__pkg
 func jsrToNPMCompatPackage(pkg string) string {
-	if scopedPkg, ok := strings.CutPrefix(pkg, "@"); ok {
-		// @scope/pkg → scope__pkg
-		// Remove the leading @ and replace / with __
-		return strings.Replace(scopedPkg, "/", "__", 1)
-	}
-	return pkg
+	return strings.Replace(strings.TrimPrefix(pkg, "@"), "/", "__", 1)
 }

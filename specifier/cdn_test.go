@@ -220,8 +220,14 @@ func TestParseCDN(t *testing.T) {
 }
 
 func TestValidCDNs(t *testing.T) {
-	cdns := ValidCDNs()
-	if len(cdns) != 5 {
-		t.Errorf("ValidCDNs() returned %d entries, want 5", len(cdns))
+	got := ValidCDNs()
+	want := []string{"unpkg", "esm.sh", "esm.run", "jspm", "jsdelivr"}
+	if len(got) != len(want) {
+		t.Fatalf("ValidCDNs() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("ValidCDNs()[%d] = %q, want %q", i, got[i], want[i])
+		}
 	}
 }
