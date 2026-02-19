@@ -13,6 +13,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"bennypowers.dev/asimonim/internal/version"
 )
 
 const (
@@ -49,10 +51,12 @@ func (f *HTTPFetcher) Fetch(ctx context.Context, url string) ([]byte, error) {
 		return nil, fmt.Errorf("creating request for %s: %w", url, err)
 	}
 
+	req.Header.Set("User-Agent", "asimonim/"+version.Get())
+
 	resp, err := f.client.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, fmt.Errorf("timeout fetching %s", url)
+			return nil, fmt.Errorf("timeout fetching %s: %w", url, err)
 		}
 		return nil, fmt.Errorf("fetching %s: %w", url, err)
 	}

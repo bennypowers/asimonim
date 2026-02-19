@@ -60,8 +60,8 @@ type Options struct {
 //   - npm package: "npm:@scope/pkg/tokens.json" (requires node_modules)
 //   - jsr package: "jsr:@scope/pkg/tokens.json" (requires node_modules)
 //
-// When Options.Fetcher is set, npm: and jsr: specifiers that fail local
-// resolution will fall back to fetching from a CDN.
+// When Options.Fetcher is set, npm: specifiers that fail local resolution
+// will fall back to fetching from unpkg.com.
 //
 // The loading process:
 //  1. Optionally loads config from .config/design-tokens.yaml
@@ -72,7 +72,7 @@ type Options struct {
 //  6. Resolves $extends (v2025.10)
 //  7. Resolves aliases
 //  8. Returns *token.Map
-func Load(spec string, opts Options) (*token.Map, error) {
+func Load(ctx context.Context, spec string, opts Options) (*token.Map, error) {
 	// Set up filesystem
 	filesystem := opts.FS
 	if filesystem == nil {
@@ -116,7 +116,7 @@ func Load(spec string, opts Options) (*token.Map, error) {
 	if fetchTimeout == 0 {
 		fetchTimeout = DefaultTimeout
 	}
-	content, err := resolveContent(spec, root, filesystem, opts.Fetcher, fetchTimeout)
+	content, err := resolveContent(ctx, spec, root, filesystem, opts.Fetcher, fetchTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve specifier %q: %w", spec, err)
 	}
@@ -157,8 +157,8 @@ func Load(spec string, opts Options) (*token.Map, error) {
 
 // resolveContent resolves a specifier to file content.
 // Tries local resolution first. If that fails and a Fetcher is provided,
-// falls back to CDN for package specifiers (npm:/jsr:).
-func resolveContent(spec, root string, filesystem fs.FileSystem, fetcher Fetcher, fetchTimeout time.Duration) ([]byte, error) {
+// falls back to CDN for npm: specifiers.
+func resolveContent(ctx context.Context, spec, root string, filesystem fs.FileSystem, fetcher Fetcher, fetchTimeout time.Duration) ([]byte, error) {
 	// Create resolver chain
 	res, err := specifier.NewDefaultResolver(filesystem, root)
 	if err != nil {
@@ -169,7 +169,7 @@ func resolveContent(spec, root string, filesystem fs.FileSystem, fetcher Fetcher
 	resolved, err := res.Resolve(spec)
 	if err != nil {
 		// Local resolution failed — try CDN fallback
-		return fetchFromCDN(spec, fetcher, fetchTimeout, err)
+		return fetchFromCDN(ctx, spec, fetcher, fetchTimeout, err)
 	}
 
 	// Make local paths absolute relative to root
@@ -183,7 +183,7 @@ func resolveContent(spec, root string, filesystem fs.FileSystem, fetcher Fetcher
 	if readErr != nil {
 		// File read failed — try CDN fallback
 		localErr := fmt.Errorf("failed to read %s: %w", path, readErr)
-		return fetchFromCDN(spec, fetcher, fetchTimeout, localErr)
+		return fetchFromCDN(ctx, spec, fetcher, fetchTimeout, localErr)
 	}
 
 	return content, nil
@@ -192,7 +192,7 @@ func resolveContent(spec, root string, filesystem fs.FileSystem, fetcher Fetcher
 // fetchFromCDN attempts to fetch content from CDN as a fallback.
 // Returns the original localErr if no fetcher is provided or the specifier
 // has no CDN URL.
-func fetchFromCDN(spec string, fetcher Fetcher, fetchTimeout time.Duration, localErr error) ([]byte, error) {
+func fetchFromCDN(ctx context.Context, spec string, fetcher Fetcher, fetchTimeout time.Duration, localErr error) ([]byte, error) {
 	if fetcher == nil {
 		return nil, localErr
 	}
@@ -202,7 +202,7 @@ func fetchFromCDN(spec string, fetcher Fetcher, fetchTimeout time.Duration, loca
 		return nil, localErr
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
 
 	content, fetchErr := fetcher.Fetch(ctx, cdnURL)

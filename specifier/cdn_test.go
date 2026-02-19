@@ -28,16 +28,14 @@ func TestCDNURL(t *testing.T) {
 			wantOK:  true,
 		},
 		{
-			name:    "jsr scoped package",
-			spec:    "jsr:@scope/pkg/tokens.json",
-			wantURL: "https://unpkg.com/@scope/pkg/tokens.json",
-			wantOK:  true,
+			name:   "jsr scoped package",
+			spec:   "jsr:@scope/pkg/tokens.json",
+			wantOK: false,
 		},
 		{
-			name:    "jsr unscoped package",
-			spec:    "jsr:pkg/tokens.json",
-			wantURL: "https://unpkg.com/pkg/tokens.json",
-			wantOK:  true,
+			name:   "jsr unscoped package",
+			spec:   "jsr:pkg/tokens.json",
+			wantOK: false,
 		},
 		{
 			name:   "local path",
@@ -68,6 +66,12 @@ func TestCDNURL(t *testing.T) {
 			name:    "npm deep path",
 			spec:    "npm:@scope/pkg/a/b/c.json",
 			wantURL: "https://unpkg.com/@scope/pkg/a/b/c.json",
+			wantOK:  true,
+		},
+		{
+			name:    "npm versioned scoped package",
+			spec:    "npm:@scope/pkg@1.2.3/tokens.json",
+			wantURL: "https://unpkg.com/@scope/pkg@1.2.3/tokens.json",
 			wantOK:  true,
 		},
 	}

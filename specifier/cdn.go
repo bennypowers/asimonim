@@ -6,11 +6,12 @@ license that can be found in the LICENSE file.
 
 package specifier
 
-// CDNURL returns the unpkg.com URL for an npm: or jsr: specifier.
-// Returns ("", false) for local paths or specifiers without a file component.
+// CDNURL returns the unpkg.com URL for an npm: specifier.
+// Returns ("", false) for local paths, jsr: specifiers (no CDN mapping yet),
+// or specifiers without a file component.
 func CDNURL(spec string) (string, bool) {
 	parsed := Parse(spec)
-	if parsed.Kind == KindLocal {
+	if parsed.Kind != KindNPM {
 		return "", false
 	}
 	if parsed.Package == "" || parsed.File == "" {

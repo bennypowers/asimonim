@@ -9,6 +9,7 @@ package load_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -25,7 +26,7 @@ func testdataDir() string {
 
 func TestLoad_SimpleFile(t *testing.T) {
 	root := testdataDir()
-	tokenMap, err := load.Load("simple.json", load.Options{
+	tokenMap, err := load.Load(t.Context(), "simple.json", load.Options{
 		Root: root,
 	})
 	if err != nil {
@@ -57,7 +58,7 @@ func TestLoad_SimpleFile(t *testing.T) {
 
 func TestLoad_WithPrefix(t *testing.T) {
 	root := testdataDir()
-	tokenMap, err := load.Load("simple.json", load.Options{
+	tokenMap, err := load.Load(t.Context(), "simple.json", load.Options{
 		Root:   root,
 		Prefix: "rh",
 	})
@@ -86,7 +87,7 @@ func TestLoad_WithPrefix(t *testing.T) {
 
 func TestLoad_WithSchemaVersion(t *testing.T) {
 	root := testdataDir()
-	tokenMap, err := load.Load("simple.json", load.Options{
+	tokenMap, err := load.Load(t.Context(), "simple.json", load.Options{
 		Root:          root,
 		SchemaVersion: schema.Draft,
 	})
@@ -105,7 +106,7 @@ func TestLoad_WithSchemaVersion(t *testing.T) {
 
 func TestLoad_FileNotFound(t *testing.T) {
 	root := testdataDir()
-	_, err := load.Load("nonexistent.json", load.Options{
+	_, err := load.Load(t.Context(), "nonexistent.json", load.Options{
 		Root: root,
 	})
 	if err == nil {
@@ -117,7 +118,7 @@ func TestLoad_InvalidJSON(t *testing.T) {
 	root := testdataDir()
 
 	// Create an invalid JSON file for this test
-	_, err := load.Load("../load_test.go", load.Options{
+	_, err := load.Load(t.Context(), "../load_test.go", load.Options{
 		Root: root,
 	})
 	if err == nil {
@@ -143,15 +144,13 @@ func (m *mockFetcher) Fetch(ctx context.Context, url string) ([]byte, error) {
 }
 
 func TestLoad_NetworkFallback(t *testing.T) {
-	tokenJSON := []byte(`{
-		"color": {
-			"$type": "color",
-			"primary": { "$value": "#FF6B35" }
-		}
-	}`)
+	tokenJSON, err := os.ReadFile(filepath.Join(testdataDir(), "cdn-fallback.json"))
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
 
 	fetcher := &mockFetcher{content: tokenJSON}
-	tokenMap, err := load.Load("npm:@rhds/tokens/json/rhds.tokens.json", load.Options{
+	tokenMap, err := load.Load(t.Context(), "npm:@rhds/tokens/json/rhds.tokens.json", load.Options{
 		Root:    testdataDir(),
 		Fetcher: fetcher,
 	})
@@ -171,7 +170,7 @@ func TestLoad_NetworkFallback(t *testing.T) {
 
 func TestLoad_LocalSuccessSkipsNetwork(t *testing.T) {
 	fetcher := &mockFetcher{content: []byte(`{}`)}
-	_, err := load.Load("simple.json", load.Options{
+	_, err := load.Load(t.Context(), "simple.json", load.Options{
 		Root:    testdataDir(),
 		Fetcher: fetcher,
 	})
@@ -184,7 +183,7 @@ func TestLoad_LocalSuccessSkipsNetwork(t *testing.T) {
 }
 
 func TestLoad_NoFetcherPreservesError(t *testing.T) {
-	_, err := load.Load("npm:@nonexistent/pkg/tokens.json", load.Options{
+	_, err := load.Load(t.Context(), "npm:@nonexistent/pkg/tokens.json", load.Options{
 		Root: testdataDir(),
 	})
 	if err == nil {
@@ -194,7 +193,7 @@ func TestLoad_NoFetcherPreservesError(t *testing.T) {
 
 func TestLoad_LocalSpecifierNeverTriggersNetwork(t *testing.T) {
 	fetcher := &mockFetcher{content: []byte(`{}`)}
-	_, err := load.Load("nonexistent.json", load.Options{
+	_, err := load.Load(t.Context(), "nonexistent.json", load.Options{
 		Root:    testdataDir(),
 		Fetcher: fetcher,
 	})
@@ -208,7 +207,7 @@ func TestLoad_LocalSpecifierNeverTriggersNetwork(t *testing.T) {
 
 func TestLoad_NetworkFallbackError(t *testing.T) {
 	fetcher := &mockFetcher{err: fmt.Errorf("CDN unavailable")}
-	_, err := load.Load("npm:@rhds/tokens/json/rhds.tokens.json", load.Options{
+	_, err := load.Load(t.Context(), "npm:@rhds/tokens/json/rhds.tokens.json", load.Options{
 		Root:    testdataDir(),
 		Fetcher: fetcher,
 	})
