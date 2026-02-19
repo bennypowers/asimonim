@@ -43,8 +43,9 @@ var (
 	// npmPattern matches npm:@scope/pkg/path, npm:pkg/path, or bare npm:pkg
 	npmPattern = regexp.MustCompile(`^npm:(@[^/]+/[^/]+|[^/]+)(/.*)?$`)
 
-	// jsrPattern matches jsr:@scope/pkg/path, jsr:pkg/path, or bare jsr:pkg
-	jsrPattern = regexp.MustCompile(`^jsr:(@[^/]+/[^/]+|[^/]+)(/.*)?$`)
+	// jsrPattern matches jsr:@scope/pkg/path or bare jsr:@scope/pkg.
+	// JSR requires scoped packages (@scope/name).
+	jsrPattern = regexp.MustCompile(`^jsr:(@[^/]+/[^/]+)(/.*)?$`)
 )
 
 // Parse parses a specifier string into a Specifier struct.

@@ -24,7 +24,7 @@ const (
 	// CDNEsmRun uses esm.run. Supports npm specifiers only.
 	CDNEsmRun CDN = "esm.run"
 
-	// CDNJspm uses jspm.dev. Supports npm specifiers only.
+	// CDNJspm uses ga.jspm.io. Supports npm specifiers only.
 	CDNJspm CDN = "jspm"
 
 	// CDNJsdelivr uses cdn.jsdelivr.net. Supports npm specifiers only.
@@ -87,7 +87,7 @@ func npmCDNURL(parsed *Specifier, cdn CDN) (string, bool) {
 	case CDNEsmRun:
 		return "https://esm.run/" + parsed.Package + "/" + parsed.File, true
 	case CDNJspm:
-		return "https://jspm.dev/" + parsed.Package + "/" + parsed.File, true
+		return "https://ga.jspm.io/npm:" + parsed.Package + "/" + parsed.File, true
 	case CDNJsdelivr:
 		return "https://cdn.jsdelivr.net/npm/" + parsed.Package + "/" + parsed.File, true
 	default:

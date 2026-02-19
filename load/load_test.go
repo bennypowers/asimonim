@@ -234,8 +234,9 @@ func TestLoad_NetworkFallback_JSR_UnsupportedCDN(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when jsr specifier uses CDN that doesn't support it")
 	}
-	// unpkg doesn't support jsr, so fetcher should not be called with a CDN URL.
-	// The CDNURL returns false, so the original local error is returned.
+	if fetcher.called {
+		t.Error("expected fetcher not to be called when CDN doesn't support jsr")
+	}
 }
 
 func TestLoad_NetworkFallbackError(t *testing.T) {

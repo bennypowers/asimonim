@@ -67,17 +67,12 @@ func TestParse_JSRScoped(t *testing.T) {
 	}
 }
 
-func TestParse_JSRUnscoped(t *testing.T) {
+func TestParse_JSRUnscopedIsLocal(t *testing.T) {
+	// JSR requires scoped packages; unscoped specs are treated as local paths.
 	spec := Parse("jsr:tokens/colors.json")
 
-	if spec.Kind != KindJSR {
-		t.Errorf("expected Kind to be KindJSR, got %v", spec.Kind)
-	}
-	if spec.Package != "tokens" {
-		t.Errorf("expected Package to be 'tokens', got '%s'", spec.Package)
-	}
-	if spec.File != "colors.json" {
-		t.Errorf("expected File to be 'colors.json', got '%s'", spec.File)
+	if spec.Kind != KindLocal {
+		t.Errorf("expected Kind to be KindLocal, got %v", spec.Kind)
 	}
 }
 
@@ -114,7 +109,7 @@ func TestIsPackageSpecifier(t *testing.T) {
 		{"npm:@scope/pkg/file.json", true},
 		{"npm:pkg/file.json", true},
 		{"jsr:@scope/pkg/file.json", true},
-		{"jsr:pkg/file.json", true},
+		{"jsr:pkg/file.json", false},
 		{"./local/path.json", false},
 		{"/absolute/path.json", false},
 		{"relative/path.json", false},
@@ -143,7 +138,7 @@ func TestSpecifier_IsNPM(t *testing.T) {
 }
 
 func TestSpecifier_IsJSR(t *testing.T) {
-	jsr := Parse("jsr:pkg/file.json")
+	jsr := Parse("jsr:@scope/pkg/file.json")
 	if !jsr.IsJSR() {
 		t.Error("expected IsJSR() to return true for jsr specifier")
 	}

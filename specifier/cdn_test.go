@@ -84,11 +84,10 @@ func TestCDNURL(t *testing.T) {
 			wantOK:  true,
 		},
 		{
-			name:    "esm.sh jsr unscoped",
-			spec:    "jsr:pkg/tokens.json",
-			cdn:     CDNEsmSh,
-			wantURL: "https://esm.sh/jsr/pkg/tokens.json",
-			wantOK:  true,
+			name:   "esm.sh jsr unscoped not supported",
+			spec:   "jsr:pkg/tokens.json",
+			cdn:    CDNEsmSh,
+			wantOK: false,
 		},
 
 		// esm.run
@@ -111,7 +110,7 @@ func TestCDNURL(t *testing.T) {
 			name:    "jspm npm scoped",
 			spec:    "npm:@rhds/tokens/json/rhds.tokens.json",
 			cdn:     CDNJspm,
-			wantURL: "https://jspm.dev/@rhds/tokens/json/rhds.tokens.json",
+			wantURL: "https://ga.jspm.io/npm:@rhds/tokens/json/rhds.tokens.json",
 			wantOK:  true,
 		},
 		{

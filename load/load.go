@@ -127,8 +127,12 @@ func Load(ctx context.Context, spec string, opts Options) (*token.Map, error) {
 
 	// Resolve effective CDN (Options take precedence)
 	cdn := opts.CDN
-	if cdn == "" {
-		cdn = specifier.CDN(cfg.CDN)
+	if cdn == "" && cfg.CDN != "" {
+		parsed, err := specifier.ParseCDN(cfg.CDN)
+		if err != nil {
+			return nil, fmt.Errorf("invalid cdn in config: %w", err)
+		}
+		cdn = parsed
 	}
 
 	// Resolve specifier to content
