@@ -19,6 +19,16 @@ Design systems use [design tokens][dtcg] to store visual primitives like colors,
 
 ## Installation
 
+### Gentoo Linux
+
+Enable the `bennypowers` overlay, then install:
+
+```bash
+eselect repository enable bennypowers
+emaint sync -r bennypowers
+emerge dev-util/asimonim
+```
+
 ### From Source
 
 ```bash
