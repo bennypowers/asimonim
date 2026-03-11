@@ -1,0 +1,8 @@
+{
+  "color": {
+    "override": {
+      "$type": "color",
+      "$value": "#000"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "test-project",
+  "dependencies": {
+    "@acme/tokens": "^1.0.0",
+    "@brand/theme": "^2.0.0",
+    "lodash": "^4.0.0"
+  }
+}

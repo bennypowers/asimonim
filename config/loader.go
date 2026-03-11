@@ -108,6 +108,29 @@ func (c *Config) ResolveFiles(resolver specifier.Resolver, filesystem asimfs.Fil
 	return result, nil
 }
 
+// ResolveResolvers expands resolver paths and resolves package specifiers to filesystem paths.
+// Returns ResolvedFile entries that preserve both the original specifier and resolved path.
+func (c *Config) ResolveResolvers(resolver specifier.Resolver, filesystem asimfs.FileSystem, rootDir string) ([]*specifier.ResolvedFile, error) {
+	var result []*specifier.ResolvedFile
+
+	for _, path := range c.Resolvers {
+		expanded, err := expandFilePath(filesystem, rootDir, path)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, p := range expanded {
+			resolved, err := resolver.Resolve(p)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, resolved)
+		}
+	}
+
+	return result, nil
+}
+
 // expandFilePath expands a single file path which may contain globs.
 // npm: paths are passed through unchanged.
 func expandFilePath(filesystem asimfs.FileSystem, rootDir, pattern string) ([]string, error) {

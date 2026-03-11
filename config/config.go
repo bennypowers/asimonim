@@ -24,6 +24,10 @@ type Config struct {
 	// Files specifies token files to load (paths or specs).
 	Files []FileSpec `yaml:"files" json:"files"`
 
+	// Resolvers specifies DTCG resolver documents to load.
+	// Each entry can be a local path (relative or absolute) or an npm:/jsr: specifier.
+	Resolvers []string `yaml:"resolvers" json:"resolvers"`
+
 	// GroupMarkers are token names that can be both tokens and groups (draft only).
 	GroupMarkers []string `yaml:"groupMarkers" json:"groupMarkers"`
 

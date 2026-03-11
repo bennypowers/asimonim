@@ -1,0 +1,6 @@
+{
+  "name": "test-project",
+  "dependencies": {
+    "@design/system": "^1.0.0"
+  }
+}

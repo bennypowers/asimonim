@@ -1,0 +1,6 @@
+prefix: "rh"
+resolvers:
+  - ./tokens.resolver.json
+  - npm:@acme/tokens/tokens.resolver.json
+files:
+  - ./overrides.json
