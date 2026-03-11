@@ -8,6 +8,9 @@ GO_BUILD_FLAGS := -ldflags="$(shell scripts/ldflags.sh)"
 # Extract version from goals if present (e.g., "make release v0.1.0" or "make release patch")
 VERSION ?= $(filter v% patch minor major,$(MAKECMDGOALS))
 
+# Optional path to release notes file for gh release create
+RELEASE_NOTES ?=
+
 # Workaround for Gentoo Linux "hole in findfunctab" error with race detector
 # See: https://bugs.gentoo.org/961618
 ifeq ($(shell test -f /etc/gentoo-release && echo yes),yes)
@@ -43,7 +46,7 @@ release:
 		echo "  make release major   - Bump major version (x.0.0)"; \
 		exit 1; \
 	fi
-	@./scripts/release.sh $(VERSION)
+	@RELEASE_NOTES="$(RELEASE_NOTES)" ./scripts/release.sh $(VERSION)
 
 # Prevent make from treating version args as file targets
 patch minor major:

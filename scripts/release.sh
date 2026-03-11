@@ -113,4 +113,8 @@ git push
 echo ""
 
 echo "Step 2: Creating GitHub release (gh will tag and push)..."
-gh release create "$VERSION" --generate-notes
+if [ -n "$RELEASE_NOTES" ] && [ -f "$RELEASE_NOTES" ]; then
+  gh release create "$VERSION" --notes-file "$RELEASE_NOTES"
+else
+  gh release create "$VERSION" --generate-notes
+fi

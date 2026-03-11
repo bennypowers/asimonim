@@ -6,6 +6,7 @@ coverage.out
 .idea/
 .vscode/
 .DS_Store
+RELEASE_NOTES.md
 
 # Allow node_modules in config test fixtures
 !testdata/fixtures/config/**/node_modules/
