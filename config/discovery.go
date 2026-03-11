@@ -8,7 +8,10 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
+	"maps"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	asimfs "bennypowers.dev/asimonim/fs"
@@ -37,13 +40,19 @@ type designTokensMeta struct {
 func DiscoverResolvers(filesystem asimfs.FileSystem, rootDir string) ([]*specifier.ResolvedFile, error) {
 	// Read the project's package.json to find direct dependencies
 	projectPkg, err := readPackageJSON(filesystem, filepath.Join(rootDir, "package.json"))
-	if err != nil || projectPkg == nil {
+	if err != nil {
+		return nil, err
+	}
+	if projectPkg == nil {
+		// No package.json found — discovery is a no-op
 		return nil, nil
 	}
 
+	depNames := slices.Sorted(maps.Keys(projectPkg.Dependencies))
+
 	var result []*specifier.ResolvedFile
 
-	for depName := range projectPkg.Dependencies {
+	for _, depName := range depNames {
 		resolved, err := discoverResolverInDep(filesystem, rootDir, depName)
 		if err != nil {
 			continue
@@ -71,7 +80,11 @@ func discoverResolverInDep(filesystem asimfs.FileSystem, rootDir, depName string
 
 	// Check "designTokens" field first (higher priority — explicit)
 	if depPkg.DesignTokens != nil && depPkg.DesignTokens.Resolver != "" {
-		resolverPath := filepath.Join(depDir, depPkg.DesignTokens.Resolver)
+		resolverPath, err := safeDependencyPath(depDir, depPkg.DesignTokens.Resolver)
+		if err != nil {
+			// Explicit resolver is invalid — don't fall through to exports
+			return nil, nil
+		}
 		if filesystem.Exists(resolverPath) {
 			return &specifier.ResolvedFile{
 				Specifier: "npm:" + depName + "/" + depPkg.DesignTokens.Resolver,
@@ -79,12 +92,17 @@ func discoverResolverInDep(filesystem asimfs.FileSystem, rootDir, depName string
 				Kind:      specifier.KindNPM,
 			}, nil
 		}
+		// Explicit resolver declared but file missing — don't fall through
+		return nil, nil
 	}
 
-	// Check "designTokens" export condition
+	// Check "designTokens" export condition (fallback when no explicit resolver)
 	resolverFile := resolveExportCondition(depPkg.Exports, "designTokens")
 	if resolverFile != "" {
-		resolverPath := filepath.Join(depDir, resolverFile)
+		resolverPath, err := safeDependencyPath(depDir, resolverFile)
+		if err != nil {
+			return nil, nil
+		}
 		if filesystem.Exists(resolverPath) {
 			return &specifier.ResolvedFile{
 				Specifier: "npm:" + depName + "/" + resolverFile,
@@ -95,6 +113,24 @@ func discoverResolverInDep(filesystem asimfs.FileSystem, rootDir, depName string
 	}
 
 	return nil, nil
+}
+
+// safeDependencyPath resolves a relative path within a dependency directory,
+// rejecting absolute paths and paths that escape the dependency root.
+func safeDependencyPath(depDir, raw string) (string, error) {
+	if filepath.IsAbs(raw) {
+		return "", fmt.Errorf("absolute path not allowed: %s", raw)
+	}
+	joined := filepath.Join(depDir, raw)
+	cleaned := filepath.Clean(joined)
+	rel, err := filepath.Rel(depDir, cleaned)
+	if err != nil {
+		return "", fmt.Errorf("invalid path: %s", raw)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path escapes dependency directory: %s", raw)
+	}
+	return cleaned, nil
 }
 
 // findDepDir locates a dependency's directory by walking up from rootDir.

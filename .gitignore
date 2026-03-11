@@ -7,5 +7,5 @@ coverage.out
 .vscode/
 .DS_Store
 
-# Allow node_modules in test fixtures
-!testdata/**/node_modules/
+# Allow node_modules in config test fixtures
+!testdata/fixtures/config/**/node_modules/

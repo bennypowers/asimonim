@@ -288,9 +288,11 @@ Resolver documents are distinct from token files — they reference and orchestr
 
 #### Auto-Discovery
 
-Asimonim can automatically discover resolver files published by npm dependencies. Packages declare their resolver via `package.json` using either:
+`DiscoverResolvers` scans the project's root `package.json` and inspects each direct dependency (the `dependencies` map) for resolver files. Only direct dependencies are checked — `devDependencies`, `peerDependencies`, and transitive dependencies are not scanned.
 
-**`designTokens` field** (recommended):
+Dependencies are processed in sorted order for deterministic results. Each dependency's `package.json` is checked for a resolver declaration using either:
+
+**`designTokens` field** (recommended, checked first):
 ```json
 {
   "name": "@acme/tokens",
@@ -300,7 +302,7 @@ Asimonim can automatically discover resolver files published by npm dependencies
 }
 ```
 
-**`designTokens` export condition:**
+**`designTokens` export condition** (fallback):
 ```json
 {
   "name": "@acme/tokens",
@@ -313,7 +315,7 @@ Asimonim can automatically discover resolver files published by npm dependencies
 }
 ```
 
-When both are present, the `designTokens` field takes priority.
+When both are present, the `designTokens` field takes priority over the export condition.
 
 ### Group Markers (Editor's Draft only)
 
