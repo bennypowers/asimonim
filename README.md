@@ -260,6 +260,9 @@ Asimonim reads configuration from `.config/design-tokens.{yaml,yml,json}`:
 ```yaml
 # .config/design-tokens.yaml
 prefix: "rh"
+resolvers:
+  - ./tokens.resolver.json
+  - npm:@acme/tokens/tokens.resolver.json
 files:
   - ./tokens.json
   - ./tokens/**/*.yaml
@@ -276,6 +279,41 @@ When running commands without file arguments, files from config are used:
 asimonim list      # Uses files from config
 asimonim validate  # Uses files from config
 ```
+
+### Resolvers
+
+The `resolvers` field accepts [DTCG resolver documents](https://www.designtokens.org/tr/2025.10/resolver/) — JSON files that declare how to compose multiple token files via sets, modifiers, and resolution order. Each entry can be a local path (relative or absolute) or an `npm:`/`jsr:` package specifier.
+
+Resolver documents are distinct from token files — they reference and orchestrate token files rather than containing tokens directly.
+
+#### Auto-Discovery
+
+Asimonim can automatically discover resolver files published by npm dependencies. Packages declare their resolver via `package.json` using either:
+
+**`designTokens` field** (recommended):
+```json
+{
+  "name": "@acme/tokens",
+  "designTokens": {
+    "resolver": "tokens.resolver.json"
+  }
+}
+```
+
+**`designTokens` export condition:**
+```json
+{
+  "name": "@acme/tokens",
+  "exports": {
+    ".": {
+      "designTokens": "./tokens.resolver.json",
+      "import": "./dist/index.js"
+    }
+  }
+}
+```
+
+When both are present, the `designTokens` field takes priority.
 
 ### Group Markers (Editor's Draft only)
 

@@ -23,7 +23,7 @@ asimonim/
 ├── convert/               # Output format conversion
 │   ├── convert.go         # Serialization logic
 │   └── formatter/         # Format implementations (dtcg, scss, swift, etc.)
-├── config/                # Configuration loading (.config/design-tokens.yaml)
+├── config/                # Configuration loading, resolver discovery
 ├── specifier/             # npm: and jsr: package specifier resolution
 ├── fs/                    # FileSystem interface (enables testability)
 ├── internal/
@@ -36,11 +36,12 @@ asimonim/
 ### Data Flow
 
 1. **Input**: CLI receives file paths or reads from config
-2. **Resolution**: `specifier.Resolver` handles npm:/jsr: paths
-3. **Detection**: `schema.DetectVersion` duck-types the schema version
-4. **Parsing**: `parser.JSONParser` extracts tokens from JSON/YAML
-5. **Resolution**: `resolver.ResolveAliases` resolves token references
-6. **Output**: `render` or `convert` formats tokens for display/export
+2. **Discovery**: `config.DiscoverResolvers` scans npm deps for `designTokens` field/export condition
+3. **Resolution**: `specifier.Resolver` handles npm:/jsr: paths
+4. **Detection**: `schema.DetectVersion` duck-types the schema version
+5. **Parsing**: `parser.JSONParser` extracts tokens from JSON/YAML
+6. **Resolution**: `resolver.ResolveAliases` resolves token references
+7. **Output**: `render` or `convert` formats tokens for display/export
 
 ### Key Interfaces
 

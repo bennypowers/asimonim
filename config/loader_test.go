@@ -249,3 +249,36 @@ func TestConfig_SchemaVersion_Empty(t *testing.T) {
 		t.Errorf("expected Unknown for empty schema, got %v", cfg.SchemaVersion())
 	}
 }
+
+func TestLoad_WithResolvers(t *testing.T) {
+	mfs := testutil.NewFixtureFS(t, "fixtures/config/with-resolvers", "/project")
+
+	cfg, err := Load(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg == nil {
+		t.Fatal("expected config, got nil")
+	}
+
+	if len(cfg.Resolvers) != 2 {
+		t.Fatalf("expected 2 resolvers, got %d", len(cfg.Resolvers))
+	}
+
+	if cfg.Resolvers[0] != "./tokens.resolver.json" {
+		t.Errorf("expected resolver[0] './tokens.resolver.json', got %q", cfg.Resolvers[0])
+	}
+
+	if cfg.Resolvers[1] != "npm:@acme/tokens/tokens.resolver.json" {
+		t.Errorf("expected resolver[1] 'npm:@acme/tokens/tokens.resolver.json', got %q", cfg.Resolvers[1])
+	}
+
+	// Files should still work alongside resolvers
+	if len(cfg.Files) != 1 {
+		t.Fatalf("expected 1 file, got %d", len(cfg.Files))
+	}
+	if cfg.Files[0].Path != "./overrides.json" {
+		t.Errorf("expected file path './overrides.json', got %q", cfg.Files[0].Path)
+	}
+}
