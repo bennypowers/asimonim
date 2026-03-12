@@ -35,19 +35,6 @@ func init() {
 	Cmd.Flags().Bool("quiet", false, "Only output errors")
 }
 
-// dedup removes duplicate resolved files by path.
-func dedup(files []*specifier.ResolvedFile) []*specifier.ResolvedFile {
-	seen := make(map[string]bool, len(files))
-	result := make([]*specifier.ResolvedFile, 0, len(files))
-	for _, f := range files {
-		if !seen[f.Path] {
-			seen[f.Path] = true
-			result = append(result, f)
-		}
-	}
-	return result
-}
-
 func run(cmd *cobra.Command, args []string) error {
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	strict, _ := cmd.Flags().GetBool("strict")
@@ -83,7 +70,7 @@ func run(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("error resolving resolver sources: %w", err)
 			}
-			resolvedFiles = dedup(append(resolvedFiles, resolverSources...))
+			resolvedFiles = specifier.DedupResolvedFiles(append(resolvedFiles, resolverSources...))
 		}
 	} else {
 		for _, arg := range args {

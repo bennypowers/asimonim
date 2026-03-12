@@ -128,7 +128,7 @@ func resolveEntry(entry json.RawMessage, sets map[string]setDef) ([]string, erro
 		return fileRefsFromSources(inlineSet.Sources), nil
 	}
 
-	return nil, nil
+	return nil, fmt.Errorf("unrecognized resolution order entry: %s", string(entry))
 }
 
 // fileRefsFromSources extracts file paths from source $ref entries,

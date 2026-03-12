@@ -210,7 +210,7 @@ func run(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("error resolving resolver sources: %w", err)
 			}
-			resolvedFiles = dedup(append(resolvedFiles, resolverSources...))
+			resolvedFiles = specifier.DedupResolvedFiles(append(resolvedFiles, resolverSources...))
 		}
 	} else {
 		for _, arg := range args {
@@ -259,19 +259,6 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter, header, cssSelector, cssModule, snippetType, jsModule, jsTypes, jsExport)
-}
-
-// dedup removes duplicate resolved files by path.
-func dedup(files []*specifier.ResolvedFile) []*specifier.ResolvedFile {
-	seen := make(map[string]bool, len(files))
-	result := make([]*specifier.ResolvedFile, 0, len(files))
-	for _, f := range files {
-		if !seen[f.Path] {
-			seen[f.Path] = true
-			result = append(result, f)
-		}
-	}
-	return result
 }
 
 // resolveHeader resolves the header content from a flag value or config.

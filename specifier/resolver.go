@@ -59,3 +59,17 @@ func (c *ChainResolver) CanResolve(spec string) bool {
 	}
 	return false
 }
+
+// DedupResolvedFiles removes duplicate resolved files by path,
+// preserving the first occurrence of each path.
+func DedupResolvedFiles(files []*ResolvedFile) []*ResolvedFile {
+	seen := make(map[string]bool, len(files))
+	result := make([]*ResolvedFile, 0, len(files))
+	for _, f := range files {
+		if !seen[f.Path] {
+			seen[f.Path] = true
+			result = append(result, f)
+		}
+	}
+	return result
+}
