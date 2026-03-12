@@ -136,8 +136,13 @@ func resolveEntry(entry json.RawMessage, sets map[string]setDef) ([]string, erro
 func fileRefsFromSources(sources []sourceRef) []string {
 	var paths []string
 	for _, src := range sources {
-		if src.Ref != "" && !strings.HasPrefix(src.Ref, "#") {
-			paths = append(paths, src.Ref)
+		if src.Ref == "" || strings.HasPrefix(src.Ref, "#") {
+			continue
+		}
+		// Strip any fragment identifier (e.g., "palette.json#/brand" → "palette.json")
+		path, _, _ := strings.Cut(src.Ref, "#")
+		if path != "" {
+			paths = append(paths, path)
 		}
 	}
 	return paths
