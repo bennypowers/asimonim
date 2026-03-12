@@ -202,6 +202,16 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("error resolving config files: %w", err)
 		}
+
+		// Also resolve sources from resolver documents (not for in-place mode,
+		// which should only rewrite files explicitly listed in config)
+		if !inPlace && len(cfg.Resolvers) > 0 {
+			resolverSources, err := cfg.ResolveResolverSources(specResolver, filesystem, cwd)
+			if err != nil {
+				return fmt.Errorf("error resolving resolver sources: %w", err)
+			}
+			resolvedFiles = specifier.DedupResolvedFiles(append(resolvedFiles, resolverSources...))
+		}
 	} else {
 		for _, arg := range args {
 			rf, err := specResolver.Resolve(arg)
