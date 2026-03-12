@@ -9,6 +9,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -112,7 +113,8 @@ func extractResolverSourcePaths(filesystem asimfs.FileSystem, resolverPath strin
 func resolveEntry(entry json.RawMessage, sets map[string]setDef) ([]string, error) {
 	var ref sourceRef
 	if err := json.Unmarshal(entry, &ref); err == nil && ref.Ref != "" {
-		if setName, ok := strings.CutPrefix(ref.Ref, "#/sets/"); ok {
+		if rawName, ok := strings.CutPrefix(ref.Ref, "#/sets/"); ok {
+			setName := unescapeJSONPointer(rawName)
 			set, exists := sets[setName]
 			if !exists {
 				return nil, fmt.Errorf("referenced set %q not found", setName)
@@ -146,6 +148,17 @@ func fileRefsFromSources(sources []sourceRef) []string {
 		}
 	}
 	return paths
+}
+
+// unescapeJSONPointer decodes a JSON Pointer token per RFC 6901:
+// percent-decoding first, then replacing ~1 with / and ~0 with ~.
+func unescapeJSONPointer(s string) string {
+	if unescaped, err := url.PathUnescape(s); err == nil {
+		s = unescaped
+	}
+	s = strings.ReplaceAll(s, "~1", "/")
+	s = strings.ReplaceAll(s, "~0", "~")
+	return s
 }
 
 // resolveRefPath resolves a $ref path relative to the resolver document's directory.
