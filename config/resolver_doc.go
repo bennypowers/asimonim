@@ -91,10 +91,10 @@ func extractResolverSourcePaths(filesystem asimfs.FileSystem, resolverPath strin
 	var paths []string
 	seen := make(map[string]bool)
 
-	for _, entry := range entries {
+	for i, entry := range entries {
 		entryPaths, err := resolveEntry(entry, doc.Sets)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("failed to resolve entry %d: %w", i, err)
 		}
 		for _, p := range entryPaths {
 			absPath := resolveRefPath(p, resolverDir)

@@ -203,13 +203,14 @@ func run(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("error resolving config files: %w", err)
 		}
 
-		// Also resolve sources from resolver documents
-		if len(cfg.Resolvers) > 0 {
+		// Also resolve sources from resolver documents (not for in-place mode,
+		// which should only rewrite files explicitly listed in config)
+		if !inPlace && len(cfg.Resolvers) > 0 {
 			resolverSources, err := cfg.ResolveResolverSources(specResolver, filesystem, cwd)
 			if err != nil {
 				return fmt.Errorf("error resolving resolver sources: %w", err)
 			}
-			resolvedFiles = append(resolvedFiles, resolverSources...)
+			resolvedFiles = dedup(append(resolvedFiles, resolverSources...))
 		}
 	} else {
 		for _, arg := range args {
@@ -258,6 +259,19 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter, header, cssSelector, cssModule, snippetType, jsModule, jsTypes, jsExport)
+}
+
+// dedup removes duplicate resolved files by path.
+func dedup(files []*specifier.ResolvedFile) []*specifier.ResolvedFile {
+	seen := make(map[string]bool, len(files))
+	result := make([]*specifier.ResolvedFile, 0, len(files))
+	for _, f := range files {
+		if !seen[f.Path] {
+			seen[f.Path] = true
+			result = append(result, f)
+		}
+	}
+	return result
 }
 
 // resolveHeader resolves the header content from a flag value or config.

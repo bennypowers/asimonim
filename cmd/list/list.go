@@ -103,7 +103,7 @@ func run(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("error resolving resolver sources: %w", err)
 			}
-			resolvedFiles = append(resolvedFiles, resolverSources...)
+			resolvedFiles = dedup(append(resolvedFiles, resolverSources...))
 		}
 	} else {
 		for _, arg := range args {
@@ -208,6 +208,19 @@ func run(cmd *cobra.Command, args []string) error {
 	default:
 		return render.Table(rows)
 	}
+}
+
+// dedup removes duplicate resolved files by path.
+func dedup(files []*specifier.ResolvedFile) []*specifier.ResolvedFile {
+	seen := make(map[string]bool, len(files))
+	result := make([]*specifier.ResolvedFile, 0, len(files))
+	for _, f := range files {
+		if !seen[f.Path] {
+			seen[f.Path] = true
+			result = append(result, f)
+		}
+	}
+	return result
 }
 
 func filterTokens(tokens []*token.Token, typeFilter, groupFilter string, onlyDeprecated, hideDeprecated bool) []*token.Token {
