@@ -19,14 +19,20 @@ import (
 
 // resolverDocument represents the structure of a DTCG resolver document.
 type resolverDocument struct {
-	Version         string            `json:"version"`
-	Sets            map[string]setDef `json:"sets"`
-	ResolutionOrder json.RawMessage   `json:"resolutionOrder"`
+	Version         string                 `json:"version"`
+	Sets            map[string]setDef      `json:"sets"`
+	Modifiers       map[string]modifierDef `json:"modifiers"`
+	ResolutionOrder json.RawMessage        `json:"resolutionOrder"`
 }
 
 // setDef represents a named set in a resolver document.
 type setDef struct {
 	Sources []sourceRef `json:"sources"`
+}
+
+// modifierDef represents a named modifier in a resolver document.
+type modifierDef struct {
+	Contexts map[string][]sourceRef `json:"contexts"`
 }
 
 // sourceRef represents a source reference in a resolver document.
@@ -93,7 +99,7 @@ func extractResolverSourcePaths(filesystem asimfs.FileSystem, resolverPath strin
 	seen := make(map[string]bool)
 
 	for i, entry := range entries {
-		entryPaths, err := resolveEntry(entry, doc.Sets)
+		entryPaths, err := resolveEntry(entry, doc.Sets, doc.Modifiers)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve entry %d: %w", i, err)
 		}
@@ -110,7 +116,12 @@ func extractResolverSourcePaths(filesystem asimfs.FileSystem, resolverPath strin
 }
 
 // resolveEntry extracts source file paths from a resolution order entry.
-func resolveEntry(entry json.RawMessage, sets map[string]setDef) ([]string, error) {
+// Per the DTCG 2025.10 resolver spec, an entry can be:
+//   - A reference to a named set: {"$ref": "#/sets/base"}
+//   - A reference to a named modifier: {"$ref": "#/modifiers/mode"}
+//   - An inline set with "sources": [{"$ref": "./file.json"}, ...]
+//   - An inline modifier with "contexts": {"light": [...], "dark": [...]}
+func resolveEntry(entry json.RawMessage, sets map[string]setDef, modifiers map[string]modifierDef) ([]string, error) {
 	var ref sourceRef
 	if err := json.Unmarshal(entry, &ref); err == nil && ref.Ref != "" {
 		if rawName, ok := strings.CutPrefix(ref.Ref, "#/sets/"); ok {
@@ -121,6 +132,14 @@ func resolveEntry(entry json.RawMessage, sets map[string]setDef) ([]string, erro
 			}
 			return fileRefsFromSources(set.Sources), nil
 		}
+		if rawName, ok := strings.CutPrefix(ref.Ref, "#/modifiers/"); ok {
+			modName := unescapeJSONPointer(rawName)
+			mod, exists := modifiers[modName]
+			if !exists {
+				return nil, fmt.Errorf("referenced modifier %q not found", modName)
+			}
+			return fileRefsFromContexts(mod.Contexts), nil
+		}
 	}
 
 	var inlineSet struct {
@@ -130,7 +149,24 @@ func resolveEntry(entry json.RawMessage, sets map[string]setDef) ([]string, erro
 		return fileRefsFromSources(inlineSet.Sources), nil
 	}
 
+	var inlineModifier struct {
+		Contexts map[string][]sourceRef `json:"contexts"`
+	}
+	if err := json.Unmarshal(entry, &inlineModifier); err == nil && len(inlineModifier.Contexts) > 0 {
+		return fileRefsFromContexts(inlineModifier.Contexts), nil
+	}
+
 	return nil, fmt.Errorf("unrecognized resolution order entry: %s", string(entry))
+}
+
+// fileRefsFromContexts extracts file paths from all contexts of a modifier,
+// collecting $ref entries from each context's source array.
+func fileRefsFromContexts(contexts map[string][]sourceRef) []string {
+	var paths []string
+	for _, sources := range contexts {
+		paths = append(paths, fileRefsFromSources(sources)...)
+	}
+	return paths
 }
 
 // fileRefsFromSources extracts file paths from source $ref entries,
