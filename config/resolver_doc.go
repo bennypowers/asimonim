@@ -77,13 +77,11 @@ func (c *Config) ResolveResolverSources(resolver specifier.Resolver, filesystem 
 	return result, nil
 }
 
-// extractResolverSourcePaths reads a resolver document and extracts source file paths.
-func extractResolverSourcePaths(filesystem asimfs.FileSystem, resolverPath string) ([]string, error) {
-	data, err := filesystem.ReadFile(resolverPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read resolver document: %w", err)
-	}
-
+// ExtractSourcePaths extracts source file paths from resolver document bytes.
+// It resolves $ref entries in sets, modifiers, and their contexts, returning
+// paths resolved relative to resolverDir. This is the primary API for consumers
+// that have already read the resolver document (e.g., the LSP server).
+func ExtractSourcePaths(data []byte, resolverDir string) ([]string, error) {
 	var doc resolverDocument
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("failed to parse resolver document: %w", err)
@@ -94,7 +92,6 @@ func extractResolverSourcePaths(filesystem asimfs.FileSystem, resolverPath strin
 		return nil, fmt.Errorf("failed to parse resolutionOrder: %w", err)
 	}
 
-	resolverDir := filepath.Dir(resolverPath)
 	var paths []string
 	seen := make(map[string]bool)
 
@@ -115,6 +112,15 @@ func extractResolverSourcePaths(filesystem asimfs.FileSystem, resolverPath strin
 	return paths, nil
 }
 
+// extractResolverSourcePaths reads a resolver document and extracts source file paths.
+func extractResolverSourcePaths(filesystem asimfs.FileSystem, resolverPath string) ([]string, error) {
+	data, err := filesystem.ReadFile(resolverPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read resolver document: %w", err)
+	}
+	return ExtractSourcePaths(data, filepath.Dir(resolverPath))
+}
+
 // resolveEntry extracts source file paths from a resolution order entry.
 // Per the DTCG 2025.10 resolver spec, an entry can be:
 //   - A reference to a named set: {"$ref": "#/sets/base"}
@@ -130,7 +136,7 @@ func resolveEntry(entry json.RawMessage, sets map[string]setDef, modifiers map[s
 			if !exists {
 				return nil, fmt.Errorf("referenced set %q not found", setName)
 			}
-			return fileRefsFromSources(set.Sources), nil
+			return fileRefsFromSources(set.Sources, sets), nil
 		}
 		if rawName, ok := strings.CutPrefix(ref.Ref, "#/modifiers/"); ok {
 			modName := unescapeJSONPointer(rawName)
@@ -138,7 +144,7 @@ func resolveEntry(entry json.RawMessage, sets map[string]setDef, modifiers map[s
 			if !exists {
 				return nil, fmt.Errorf("referenced modifier %q not found", modName)
 			}
-			return fileRefsFromContexts(mod.Contexts), nil
+			return fileRefsFromContexts(mod.Contexts, sets), nil
 		}
 	}
 
@@ -146,14 +152,14 @@ func resolveEntry(entry json.RawMessage, sets map[string]setDef, modifiers map[s
 		Sources []sourceRef `json:"sources"`
 	}
 	if err := json.Unmarshal(entry, &inlineSet); err == nil && len(inlineSet.Sources) > 0 {
-		return fileRefsFromSources(inlineSet.Sources), nil
+		return fileRefsFromSources(inlineSet.Sources, sets), nil
 	}
 
 	var inlineModifier struct {
 		Contexts map[string][]sourceRef `json:"contexts"`
 	}
 	if err := json.Unmarshal(entry, &inlineModifier); err == nil && len(inlineModifier.Contexts) > 0 {
-		return fileRefsFromContexts(inlineModifier.Contexts), nil
+		return fileRefsFromContexts(inlineModifier.Contexts, sets), nil
 	}
 
 	return nil, fmt.Errorf("unrecognized resolution order entry: %s", string(entry))
@@ -161,20 +167,35 @@ func resolveEntry(entry json.RawMessage, sets map[string]setDef, modifiers map[s
 
 // fileRefsFromContexts extracts file paths from all contexts of a modifier,
 // collecting $ref entries from each context's source array.
-func fileRefsFromContexts(contexts map[string][]sourceRef) []string {
+// Per the DTCG spec, modifier contexts may reference named sets.
+func fileRefsFromContexts(contexts map[string][]sourceRef, sets map[string]setDef) []string {
 	var paths []string
 	for _, sources := range contexts {
-		paths = append(paths, fileRefsFromSources(sources)...)
+		paths = append(paths, fileRefsFromSources(sources, sets)...)
 	}
 	return paths
 }
 
-// fileRefsFromSources extracts file paths from source $ref entries,
-// filtering out JSON pointer references.
-func fileRefsFromSources(sources []sourceRef) []string {
+// fileRefsFromSources extracts file paths from source $ref entries.
+// Resolves #/sets/<name> references to their source files (per DTCG spec,
+// sets and modifier contexts may reference named sets).
+// Filters out other JSON pointer references and strips fragment identifiers.
+func fileRefsFromSources(sources []sourceRef, sets map[string]setDef) []string {
 	var paths []string
 	for _, src := range sources {
-		if src.Ref == "" || strings.HasPrefix(src.Ref, "#") {
+		if src.Ref == "" {
+			continue
+		}
+		// Resolve #/sets/<name> references within source arrays
+		if rawName, ok := strings.CutPrefix(src.Ref, "#/sets/"); ok {
+			setName := unescapeJSONPointer(rawName)
+			if set, exists := sets[setName]; exists {
+				paths = append(paths, fileRefsFromSources(set.Sources, sets)...)
+			}
+			continue
+		}
+		// Skip other JSON pointer references
+		if strings.HasPrefix(src.Ref, "#") {
 			continue
 		}
 		// Strip any fragment identifier (e.g., "palette.json#/brand" → "palette.json")
@@ -198,7 +219,11 @@ func unescapeJSONPointer(s string) string {
 }
 
 // resolveRefPath resolves a $ref path relative to the resolver document's directory.
+// URI-scheme refs (npm:, jsr:, http://, etc.) are returned unchanged.
 func resolveRefPath(refPath, resolverDir string) string {
+	if strings.Contains(refPath, "://") || strings.HasPrefix(refPath, "npm:") || strings.HasPrefix(refPath, "jsr:") {
+		return refPath
+	}
 	if filepath.IsAbs(refPath) {
 		return filepath.Clean(refPath)
 	}

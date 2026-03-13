@@ -1,0 +1,26 @@
+{
+  "version": "2025.10",
+  "sets": {
+    "dark-overrides": {
+      "sources": [{ "$ref": "./dark-overrides.json" }]
+    }
+  },
+  "resolutionOrder": [
+    {
+      "type": "set",
+      "name": "base",
+      "sources": [{ "$ref": "./palette.json" }]
+    },
+    {
+      "type": "modifier",
+      "name": "mode",
+      "contexts": {
+        "light": [],
+        "dark": [
+          { "$ref": "./dark.json" },
+          { "$ref": "#/sets/dark-overrides" }
+        ]
+      }
+    }
+  ]
+}

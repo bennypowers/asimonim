@@ -1,0 +1,14 @@
+{
+  "version": "2025.10",
+  "resolutionOrder": [
+    {
+      "type": "set",
+      "name": "base",
+      "sources": [
+        { "$ref": "./palette.json" },
+        { "$ref": "npm:@acme/tokens/tokens.json" },
+        { "$ref": "https://cdn.example.com/tokens.json" }
+      ]
+    }
+  ]
+}
