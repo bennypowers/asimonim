@@ -13,6 +13,7 @@ import (
 
 	"bennypowers.dev/asimonim/cmd/convert"
 	"bennypowers.dev/asimonim/cmd/list"
+	cmdlsp "bennypowers.dev/asimonim/cmd/lsp"
 	"bennypowers.dev/asimonim/cmd/search"
 	"bennypowers.dev/asimonim/cmd/validate"
 	"bennypowers.dev/asimonim/cmd/version"
@@ -40,6 +41,7 @@ func init() {
 
 	rootCmd.AddCommand(convert.Cmd)
 	rootCmd.AddCommand(list.Cmd)
+	rootCmd.AddCommand(cmdlsp.Cmd)
 	rootCmd.AddCommand(search.Cmd)
 	rootCmd.AddCommand(validate.Cmd)
 	rootCmd.AddCommand(version.Cmd)
