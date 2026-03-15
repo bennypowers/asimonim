@@ -11,6 +11,7 @@ import (
 	"os"
 
 	"bennypowers.dev/asimonim/cmd"
+	_ "bennypowers.dev/asimonim/cmd/lsp" // registers lsp command when CGO is available
 )
 
 func main() {

@@ -13,13 +13,13 @@ import (
 
 	"bennypowers.dev/asimonim/cmd/convert"
 	"bennypowers.dev/asimonim/cmd/list"
-	cmdlsp "bennypowers.dev/asimonim/cmd/lsp"
 	"bennypowers.dev/asimonim/cmd/search"
 	"bennypowers.dev/asimonim/cmd/validate"
 	"bennypowers.dev/asimonim/cmd/version"
 )
 
-var rootCmd = &cobra.Command{
+// RootCmd is the root cobra command, exported for subcommand registration.
+var RootCmd = &cobra.Command{
 	Use:   "asimonim",
 	Short: "Parse and work with design tokens definitions",
 	Long:  `asimonim parses and validates design token files, defined by the Design Tokens Community Group specification.`,
@@ -27,24 +27,23 @@ var rootCmd = &cobra.Command{
 
 // Execute runs the root command.
 func Execute() error {
-	return rootCmd.Execute()
+	return RootCmd.Execute()
 }
 
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringP("schema", "s", "", "Force schema version (draft, v2025.10)")
-	rootCmd.PersistentFlags().StringP("prefix", "p", "", "Prefix for output variable names")
+	RootCmd.PersistentFlags().StringP("schema", "s", "", "Force schema version (draft, v2025.10)")
+	RootCmd.PersistentFlags().StringP("prefix", "p", "", "Prefix for output variable names")
 
-	_ = viper.BindPFlag("schema", rootCmd.PersistentFlags().Lookup("schema"))
-	_ = viper.BindPFlag("prefix", rootCmd.PersistentFlags().Lookup("prefix"))
+	_ = viper.BindPFlag("schema", RootCmd.PersistentFlags().Lookup("schema"))
+	_ = viper.BindPFlag("prefix", RootCmd.PersistentFlags().Lookup("prefix"))
 
-	rootCmd.AddCommand(convert.Cmd)
-	rootCmd.AddCommand(list.Cmd)
-	rootCmd.AddCommand(cmdlsp.Cmd)
-	rootCmd.AddCommand(search.Cmd)
-	rootCmd.AddCommand(validate.Cmd)
-	rootCmd.AddCommand(version.Cmd)
+	RootCmd.AddCommand(convert.Cmd)
+	RootCmd.AddCommand(list.Cmd)
+	RootCmd.AddCommand(search.Cmd)
+	RootCmd.AddCommand(validate.Cmd)
+	RootCmd.AddCommand(version.Cmd)
 }
 
 func initConfig() {
