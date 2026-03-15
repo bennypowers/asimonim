@@ -1,5 +1,3 @@
-//go:build cgo
-
 /*
 Copyright 2026 Benny Powers. All rights reserved.
 Use of this source code is governed by the GPLv3
@@ -7,7 +5,6 @@ license that can be found in the LICENSE file.
 */
 
 // Package lsp provides the lsp command for asimonim.
-// It requires CGO for tree-sitter parser support.
 package lsp
 
 import (
