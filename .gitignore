@@ -8,5 +8,15 @@ coverage.out
 .DS_Store
 RELEASE_NOTES.md
 
+# VS Code extension
+extensions/vscode/node_modules/
+extensions/vscode/client/node_modules/
+extensions/vscode/client/out/
+extensions/vscode/dist/
+extensions/vscode/*.vsix
+
+# Zed extension
+extensions/zed/target/
+
 # Allow node_modules in config test fixtures
 !testdata/fixtures/config/**/node_modules/

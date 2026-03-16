@@ -1,0 +1,15 @@
+{
+  "name": "design-tokens-language-server-vscode",
+  "author": "Benny Powers <web@bennypowers.com>",
+  "license": "GPL-3.0-only",
+  "version": "0.2.0",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.81.0"
+  }
+}

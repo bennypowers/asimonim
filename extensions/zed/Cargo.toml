@@ -1,0 +1,12 @@
+
+[package]
+name = "zed_asimonim"
+version = "0.2.0"
+license = "GPL-3.0-or-later"
+
+[lib]
+path = "src/asimonim.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+zed_extension_api = "0.1.0"

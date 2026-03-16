@@ -79,6 +79,10 @@ fi
 echo "✓ Tag $VERSION does not exist"
 echo ""
 
+# Update extension versions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$SCRIPT_DIR/version.sh" "$VERSION"
+
 # Check for uncommitted changes
 if [[ $(git status --porcelain 2>/dev/null) ]]; then
   echo "Error: Working directory has uncommitted changes"

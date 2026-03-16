@@ -1,0 +1,50 @@
+{
+  "css": {
+    "command": "asimonim",
+    "args": ["lsp"],
+    "extensionToLanguage": {
+      ".css": "css"
+    }
+  },
+  "html": {
+    "command": "asimonim",
+    "args": ["lsp"],
+    "extensionToLanguage": {
+      ".html": "html",
+      ".htm": "html"
+    }
+  },
+  "javascript": {
+    "command": "asimonim",
+    "args": ["lsp"],
+    "extensionToLanguage": {
+      ".js": "javascript",
+      ".mjs": "javascript",
+      ".cjs": "javascript",
+      ".jsx": "javascript"
+    }
+  },
+  "typescript": {
+    "command": "asimonim",
+    "args": ["lsp"],
+    "extensionToLanguage": {
+      ".ts": "typescript",
+      ".tsx": "typescript"
+    }
+  },
+  "json": {
+    "command": "asimonim",
+    "args": ["lsp"],
+    "extensionToLanguage": {
+      ".json": "json"
+    }
+  },
+  "yaml": {
+    "command": "asimonim",
+    "args": ["lsp"],
+    "extensionToLanguage": {
+      ".yaml": "yaml",
+      ".yml": "yaml"
+    }
+  }
+}
