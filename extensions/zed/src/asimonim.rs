@@ -27,13 +27,24 @@ impl DesignTokensExtension {
             language_server_id,
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
-        let release = zed::latest_github_release(
+        let release = match zed::latest_github_release(
             "bennypowers/asimonim",
             zed::GithubReleaseOptions {
                 require_assets: true,
                 pre_release: false,
             },
-        )?;
+        ) {
+            Ok(release) => release,
+            Err(err) => {
+                // Fall back to cached binary if GitHub API fails
+                if let Some(path) = &self.cached_binary_path {
+                    if fs::metadata(path).map_or(false, |stat| stat.is_file()) {
+                        return Ok(path.clone());
+                    }
+                }
+                return Err(err);
+            }
+        };
 
         let (platform, arch) = zed::current_platform();
         // Binary names for asimonim:
@@ -86,12 +97,18 @@ impl DesignTokensExtension {
 
             zed::make_file_executable(&binary_path)?;
 
+            // Clean up old version directories
             let entries = fs::read_dir(".")
                 .map_err(|err| format!("failed to list working directory {err}"))?;
             for entry in entries {
                 let entry = entry.map_err(|err| format!("failed to load directory entry {err}"))?;
-                if entry.file_name().to_str() != Some(&version_dir) {
-                    fs::remove_dir_all(entry.path()).ok();
+                if let Some(name) = entry.file_name().to_str() {
+                    if name != version_dir
+                        && name.starts_with("asimonim-")
+                        && entry.file_type().map_or(false, |ft| ft.is_dir())
+                    {
+                        fs::remove_dir_all(entry.path()).ok();
+                    }
                 }
             }
         }

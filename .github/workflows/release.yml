@@ -46,7 +46,6 @@ jobs:
         working-directory: extensions/vscode
         run: |
           npm install
-          node build.js
           npm run build
 
       - name: Upload VSCode extension to release
@@ -83,6 +82,7 @@ jobs:
 
   publish-zed:
     name: Publish to Zed Extensions
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -115,6 +115,7 @@ jobs:
           git push origin main --force
 
       - name: Update Zed Extension
+        id: update-zed
         working-directory: zed-extensions
         run: |
           # Initialize only the design-tokens submodule
@@ -127,12 +128,19 @@ jobs:
           # Update version in extensions.toml for design-tokens section only
           sed -i '/^\[design-tokens\]/,/^\[/ s/^version = .*/version = "${{ steps.version.outputs.version }}"/' extensions.toml
           git add extensions/design-tokens extensions.toml
-          BRANCH="update-design-tokens-${{ steps.version.outputs.version }}"
-          git checkout -B "$BRANCH"
-          git commit -m "Update design-tokens to v${{ steps.version.outputs.version }}"
-          git push -f -u origin "$BRANCH"
+          if git diff --staged --quiet; then
+            echo "No changes to commit — submodule already at this version"
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            BRANCH="update-design-tokens-${{ steps.version.outputs.version }}"
+            git checkout -B "$BRANCH"
+            git commit -m "Update design-tokens to v${{ steps.version.outputs.version }}"
+            git push -f -u origin "$BRANCH"
+          fi
 
       - name: Create Pull Request
+        if: steps.update-zed.outputs.has_changes == 'true'
         working-directory: zed-extensions
         env:
           GH_TOKEN: ${{ secrets.ZED_COMMITTER_TOKEN }}

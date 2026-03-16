@@ -4,7 +4,7 @@
   "description": "Design Tokens Language Server for Visual Studio Code",
   "author": "Benny Powers <web@bennypowers.com>",
   "publisher": "pwrs",
-  "license": "GPL-3.0-only",
+  "license": "GPL-3.0-or-later",
   "version": "0.2.0",
   "categories": [
     "Programming Languages",
@@ -12,7 +12,7 @@
     "Linters"
   ],
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.82.0"
   },
   "icon": "logo.png",
   "galleryBanner": {

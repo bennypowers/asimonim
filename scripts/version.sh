@@ -19,14 +19,21 @@ VERSION="${VERSION#v}"
 
 echo "Updating version to: $VERSION"
 
+# Helper: portable sed -i
+sed_inplace() {
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "$@"
+  else
+    sed -i "$@"
+  fi
+}
+
 # Update VSCode extension version
 echo "Updating extensions/vscode/package.json..."
 if command -v jq &> /dev/null; then
-  # Use jq if available (preferred for correctness)
   jq ".version = \"$VERSION\"" extensions/vscode/package.json > extensions/vscode/package.json.tmp
   mv extensions/vscode/package.json.tmp extensions/vscode/package.json
 elif command -v node &> /dev/null; then
-  # Use Node.js if available (most portable on developer machines)
   node -e "
     const fs = require('fs');
     const pkg = JSON.parse(fs.readFileSync('extensions/vscode/package.json', 'utf8'));
@@ -34,45 +41,62 @@ elif command -v node &> /dev/null; then
     fs.writeFileSync('extensions/vscode/package.json', JSON.stringify(pkg, null, 2) + '\n');
   "
 else
-  # Fallback to sed (fragile but works for basic cases)
-  sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" extensions/vscode/package.json
+  sed_inplace "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" extensions/vscode/package.json
 fi
 
 # Update Zed extension version
 echo "Updating extensions/zed/extension.toml..."
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  # macOS requires '' after -i
-  sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" extensions/zed/extension.toml
-else
-  sed -i "s/^version = \".*\"/version = \"$VERSION\"/" extensions/zed/extension.toml
+sed_inplace "s/^version = \".*\"/version = \"$VERSION\"/" extensions/zed/extension.toml
+
+# Update Claude Code plugin version
+echo "Updating .claude-plugin/marketplace.json..."
+if command -v jq &> /dev/null; then
+  jq ".plugins[0].version = \"$VERSION\"" .claude-plugin/marketplace.json > .claude-plugin/marketplace.json.tmp
+  mv .claude-plugin/marketplace.json.tmp .claude-plugin/marketplace.json
+elif command -v node &> /dev/null; then
+  node -e "
+    const fs = require('fs');
+    const m = JSON.parse(fs.readFileSync('.claude-plugin/marketplace.json', 'utf8'));
+    m.plugins[0].version = '$VERSION';
+    fs.writeFileSync('.claude-plugin/marketplace.json', JSON.stringify(m, null, 2) + '\n');
+  "
 fi
+
+VERSION_FILES="extensions/vscode/package.json extensions/zed/extension.toml .claude-plugin/marketplace.json"
 
 # Show changes
 echo ""
 echo "Version updated in:"
 echo "  - extensions/vscode/package.json"
 echo "  - extensions/zed/extension.toml"
+echo "  - .claude-plugin/marketplace.json"
 echo ""
 echo "Changes:"
-git diff extensions/vscode/package.json extensions/zed/extension.toml
+git diff $VERSION_FILES
 
 # Check if there are changes
-if ! git diff --quiet extensions/vscode/package.json extensions/zed/extension.toml; then
-  echo ""
-  read -p "Commit version changes? (y/n) " -n 1 -r
-  echo
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
-    git add extensions/vscode/package.json extensions/zed/extension.toml
+if ! git diff --quiet $VERSION_FILES; then
+  # Auto-commit in non-interactive mode (CI or piped stdin)
+  if [[ ! -t 0 ]]; then
+    git add $VERSION_FILES
     git commit -m "chore: prepare version $VERSION"
-    echo "✓ Version changes committed"
-    echo ""
-    echo "Next steps:"
-    echo "  make release v$VERSION  (to tag, push, and create GitHub release)"
+    echo "✓ Version changes committed (non-interactive)"
   else
-    echo "Version changes rejected by user."
-    # Discard changes
-    git checkout -- extensions/vscode/package.json extensions/zed/extension.toml
-    exit 1
+    echo ""
+    read -p "Commit version changes? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      git add $VERSION_FILES
+      git commit -m "chore: prepare version $VERSION"
+      echo "✓ Version changes committed"
+      echo ""
+      echo "Next steps:"
+      echo "  make release v$VERSION  (to tag, push, and create GitHub release)"
+    else
+      echo "Version changes rejected by user."
+      git checkout -- $VERSION_FILES
+      exit 1
+    fi
   fi
 else
   echo ""

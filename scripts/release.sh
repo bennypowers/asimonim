@@ -100,9 +100,14 @@ LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse origin/main 2>/dev/null || git rev-parse origin/master 2>/dev/null || echo "")
 if [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
   echo "Warning: Local branch differs from remote"
-  read -p "Continue anyway? (y/n) " -n 1 -r
-  echo
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  if [[ -t 0 ]]; then
+    read -p "Continue anyway? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      exit 1
+    fi
+  else
+    echo "Non-interactive mode: aborting due to remote divergence"
     exit 1
   fi
 fi

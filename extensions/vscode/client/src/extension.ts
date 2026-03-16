@@ -124,7 +124,9 @@ export async function activate(context: ExtensionContext) {
   try {
     await client.start();
   } catch (error) {
-    console.error(error);
+    const message = error instanceof Error ? error.message : String(error);
+    window.showErrorMessage(`Design Tokens Language Server failed to start: ${message}`);
+    client = undefined!;
   }
 }
 
