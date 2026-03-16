@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   build:
+    name: Build Binaries
     uses: bennypowers/go-release-workflows/.github/workflows/build-binaries.yml@main
     with:
       binary-name: asimonim
