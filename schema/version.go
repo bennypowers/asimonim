@@ -52,7 +52,8 @@ func FromURL(url string) (Version, error) {
 	switch url {
 	case "https://www.designtokens.org/schemas/draft.json":
 		return Draft, nil
-	case "https://www.designtokens.org/schemas/2025.10.json":
+	case "https://www.designtokens.org/schemas/2025.10.json",
+		"https://www.designtokens.org/schemas/2025.10/format.json":
 		return V2025_10, nil
 	default:
 		return Unknown, fmt.Errorf("unrecognized schema URL: %s", url)

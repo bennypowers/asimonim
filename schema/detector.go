@@ -114,11 +114,10 @@ func hasStructuredColorObjects(data map[string]any) bool {
 func checkForStructuredColors(obj any) bool {
 	switch v := obj.(type) {
 	case map[string]any:
-		if colorType, ok := v["$type"].(string); ok && colorType == "color" {
-			if value, ok := v["$value"].(map[string]any); ok {
-				if _, hasColorSpace := value["colorSpace"]; hasColorSpace {
-					return true
-				}
+		// Check if this node has a structured $value with colorSpace
+		if value, ok := v["$value"].(map[string]any); ok {
+			if _, hasColorSpace := value["colorSpace"]; hasColorSpace {
+				return true
 			}
 		}
 		for _, child := range v {

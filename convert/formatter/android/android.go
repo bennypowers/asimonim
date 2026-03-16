@@ -41,11 +41,11 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 	for _, tok := range sorted {
 		baseName := formatter.ToSnakeCase(strings.Join(tok.Path, "_"))
 		name := formatter.ApplyPrefix(baseName, opts.Prefix, "_")
-		value := formatter.ResolvedValue(tok)
+		displayVal := tok.DisplayValue()
 		xmlType := xmlType(tok.Type)
 
 		sb.WriteString(fmt.Sprintf("    <%s name=\"%s\">%s</%s>\n",
-			xmlType, formatter.EscapeXML(name), formatter.EscapeXML(fmt.Sprintf("%v", value)), xmlType))
+			xmlType, formatter.EscapeXML(name), formatter.EscapeXML(displayVal), xmlType))
 	}
 
 	sb.WriteString("</resources>\n")

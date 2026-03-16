@@ -115,6 +115,31 @@ func toSwiftValue(tokenType string, value any) string {
 			return fmt.Sprintf("%q", s)
 		}
 	case token.TypeDimension:
+		if m, ok := value.(map[string]any); ok {
+			if v, hasValue := m["value"]; hasValue && v != nil {
+				u, hasUnit := m["unit"].(string)
+				formatDim := func(numStr string) string {
+					if hasUnit {
+						safeUnit := strings.ReplaceAll(u, "/*", "")
+						safeUnit = strings.ReplaceAll(safeUnit, "*/", "")
+						safeUnit = strings.ReplaceAll(safeUnit, "\n", " ")
+						safeUnit = strings.ReplaceAll(safeUnit, "\r", " ")
+						return fmt.Sprintf("CGFloat(%s) /* %s */", numStr, safeUnit)
+					}
+					return fmt.Sprintf("CGFloat(%s)", numStr)
+				}
+				switch num := v.(type) {
+				case float64:
+					if num == float64(int(num)) {
+						return formatDim(fmt.Sprintf("%d", int(num)))
+					}
+					return formatDim(fmt.Sprintf("%g", num))
+				case int:
+					return formatDim(fmt.Sprintf("%d", num))
+				}
+			}
+			logger.Warn("dimension token has map structure but missing valid value")
+		}
 		if s, ok := value.(string); ok {
 			s = strings.TrimSuffix(s, "px")
 			s = strings.TrimSuffix(s, "rem")
