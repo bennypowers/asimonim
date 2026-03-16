@@ -57,7 +57,7 @@ elif command -v node &> /dev/null; then
     fs.writeFileSync('npm/package.json', JSON.stringify(pkg, null, 2) + '\n');
   "
 else
-  sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" npm/package.json
+  sed_inplace "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" npm/package.json
 fi
 
 # Update Zed extension version
