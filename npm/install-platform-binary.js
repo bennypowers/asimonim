@@ -22,9 +22,13 @@ const { optionalDependencies = {} } = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
 );
 const pkgVersion = optionalDependencies[pkg];
+if (!pkgVersion) {
+  console.error(`No version found for ${pkg} in optionalDependencies`);
+  process.exit(1);
+}
 
 try {
-  execSync(`npm install --no-save ${pkg}${pkgVersion ? `@${pkgVersion}` : ''}`, { stdio: "inherit" });
+  execSync(`npm install --no-save ${pkg}@${pkgVersion}`, { stdio: "inherit" });
 } catch (err) {
   console.error(`Failed to install platform binary package: ${pkg}`);
   process.exit(1);
