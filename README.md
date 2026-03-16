@@ -1,7 +1,7 @@
 # Asimonim
 
 ![A vintage Israeli phone token (asimon), captured mid-drop as it falls into a payphone coin slot](./logo.png)
-A high-performance design tokens parser and validator, available as a CLI tool and Go library.
+A high-performance design tokens parser, validator, and language server, available as a CLI tool and Go library.
 
 > *Asimonim* (אֲסִימוֹנִים) (ahh-see-moh-NEEM) is Hebrew for "[tokens](https://www.wikiwand.com/en/articles/Telephone_token)".
 
@@ -16,8 +16,15 @@ Design systems use [design tokens][dtcg] to store visual primitives like colors,
 - **CSS output**: Generate CSS custom properties from tokens
 - **Search**: Find tokens by name, value, or type with regex support
 - **Validation**: Check files for schema compliance and circular references
+- **Language Server**: Full LSP support for design tokens in your editor
 
 ## Installation
+
+### npm
+
+```bash
+npm install -g @pwrs/asimonim
+```
 
 ### Gentoo Linux
 
@@ -52,6 +59,180 @@ asimonim list tokens.json --format css
 # Search for color tokens
 asimonim search "primary" tokens.json --type color
 ```
+
+## Editor Integration
+
+Asimonim includes a built-in language server (`asimonim lsp`) with editor
+extensions for VS Code, Zed, and Claude Code.
+
+### VS Code
+
+Install [Design Tokens Language Server][vscode-ext] from the VS Code Marketplace.
+
+### Zed
+
+Install [design-tokens][zed-ext] from the Zed extension registry.
+
+### Claude Code
+
+Asimonim is available as a [Claude Code plugin][claude-plugin].
+
+### Neovim
+
+Using native Neovim LSP (see [`:help lsp`][neovimlspdocs] for more info):
+
+Create a file like `~/.config/nvim/lsp/asimonim.lua`:
+
+```lua
+---@type vim.lsp.ClientConfig
+return {
+  cmd = { 'asimonim', 'lsp' },
+  root_markers = { '.git', 'package.json' },
+  filetypes = { 'css', 'html', 'javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'json', 'yaml' },
+  settings = {
+    dtls = {
+      tokensFiles = {
+        {
+          path = "~/path/to/tokens.json",
+          prefix = "my-ds",
+        },
+      },
+      groupMarkers = { '_', '@', 'DEFAULT' },
+    }
+  },
+  on_attach = function(client, bufnr)
+    if vim.lsp.document_color then
+      vim.lsp.document_color.enable(true, bufnr, {
+        style = 'virtual'
+      })
+    end
+  end,
+}
+```
+
+> [!TIP]
+> If your tokens are in `node_modules` (e.g., `npm:@my-ds/tokens/tokens.json`),
+> the default `root_markers` may find the wrong `package.json`. The example
+> above uses `{ '.git', 'package.json' }` which prefers `.git` over nested
+> `package.json` files.
+>
+> For non-git projects or monorepos, use a custom `root_dir` that explicitly
+> skips `node_modules`:
+>
+> ```lua
+> root_dir = function(bufnr, on_dir)
+>   local root = vim.fs.root(bufnr, function(name, path)
+>     if name == 'package.json' and not path:match('node_modules') then
+>       return true
+>     end
+>     return name == '.git'
+>   end)
+>   if root then on_dir(root) end
+> end,
+> ```
+
+### Other Editors
+
+Any editor with LSP support can use Asimonim. Run `asimonim lsp` as the
+language server command, with document selectors for CSS, HTML, JavaScript,
+TypeScript, JSON, and YAML.
+
+## Language Server Features
+
+### Hover Docs
+
+Display markdown-formatted token descriptions and value when hovering over token
+names.
+
+![Hover screenshot](./docs/hover.png)
+
+### Snippets
+
+Auto complete for design tokens — get code snippets for token values with
+optional fallbacks.
+
+![Completions screenshot with menu open and ghost text of snippet](./docs/completions.png)
+
+### Diagnostics
+
+Warns when your stylesheet contains a `var()` call for a design token,
+but the fallback value doesn't match the token's pre-defined `$value`.
+
+![Diagnostics visible in editor](./docs/diagnostics.png)
+
+### Code Actions
+
+Toggle the presence of a token `var()` call's fallback value. Offers to fix
+wrong token definitions in diagnostics.
+
+![Code actions menu open for a line](./docs/toggle-fallback.png)
+![Code actions menu open for a diagnostic](./docs/autofix.png)
+
+### Document Color
+
+Display token color values in your source, e.g. as swatches.
+
+![Document color swatches](./docs/document-color.png)
+
+### Semantic Tokens
+
+Highlight token references inside token definition files.
+
+![Semantic tokens highlighting legit token definitions](./docs/semantic-tokens.png)
+
+### Go to Definition
+
+Jump to the position in the tokens file where the token is defined. Can also
+jump from a token reference in a JSON file to the token's definition.
+
+![Json file jump in neovim](./docs/goto-definition.png)
+
+Go to definition in a split window using Neovim's [`<C-w C-]>` binding][cwcdash],
+which defers to LSP methods when they're available.
+
+### References
+
+Locate all references to a token in open files, whether in CSS or in the token
+definition JSON or YAML files.
+
+![References](./docs/references.png)
+
+## Schema Support
+
+Asimonim supports both DTCG schema versions:
+
+- **[Editor's Draft][editorsdraft]** — Original DTCG format
+  - String color values (hex, rgb, hsl, named colors)
+  - Curly brace references: `{color.brand.primary}`
+  - Group markers for root tokens: `_`, `@`, `DEFAULT`
+
+- **[2025.10 Stable][202510stable]** — Latest stable specification
+  - Structured color values with 14 color spaces (sRGB, oklch, display-p3, etc.)
+  - JSON Pointer references: `$ref: "#/color/brand/primary"`
+  - Group inheritance: `$extends: "#/baseColors"`
+  - Standardized `$root` token for root-level tokens
+  - All draft features (backward compatible)
+
+### Multi-Schema Workspaces
+
+Asimonim can load multiple token files with different schema versions simultaneously:
+
+```json
+{
+  "designTokensLanguageServer": {
+    "tokensFiles": [
+      "legacy/draft-tokens.json",
+      "design-system/tokens.json"
+    ]
+  }
+}
+```
+
+Schema version detection priority:
+1. `$schema` field in the token file (recommended)
+2. Per-file `schemaVersion` config in `package.json`
+3. Duck-typing based on features (structured colors, `$ref`, `$extends`)
+4. Defaults to Editor's Draft for ambiguous files
 
 ## CLI Reference
 
@@ -241,6 +422,18 @@ asimonim convert --format snippets --snippet-type textmate -o tokens.tmSnippet t
 asimonim convert --format snippets --snippet-type zed -o css.json tokens/*.yaml
 ```
 
+### `asimonim lsp`
+
+Start the language server for editor integration.
+
+```
+Usage:
+  asimonim lsp
+```
+
+The LSP server communicates over stdin/stdout using JSON-RPC. It is typically
+launched by an editor extension rather than manually.
+
 ### `asimonim version`
 
 Display version information.
@@ -280,6 +473,28 @@ asimonim list      # Uses files from config
 asimonim validate  # Uses files from config
 ```
 
+The language server also reads from `package.json`:
+
+```json
+{
+  "designTokensLanguageServer": {
+    "prefix": "my-ds",
+    "tokensFiles": [
+      "npm:@my-design-system/tokens/tokens.json",
+      {
+        "path": "npm:@his-design-system/tokens/tokens.json",
+        "prefix": "his-ds",
+        "groupMarkers": ["GROUP"]
+      },
+      {
+        "path": "./docs/docs-site-tokens.json",
+        "prefix": "docs-site"
+      }
+    ]
+  }
+}
+```
+
 ### Resolvers
 
 The `resolvers` field accepts [DTCG resolver documents](https://www.designtokens.org/tr/2025.10/resolver/) — JSON files that declare how to compose multiple token files via sets, modifiers, and resolution order. Each entry can be a local path (relative or absolute) or an `npm:`/`jsr:` package specifier.
@@ -317,22 +532,84 @@ Dependencies are processed in sorted order for deterministic results. Each depen
 
 When both are present, the `designTokens` field takes priority over the export condition.
 
-### Group Markers (Editor's Draft only)
+### Network Fallback
 
-The Editor's Draft schema has no built-in way for a token to also act as a group. The `groupMarkers` option works around this by treating certain token names as group names. For example, with `groupMarkers: ["DEFAULT"]`:
+When using `npm:` specifiers for token packages, Asimonim normally resolves them
+from `node_modules`. If the package isn't installed locally, you can enable
+**network fallback** to fetch tokens from a CDN (default:
+[unpkg.com](https://unpkg.com), configurable via the `cdn` option).
+
+This is opt-in and disabled by default.
+
+#### Enable in package.json
 
 ```json
 {
-  "color": {
-    "DEFAULT": { "$value": "#000" },
-    "light": { "$value": "#fff" }
+  "designTokensLanguageServer": {
+    "networkFallback": true,
+    "networkTimeout": 30,
+    "cdn": "unpkg",
+    "tokensFiles": [
+      "npm:@my-design-system/tokens/tokens.json"
+    ]
   }
 }
 ```
 
-This produces `--prefix-color` (from DEFAULT) and `--prefix-color-light`. The v2025.10 stable schema uses `$root` instead, so `groupMarkers` is ignored for that schema.
+#### Options
 
-This configuration is also consumed by [dtls](https://github.com/bennypowers/design-tokens-language-server) and [cem](https://github.com/bennypowers/cem).
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `networkFallback` | `boolean` | `false` | Enable CDN fallback for package specifiers |
+| `networkTimeout` | `number` | `30` | Max seconds to wait for CDN requests |
+| `cdn` | `string` | `"unpkg"` | CDN provider: `unpkg`, `esm.sh`, `esm.run`, `jspm`, `jsdelivr` |
+
+#### Security
+
+- Network fallback is **opt-in** — it never fetches from the network unless
+  explicitly enabled
+- Responses are limited to 10 MB to prevent resource exhaustion
+- Requests have a configurable timeout (default 30 seconds)
+- Only `npm:` specifiers with a file component trigger CDN lookups
+
+### Token Prefixes
+
+The DTCG format does not require a prefix for tokens, but it is recommended to
+use a prefix to avoid conflicts with other design systems. If your token files
+do not nest all of their tokens under a common prefix, you can pass one yourself
+in the `prefix` property of the token file object.
+
+### Group Markers
+
+> [!IMPORTANT]
+> Group markers are **only used with Editor's Draft schema**. The 2025.10 stable
+> specification uses the standardized `$root` reserved token name instead.
+
+The `groupMarkers` option works around the DTCG draft schema's lack of a
+built-in way for a token to also act as a group. For example, with
+`groupMarkers: ["_"]`:
+
+```json
+{
+  "color": {
+    "red": {
+      "_": {
+        "$value": "#FF0000",
+        "$description": "Red color"
+      },
+      "darker": {
+        "$value": "#AA0000",
+        "$description": "Darker red color"
+      }
+    }
+  }
+}
+```
+
+This creates tokens: `--color-red` and `--color-red-darker`.
+
+The v2025.10 stable schema uses `$root` instead, so `groupMarkers` is ignored
+for that schema version.
 
 ## CSS Output
 
@@ -388,12 +665,6 @@ asimonim convert --format snippets --snippet-type textmate -o tokens.tmSnippet t
 asimonim convert --format snippets --snippet-type zed -o css.json tokens/*.yaml
 ```
 
-Each snippet includes multiple prefix triggers:
-- Kebab-case: `color-primary`
-- CamelCase: `colorPrimary`
-- Snake_case: `color_primary`
-- Value (for colors): `FF6B35`
-
 ## Schema Versions
 
 Asimonim supports multiple DTCG schema versions:
@@ -405,8 +676,20 @@ Asimonim supports multiple DTCG schema versions:
 
 Schema version is automatically detected from file contents, or can be forced with the `--schema` flag.
 
+## Contributing
+
+See [CONTRIBUTING.md][contributingmd]
+
 ## License
 
 GPLv3
 
 [dtcg]: https://design-tokens.github.io/community-group/format/
+[contributingmd]: ./CONTRIBUTING.md
+[neovimlspdocs]: https://neovim.io/doc/user/lsp.html
+[cwcdash]: https://neovim.io/doc/user/windows.html#CTRL-W_g_CTRL-%5D
+[editorsdraft]: https://second-editors-draft.tr.designtokens.org/format/
+[202510stable]: https://www.designtokens.org/tr/2025.10/
+[vscode-ext]: https://marketplace.visualstudio.com/items?itemName=pwrs.design-tokens-language-server-vscode
+[zed-ext]: https://zed.dev/extensions/design-tokens
+[claude-plugin]: https://github.com/bennypowers/asimonim
