@@ -8,7 +8,7 @@ import {
   TransportKind,
 } from "vscode-languageclient/node";
 
-let client: LanguageClient;
+let client: LanguageClient | undefined;
 
 const SETTINGS_MAP = [
   "tokensFiles",
@@ -131,7 +131,7 @@ export async function activate(context: ExtensionContext) {
     const message = error instanceof Error ? error.message : String(error);
     window.showErrorMessage(`Design Tokens Language Server failed to start: ${message}`);
     try { await client.stop(); } catch { /* ignore stop errors */ }
-    client = undefined!;
+    client = undefined;
   }
 }
 
