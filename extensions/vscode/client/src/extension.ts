@@ -32,22 +32,26 @@ async function migrateSettings() {
     const oldValue = oldConfig.inspect(key);
     if (!oldValue) continue;
 
-    // Migrate workspace settings
-    if (oldValue.workspaceValue !== undefined) {
-      const newValue = asimonimConfig.inspect(key);
-      if (newValue?.workspaceValue === undefined) {
-        await asimonimConfig.update(key, oldValue.workspaceValue, false);
-        migrated = true;
+    try {
+      // Migrate workspace settings
+      if (oldValue.workspaceValue !== undefined) {
+        const newValue = asimonimConfig.inspect(key);
+        if (newValue?.workspaceValue === undefined) {
+          await asimonimConfig.update(key, oldValue.workspaceValue, false);
+          migrated = true;
+        }
       }
-    }
 
-    // Migrate global settings
-    if (oldValue.globalValue !== undefined) {
-      const newValue = asimonimConfig.inspect(key);
-      if (newValue?.globalValue === undefined) {
-        await asimonimConfig.update(key, oldValue.globalValue, true);
-        migrated = true;
+      // Migrate global settings
+      if (oldValue.globalValue !== undefined) {
+        const newValue = asimonimConfig.inspect(key);
+        if (newValue?.globalValue === undefined) {
+          await asimonimConfig.update(key, oldValue.globalValue, true);
+          migrated = true;
+        }
       }
+    } catch (err) {
+      console.warn(`Failed to migrate setting "${key}": ${err}`);
     }
   }
 
@@ -126,6 +130,7 @@ export async function activate(context: ExtensionContext) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     window.showErrorMessage(`Design Tokens Language Server failed to start: ${message}`);
+    try { await client.stop(); } catch { /* ignore stop errors */ }
     client = undefined!;
   }
 }

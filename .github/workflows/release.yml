@@ -52,8 +52,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.event.release.tag_name }} \
-            extensions/vscode/*.vsix
+          for vsix in extensions/vscode/*.vsix; do
+            name=$(basename "$vsix")
+            if gh release view ${{ github.event.release.tag_name }} --json assets --jq ".assets[].name" | grep -qx "$name"; then
+              echo "Asset $name already exists, skipping"
+            else
+              gh release upload ${{ github.event.release.tag_name }} "$vsix"
+            fi
+          done
 
   publish-vscode:
     name: Publish to VSCode Marketplace
@@ -78,7 +84,7 @@ jobs:
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
-          npx @vscode/vsce publish --packagePath ./*.vsix
+          npx @vscode/vsce publish --skip-duplicate --packagePath ./*.vsix
 
   publish-zed:
     name: Publish to Zed Extensions
