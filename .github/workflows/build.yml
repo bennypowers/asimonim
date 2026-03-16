@@ -24,14 +24,16 @@ jobs:
           TAG_VERSION="${GITHUB_REF#refs/tags/v}"
           VSCODE_VERSION=$(jq -r .version extensions/vscode/package.json)
           ZED_VERSION=$(grep '^version = ' extensions/zed/extension.toml | cut -d'"' -f2)
+          NPM_VERSION=$(jq -r .version npm/package.json)
 
           echo "Checking version consistency:"
           echo "  Git tag:  v$TAG_VERSION"
           echo "  VSCode:   $VSCODE_VERSION"
           echo "  Zed:      $ZED_VERSION"
+          echo "  npm:      $NPM_VERSION"
           echo ""
 
-          if [ "$TAG_VERSION" != "$VSCODE_VERSION" ] || [ "$TAG_VERSION" != "$ZED_VERSION" ]; then
+          if [ "$TAG_VERSION" != "$VSCODE_VERSION" ] || [ "$TAG_VERSION" != "$ZED_VERSION" ] || [ "$TAG_VERSION" != "$NPM_VERSION" ]; then
             echo "❌ ERROR: Version mismatch detected!"
             echo ""
             echo "The git tag version does not match the extension versions."

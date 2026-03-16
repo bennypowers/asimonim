@@ -16,6 +16,17 @@ jobs:
       binary-name: asimonim
       release-tag: ${{ github.event.release.tag_name }}
 
+  npm:
+    needs: build
+    uses: bennypowers/go-release-workflows/.github/workflows/npm-publish.yml@main
+    with:
+      binary-name: asimonim
+      npm-package-name: "@pwrs/asimonim"
+      release-tag: ${{ github.event.release.tag_name }}
+      pre-main-publish-script: 'cp ../README.md . && node ../scripts/update-platform-package-versions.js'
+    secrets:
+      npm-token: ${{ secrets.NPM_TOKEN }}
+
   build-vscode:
     name: Build VSCode Extension
     runs-on: ubuntu-latest
