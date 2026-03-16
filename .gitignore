@@ -10,6 +10,7 @@ RELEASE_NOTES.md
 
 # npm package
 npm/node_modules/
+npm/README.md
 
 # VS Code extension
 extensions/vscode/node_modules/
