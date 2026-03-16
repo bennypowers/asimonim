@@ -79,6 +79,10 @@ fi
 echo "✓ Tag $VERSION does not exist"
 echo ""
 
+# Update extension versions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$SCRIPT_DIR/version.sh" "$VERSION"
+
 # Check for uncommitted changes
 if [[ $(git status --porcelain 2>/dev/null) ]]; then
   echo "Error: Working directory has uncommitted changes"
@@ -96,9 +100,14 @@ LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse origin/main 2>/dev/null || git rev-parse origin/master 2>/dev/null || echo "")
 if [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
   echo "Warning: Local branch differs from remote"
-  read -p "Continue anyway? (y/n) " -n 1 -r
-  echo
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  if [[ -t 0 ]]; then
+    read -p "Continue anyway? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      exit 1
+    fi
+  else
+    echo "Non-interactive mode: aborting due to remote divergence"
     exit 1
   fi
 fi
