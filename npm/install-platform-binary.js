@@ -1,5 +1,6 @@
 import { platform, arch } from "node:process";
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const pkg = {
   "darwin-x64": "@pwrs/asimonim-darwin-x64",
@@ -17,8 +18,13 @@ if (!pkg) {
   process.exit(1);
 }
 
+const { optionalDependencies = {} } = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+);
+const pkgVersion = optionalDependencies[pkg];
+
 try {
-  execSync(`npm install --no-save ${pkg}`, { stdio: "inherit" });
+  execSync(`npm install --no-save ${pkg}${pkgVersion ? `@${pkgVersion}` : ''}`, { stdio: "inherit" });
 } catch (err) {
   console.error(`Failed to install platform binary package: ${pkg}`);
   process.exit(1);

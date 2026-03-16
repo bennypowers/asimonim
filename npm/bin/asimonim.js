@@ -54,9 +54,9 @@ child.on('error', (err) => {
 });
 
 child.on('exit', (code, signal) => {
-  // Exit with child's code, or 128 + signal number per Unix convention
   if (signal) {
-    process.exit(128 + (process.platform === 'win32' ? 1 : 0));
+    const signum = { SIGHUP: 1, SIGINT: 2, SIGTERM: 15 }[signal] ?? 1;
+    process.exit(128 + signum);
   }
   process.exit(code ?? 1);
 });
