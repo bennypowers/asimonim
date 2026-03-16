@@ -44,6 +44,22 @@ else
   sed_inplace "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" extensions/vscode/package.json
 fi
 
+# Update npm package version
+echo "Updating npm/package.json..."
+if command -v jq &> /dev/null; then
+  jq ".version = \"$VERSION\"" npm/package.json > npm/package.json.tmp
+  mv npm/package.json.tmp npm/package.json
+elif command -v node &> /dev/null; then
+  node -e "
+    const fs = require('fs');
+    const pkg = JSON.parse(fs.readFileSync('npm/package.json', 'utf8'));
+    pkg.version = '$VERSION';
+    fs.writeFileSync('npm/package.json', JSON.stringify(pkg, null, 2) + '\n');
+  "
+else
+  sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" npm/package.json
+fi
+
 # Update Zed extension version
 echo "Updating extensions/zed/extension.toml..."
 sed_inplace "s/^version = \".*\"/version = \"$VERSION\"/" extensions/zed/extension.toml
@@ -62,7 +78,7 @@ elif command -v node &> /dev/null; then
   "
 fi
 
-VERSION_FILES="extensions/vscode/package.json extensions/zed/extension.toml .claude-plugin/marketplace.json"
+VERSION_FILES="extensions/vscode/package.json extensions/zed/extension.toml .claude-plugin/marketplace.json npm/package.json"
 
 # Show changes
 echo ""
@@ -70,6 +86,7 @@ echo "Version updated in:"
 echo "  - extensions/vscode/package.json"
 echo "  - extensions/zed/extension.toml"
 echo "  - .claude-plugin/marketplace.json"
+echo "  - npm/package.json"
 echo ""
 echo "Changes:"
 git diff $VERSION_FILES

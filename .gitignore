@@ -8,6 +8,9 @@ coverage.out
 .DS_Store
 RELEASE_NOTES.md
 
+# npm package
+npm/node_modules/
+
 # VS Code extension
 extensions/vscode/node_modules/
 extensions/vscode/client/node_modules/
