@@ -173,3 +173,16 @@ jobs:
             --repo zed-industries/extensions \
             --title "Update design-tokens to v${{ steps.version.outputs.version }}" \
             --body "Updates design-tokens extension to [version ${{ steps.version.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }})."
+
+  sync-dtls:
+    name: Sync DTLS Release
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger DTLS sync
+        env:
+          GH_TOKEN: ${{ secrets.DTLS_DISPATCH_TOKEN }}
+        run: |
+          gh workflow run sync-asimonim.yaml \
+            --repo bennypowers/design-tokens-language-server \
+            --field asimonim_version=${{ github.event.release.tag_name }}
