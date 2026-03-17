@@ -18,15 +18,15 @@ func TestDocumentColor_ColorTokenInVar(t *testing.T) {
 	req := types.NewRequestContext(ctx, glspCtx)
 
 	// Add a color token
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
 		Value: "#ff0000",
 		Type:  "color",
-	})
+	}))
 
 	uri := "file:///test.css"
 	cssContent := `.button { color: var(--color-primary); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
@@ -49,15 +49,15 @@ func TestDocumentColor_ColorTokenInDeclaration(t *testing.T) {
 	req := types.NewRequestContext(ctx, glspCtx)
 
 	// Add a color token
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
 		Value: "#00ff00",
 		Type:  "color",
-	})
+	}))
 
 	uri := "file:///test.css"
 	cssContent := `:root { --color-primary: #00ff00; }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
@@ -84,15 +84,15 @@ func TestDocumentColor_NonColorToken(t *testing.T) {
 	req := types.NewRequestContext(ctx, glspCtx)
 
 	// Add a non-color token
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.small",
 		Value: "8px",
 		Type:  "dimension",
-	})
+	}))
 
 	uri := "file:///test.css"
 	cssContent := `.button { padding: var(--spacing-small); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
@@ -138,21 +138,21 @@ func TestColorPresentation_MatchingTokens(t *testing.T) {
 	req := types.NewRequestContext(ctx, glspCtx)
 
 	// Add multiple tokens with red color
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
 		Value: "#ff0000",
 		Type:  "color",
-	})
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	}))
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.danger",
 		Value: "rgb(255, 0, 0)", // Same color, different format
 		Type:  "color",
-	})
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	}))
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.safe",
 		Value: "#00ff00", // Different color
 		Type:  "color",
-	})
+	}))
 
 	// Request presentations for red color
 	result, err := ColorPresentation(req, &protocol.ColorPresentationParams{
@@ -185,21 +185,21 @@ func TestColorPresentation_WithAlpha(t *testing.T) {
 	req := types.NewRequestContext(ctx, glspCtx)
 
 	// Add tokens with alpha channel (using same hex value to ensure exact match)
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.overlay",
 		Value: "#ff000080", // Red with alpha=0x80/255≈0.502
 		Type:  "color",
-	})
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	}))
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.transparent",
 		Value: "rgba(255, 0, 0, 0.5)", // csscolorparser converts to #ff000080
 		Type:  "color",
-	})
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	}))
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.opaque",
 		Value: "#ff0000", // Same color but fully opaque - should NOT match
 		Type:  "color",
-	})
+	}))
 
 	// Request presentations for semi-transparent red
 	// Alpha 0.5 will be converted to #ff000080 by csscolorparser
@@ -552,15 +552,15 @@ func TestDocumentColor_HTMLDocument(t *testing.T) {
 	glspCtx := &glsp.Context{}
 	req := types.NewRequestContext(ctx, glspCtx)
 
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
 		Value: "#ff0000",
 		Type:  "color",
-	})
+	}))
 
 	uri := "file:///test.html"
 	content := `<style>.btn { color: var(--color-primary); }</style>`
-	_ = ctx.DocumentManager().DidOpen(uri, "html", 1, content)
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "html", 1, content))
 
 	colors, err := DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
@@ -603,15 +603,15 @@ func TestDocumentColor_UnparseableColorInDeclaration(t *testing.T) {
 	req := types.NewRequestContext(ctx, glspCtx)
 
 	// Add a color token with an unparseable value
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.bad",
 		Value: "not-a-color!!",
 		Type:  "color",
-	})
+	}))
 
 	uri := "file:///test.css"
 	cssContent := `:root { --color-bad: something; }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
@@ -628,15 +628,15 @@ func TestDocumentColor_NonColorTokenInDeclaration(t *testing.T) {
 	req := types.NewRequestContext(ctx, glspCtx)
 
 	// Add a non-color token
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.small",
 		Value: "8px",
 		Type:  "dimension",
-	})
+	}))
 
 	uri := "file:///test.css"
 	cssContent := `:root { --spacing-small: 8px; }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
@@ -654,7 +654,7 @@ func TestDocumentColor_UnknownTokenInDeclaration(t *testing.T) {
 	// Don't add any tokens - --local-var is unknown
 	uri := "file:///test.css"
 	cssContent := `:root { --local-var: blue; }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
@@ -672,7 +672,7 @@ func TestDocumentColor_UnknownTokenInVarCall(t *testing.T) {
 	// No tokens loaded
 	uri := "file:///test.css"
 	cssContent := `.button { color: var(--unknown-thing); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
@@ -687,21 +687,21 @@ func TestDocumentColor_MultipleColorsAndNonColors(t *testing.T) {
 	glspCtx := &glsp.Context{}
 	req := types.NewRequestContext(ctx, glspCtx)
 
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
 		Value: "#ff0000",
 		Type:  "color",
-	})
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	}))
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.large",
 		Value: "2rem",
 		Type:  "dimension",
-	})
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	}))
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.secondary",
 		Value: "#0000ff",
 		Type:  "color",
-	})
+	}))
 
 	uri := "file:///test.css"
 	cssContent := `.card {
@@ -709,7 +709,7 @@ func TestDocumentColor_MultipleColorsAndNonColors(t *testing.T) {
   padding: var(--spacing-large);
   background: var(--color-secondary);
 }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
@@ -739,11 +739,11 @@ func TestColorPresentation_NoMatchingTokens(t *testing.T) {
 	glspCtx := &glsp.Context{}
 	req := types.NewRequestContext(ctx, glspCtx)
 
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
 		Value: "#ff0000",
 		Type:  "color",
-	})
+	}))
 
 	// Request presentations for green - no tokens should match
 	result, err := ColorPresentation(req, &protocol.ColorPresentationParams{
@@ -765,11 +765,11 @@ func TestColorPresentation_NonColorTokensIgnored(t *testing.T) {
 	glspCtx := &glsp.Context{}
 	req := types.NewRequestContext(ctx, glspCtx)
 
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.small",
 		Value: "8px",
 		Type:  "dimension",
-	})
+	}))
 
 	result, err := ColorPresentation(req, &protocol.ColorPresentationParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
@@ -790,11 +790,11 @@ func TestColorPresentation_UnparseableTokenColor(t *testing.T) {
 	glspCtx := &glsp.Context{}
 	req := types.NewRequestContext(ctx, glspCtx)
 
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.weird",
 		Value: "not-a-parseable-color",
 		Type:  "color",
-	})
+	}))
 
 	result, err := ColorPresentation(req, &protocol.ColorPresentationParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
@@ -816,15 +816,15 @@ func TestDocumentColor_JSDocument(t *testing.T) {
 	glspCtx := &glsp.Context{}
 	req := types.NewRequestContext(ctx, glspCtx)
 
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
 		Value: "#ff0000",
 		Type:  "color",
-	})
+	}))
 
 	uri := "file:///test.js"
 	content := "const s = css`\n  .card { color: var(--color-primary); }\n`;"
-	_ = ctx.DocumentManager().DidOpen(uri, "javascript", 1, content)
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "javascript", 1, content))
 
 	colors, err := DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
@@ -841,7 +841,7 @@ func TestDocumentColor_HTMLNoCSS(t *testing.T) {
 
 	uri := "file:///test.html"
 	content := `<p>Hello</p>`
-	_ = ctx.DocumentManager().DidOpen(uri, "html", 1, content)
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "html", 1, content))
 
 	colors, err := DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: uri},

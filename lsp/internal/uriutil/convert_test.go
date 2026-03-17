@@ -682,9 +682,9 @@ func TestHandleWindowsUNCPath_NonWindows(t *testing.T) {
 
 // TestURIToPath_NonFileScheme tests URIToPath with non-file schemes falls back
 func TestURIToPath_NonFileScheme(t *testing.T) {
-	// http scheme should trigger uriFallback
+	// http scheme should trigger uriFallback, returning the original URI
 	result := URIToPath("http://example.com/path")
-	assert.NotEmpty(t, result)
+	assert.Equal(t, "http://example.com/path", result)
 }
 
 // TestURIToPath_PercentEncodedSpecialChars tests percent-decoding in URIs
