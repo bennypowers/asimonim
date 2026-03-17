@@ -1,0 +1,14 @@
+{
+  "color-primary": {
+    "scope": "css,scss,less,stylus,postcss",
+    "prefix": [
+      "color-primary",
+      "colorPrimary",
+      "color_primary",
+      "FF0000"
+    ],
+    "body": [
+      "var(--color-primary)"
+    ]
+  }
+}

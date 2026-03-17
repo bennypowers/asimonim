@@ -1,0 +1,9 @@
+{
+  "color-text": {
+    "prefix": "color-text",
+    "body": [
+      "var(--color-text, light-dark(\n  var(--color-text-light, #000000),\n  var(--color-text-dark, #ffffff)\n))"
+    ],
+    "description": "Light text color"
+  }
+}

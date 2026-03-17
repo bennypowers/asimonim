@@ -91,7 +91,81 @@ func TestCustomHandler_DiagnosticMethod(t *testing.T) {
 		assert.True(t, validMethod, "Should pass through to base handler and recognize the method")
 	})
 
-	// NOTE: semanticTokens/delta test removed
-	// Delta support was disabled because the implementation lacks proper result caching
-	// and would corrupt client state. See custom_handler.go for details.
+	t.Run("initialize intercepts pull diagnostics detection", func(t *testing.T) {
+		// Create a handler with initialize set up
+		initHandler := &protocol.Handler{}
+		initHandler.Initialize = func(ctx *glsp.Context, params *protocol.InitializeParams) (any, error) {
+			return protocol.InitializeResult{
+				Capabilities: protocol.ServerCapabilities{},
+			}, nil
+		}
+
+		h := &CustomHandler{
+			Handler: initHandler,
+			server:  server,
+		}
+
+		// Send initialize with pull diagnostics capability
+		paramsJSON := []byte(`{
+			"capabilities": {
+				"textDocument": {
+					"diagnostic": {"dynamicRegistration": true}
+				}
+			}
+		}`)
+
+		ctx := &glsp.Context{
+			Method: "initialize",
+			Params: paramsJSON,
+		}
+
+		result, validMethod, _, err := h.Handle(ctx)
+		assert.True(t, validMethod)
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("semanticTokens/full/delta with valid params", func(t *testing.T) {
+		// Open the document so it can be found
+		server.DocumentManager().DidOpen("file:///test.css", "css", 1, ".btn { color: var(--c); }")
+
+		h := &CustomHandler{
+			Handler: &protocol.Handler{},
+			server:  server,
+		}
+
+		params := map[string]any{
+			"textDocument":     map[string]any{"uri": "file:///test.css"},
+			"previousResultId": "prev-id",
+		}
+		paramsJSON, err := json.Marshal(params)
+		require.NoError(t, err)
+
+		ctx := &glsp.Context{
+			Method: "textDocument/semanticTokens/full/delta",
+			Params: paramsJSON,
+		}
+
+		_, validMethod, validParams, err := h.Handle(ctx)
+		assert.True(t, validMethod)
+		assert.True(t, validParams)
+		assert.NoError(t, err)
+	})
+
+	t.Run("semanticTokens/full/delta with invalid JSON", func(t *testing.T) {
+		h := &CustomHandler{
+			Handler: &protocol.Handler{},
+			server:  server,
+		}
+
+		ctx := &glsp.Context{
+			Method: "textDocument/semanticTokens/full/delta",
+			Params: []byte(`{invalid`),
+		}
+
+		_, validMethod, validParams, err := h.Handle(ctx)
+		assert.True(t, validMethod)
+		assert.False(t, validParams)
+		assert.Error(t, err)
+	})
 }

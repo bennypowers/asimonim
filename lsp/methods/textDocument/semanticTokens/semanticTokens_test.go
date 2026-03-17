@@ -1,7 +1,9 @@
 package semantictokens_test
 
 import (
+	"strings"
 	"testing"
+
 
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
@@ -356,6 +358,266 @@ func TestSemanticTokensFullDelta_NonTokenFile(t *testing.T) {
 	if result != nil {
 		t.Errorf("Expected nil result for non-token file, got %v", result)
 	}
+}
+
+func TestSemanticTokensRange_FiltersTokensByRange(t *testing.T) {
+	s := testutil.NewMockServerContext()
+
+	// Add a test token
+	token := &tokens.Token{
+		Name:  "color-brand-primary",
+		Value: "#FF6B35",
+		Type:  "color",
+	}
+	if err := s.TokenManager().Add(token); err != nil {
+		t.Fatalf("Failed to add token: %v", err)
+	}
+
+	// Document with references on multiple lines
+	content := `{
+  "line1": "{color.brand.primary}",
+  "line2": "{color.brand.primary}",
+  "line3": "{color.brand.primary}"
+}`
+	uri := "file:///test.json"
+	_ = s.DocumentManager().DidOpen(uri, "json", 1, content)
+
+	req := types.NewRequestContext(s, nil)
+
+	// Request only tokens for line 2 (0-indexed)
+	result, err := semantictokens.SemanticTokensRange(req, &protocol.SemanticTokensRangeParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		Range: protocol.Range{
+			Start: protocol.Position{Line: 2, Character: 0},
+			End:   protocol.Position{Line: 2, Character: 100},
+		},
+	})
+
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if result == nil { t.Fatal("expected non-nil result") }
+	// line 2 has 3 tokens: "color", "brand", "primary"
+	if len(result.Data) != 15 { t.Errorf("Expected 3 tokens (15 uint32 values) for line 2, got %d", len(result.Data)) }
+}
+
+func TestSemanticTokensRange_EmptyRangeReturnsEmptyData(t *testing.T) {
+	s := testutil.NewMockServerContext()
+
+	// Add a test token
+	token := &tokens.Token{
+		Name:  "color-brand-primary",
+		Value: "#FF6B35",
+		Type:  "color",
+	}
+	if err := s.TokenManager().Add(token); err != nil {
+		t.Fatalf("Failed to add token: %v", err)
+	}
+
+	content := `{
+  "secondary": {
+    "$value": "{color.brand.primary}"
+  }
+}`
+	uri := "file:///test.json"
+	_ = s.DocumentManager().DidOpen(uri, "json", 1, content)
+
+	req := types.NewRequestContext(s, nil)
+
+	// Request a range that has no tokens (line 0, the opening brace)
+	result, err := semantictokens.SemanticTokensRange(req, &protocol.SemanticTokensRangeParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		Range: protocol.Range{
+			Start: protocol.Position{Line: 0, Character: 0},
+			End:   protocol.Position{Line: 0, Character: 10},
+		},
+	})
+
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if result == nil { t.Fatal("expected non-nil result") }
+	if len(result.Data) != 0 { t.Errorf("expected empty data, got %d elements", len(result.Data)) }
+}
+
+func TestSemanticTokensRange_DocumentNotFound(t *testing.T) {
+	s := testutil.NewMockServerContext()
+
+	req := types.NewRequestContext(s, nil)
+
+	_, err := semantictokens.SemanticTokensRange(req, &protocol.SemanticTokensRangeParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///nonexistent.json"},
+		Range: protocol.Range{
+			Start: protocol.Position{Line: 0, Character: 0},
+			End:   protocol.Position{Line: 10, Character: 0},
+		},
+	})
+
+	if err == nil { t.Fatal("expected error") }
+}
+
+func TestSemanticTokensRange_FiltersStartCharOnStartLine(t *testing.T) {
+	s := testutil.NewMockServerContext()
+
+	token := &tokens.Token{
+		Name:  "color-brand-primary",
+		Value: "#FF6B35",
+		Type:  "color",
+	}
+	if err := s.TokenManager().Add(token); err != nil {
+		t.Fatalf("Failed to add token: %v", err)
+	}
+
+	// Reference "{color.brand.primary}" -- the parts start at char 16 in this layout
+	content := `{
+  "secondary": {
+    "$value": "{color.brand.primary}"
+  }
+}`
+	uri := "file:///test.json"
+	_ = s.DocumentManager().DidOpen(uri, "json", 1, content)
+
+	req := types.NewRequestContext(s, nil)
+
+	// Request range starting after the first token ("color" starts at char 16)
+	// so only "brand" and "primary" should be included
+	result, err := semantictokens.SemanticTokensRange(req, &protocol.SemanticTokensRangeParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		Range: protocol.Range{
+			Start: protocol.Position{Line: 2, Character: 22}, // after "color" part
+			End:   protocol.Position{Line: 2, Character: 100},
+		},
+	})
+
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if result == nil { t.Fatal("expected non-nil result") }
+	// Should have 2 tokens: "brand" and "primary" (10 uint32 values)
+	if len(result.Data) != 10 { t.Errorf("Expected 2 tokens (10 uint32 values) after filtering by start char, got %d", len(result.Data)) }
+}
+
+func TestSemanticTokensRange_FiltersEndCharOnEndLine(t *testing.T) {
+	s := testutil.NewMockServerContext()
+
+	token := &tokens.Token{
+		Name:  "color-brand-primary",
+		Value: "#FF6B35",
+		Type:  "color",
+	}
+	if err := s.TokenManager().Add(token); err != nil {
+		t.Fatalf("Failed to add token: %v", err)
+	}
+
+	content := `{
+  "secondary": {
+    "$value": "{color.brand.primary}"
+  }
+}`
+	uri := "file:///test.json"
+	_ = s.DocumentManager().DidOpen(uri, "json", 1, content)
+
+	req := types.NewRequestContext(s, nil)
+
+	// Request range ending before "primary" (which starts at char 28)
+	result, err := semantictokens.SemanticTokensRange(req, &protocol.SemanticTokensRangeParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		Range: protocol.Range{
+			Start: protocol.Position{Line: 2, Character: 0},
+			End:   protocol.Position{Line: 2, Character: 22}, // before "brand"
+		},
+	})
+
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if result == nil { t.Fatal("expected non-nil result") }
+	// Should have only 1 token: "color" (5 uint32 values)
+	if len(result.Data) != 5 { t.Errorf("Expected 1 token (5 uint32 values) after filtering by end char, got %d", len(result.Data)) }
+}
+
+func TestSemanticTokensFull_NonJSONYAMLLanguage(t *testing.T) {
+	s := testutil.NewMockServerContext()
+
+	// Open a CSS document
+	uri := "file:///test.css"
+	_ = s.DocumentManager().DidOpen(uri, "css", 1, ".foo { color: red; }")
+
+	req := types.NewRequestContext(s, nil)
+	result, err := semantictokens.SemanticTokensFull(req, &protocol.SemanticTokensParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+	})
+
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if result != nil { t.Errorf("Should return nil for non-JSON/YAML files") }
+}
+
+func TestSemanticTokensFull_NonTokenFile(t *testing.T) {
+	s := testutil.NewMockServerContext()
+	s.ShouldProcessAsTokenFileFunc = func(uri string) bool { return false }
+
+	uri := "file:///package.json"
+	_ = s.DocumentManager().DidOpen(uri, "json", 1, `{"name": "test"}`)
+
+	req := types.NewRequestContext(s, nil)
+	result, err := semantictokens.SemanticTokensFull(req, &protocol.SemanticTokensParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+	})
+
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if result != nil { t.Errorf("Should return nil for non-token files") }
+}
+
+func TestSemanticTokensFull_DocumentNotFound(t *testing.T) {
+	s := testutil.NewMockServerContext()
+
+	req := types.NewRequestContext(s, nil)
+	_, err := semantictokens.SemanticTokensFull(req, &protocol.SemanticTokensParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///nonexistent.json"},
+	})
+
+	if err == nil { t.Fatal("expected error") }
+}
+
+func TestEncodeSemanticTokens_NegativeValues(t *testing.T) {
+	// Negative line value should cause an error
+	tokens := []semantictokens.SemanticTokenIntermediate{
+		{Line: -1, StartChar: 0, Length: 5, TokenType: 0, TokenModifiers: 0},
+	}
+
+	_, err := semantictokens.EncodeSemanticTokens(tokens)
+	if err == nil { t.Fatal("expected error") }
+	if !strings.Contains(err.Error(), "negative") { t.Errorf("expected error containing %q, got %q", "negative", err.Error()) }
+}
+
+func TestEncodeSemanticTokens_NegativeLength(t *testing.T) {
+	tokens := []semantictokens.SemanticTokenIntermediate{
+		{Line: 0, StartChar: 0, Length: -1, TokenType: 0, TokenModifiers: 0},
+	}
+
+	_, err := semantictokens.EncodeSemanticTokens(tokens)
+	if err == nil { t.Fatal("expected error") }
+	if !strings.Contains(err.Error(), "negative") { t.Errorf("expected error containing %q, got %q", "negative", err.Error()) }
+}
+
+func TestEncodeSemanticTokens_NegativeTokenType(t *testing.T) {
+	tokens := []semantictokens.SemanticTokenIntermediate{
+		{Line: 0, StartChar: 0, Length: 5, TokenType: -1, TokenModifiers: 0},
+	}
+
+	_, err := semantictokens.EncodeSemanticTokens(tokens)
+	if err == nil { t.Fatal("expected error") }
+	if !strings.Contains(err.Error(), "negative") { t.Errorf("expected error containing %q, got %q", "negative", err.Error()) }
+}
+
+func TestEncodeSemanticTokens_NegativeTokenModifiers(t *testing.T) {
+	tokens := []semantictokens.SemanticTokenIntermediate{
+		{Line: 0, StartChar: 0, Length: 5, TokenType: 0, TokenModifiers: -1},
+	}
+
+	_, err := semantictokens.EncodeSemanticTokens(tokens)
+	if err == nil { t.Fatal("expected error") }
+	if !strings.Contains(err.Error(), "negative") { t.Errorf("expected error containing %q, got %q", "negative", err.Error()) }
+}
+
+func TestEncodeSemanticTokens_EmptyInput(t *testing.T) {
+	tokens := []semantictokens.SemanticTokenIntermediate{}
+
+	data, err := semantictokens.EncodeSemanticTokens(tokens)
+	if err != nil { t.Fatalf("unexpected error: %v", err) }
+	if len(data) != 0 { t.Errorf("expected empty data, got %d elements", len(data)) }
 }
 
 func TestSemanticTokensFull_ReturnsResultID(t *testing.T) {

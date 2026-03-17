@@ -47,6 +47,128 @@ func TestDependencyGraph_Cycle(t *testing.T) {
 	}
 }
 
+func TestDependencyGraph_Dependencies(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "a", Value: "1"},
+		{Name: "b", Value: "{a}"},
+		{Name: "c", Value: "{a} and {b}"},
+	}
+
+	graph := resolver.BuildDependencyGraph(tokens)
+
+	// "a" has no dependencies
+	aDeps := graph.Dependencies("a")
+	if len(aDeps) != 0 {
+		t.Errorf("expected 0 dependencies for 'a', got %d", len(aDeps))
+	}
+
+	// "b" depends on "a"
+	bDeps := graph.Dependencies("b")
+	if len(bDeps) != 1 || bDeps[0] != "a" {
+		t.Errorf("expected [a] for 'b' dependencies, got %v", bDeps)
+	}
+
+	// "c" depends on "a" and "b"
+	cDeps := graph.Dependencies("c")
+	if len(cDeps) != 2 {
+		t.Errorf("expected 2 dependencies for 'c', got %d", len(cDeps))
+	}
+
+	// non-existent node
+	xDeps := graph.Dependencies("nonexistent")
+	if len(xDeps) != 0 {
+		t.Errorf("expected 0 dependencies for nonexistent, got %d", len(xDeps))
+	}
+}
+
+func TestDependencyGraph_Dependents(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "a", Value: "1"},
+		{Name: "b", Value: "{a}"},
+		{Name: "c", Value: "{a}"},
+	}
+
+	graph := resolver.BuildDependencyGraph(tokens)
+
+	// "a" is depended on by "b" and "c"
+	aDependents := graph.Dependents("a")
+	if len(aDependents) != 2 {
+		t.Errorf("expected 2 dependents for 'a', got %d", len(aDependents))
+	}
+
+	// "b" has no dependents
+	bDependents := graph.Dependents("b")
+	if len(bDependents) != 0 {
+		t.Errorf("expected 0 dependents for 'b', got %d", len(bDependents))
+	}
+
+	// non-existent node
+	xDependents := graph.Dependents("nonexistent")
+	if len(xDependents) != 0 {
+		t.Errorf("expected 0 dependents for nonexistent, got %d", len(xDependents))
+	}
+}
+
+func TestDependencyGraph_TopologicalSort(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "a", Value: "1"},
+		{Name: "b", Value: "{a}"},
+		{Name: "c", Value: "{b}"},
+	}
+
+	graph := resolver.BuildDependencyGraph(tokens)
+
+	sorted, err := graph.TopologicalSort()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(sorted) != 3 {
+		t.Fatalf("expected 3 nodes in sort, got %d", len(sorted))
+	}
+
+	// "a" must appear before "b", and "b" before "c"
+	indexOf := make(map[string]int)
+	for i, name := range sorted {
+		indexOf[name] = i
+	}
+
+	if indexOf["a"] > indexOf["b"] {
+		t.Errorf("'a' should appear before 'b' in topological sort")
+	}
+	if indexOf["b"] > indexOf["c"] {
+		t.Errorf("'b' should appear before 'c' in topological sort")
+	}
+}
+
+func TestDependencyGraph_TopologicalSort_Cycle(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "a", Value: "{b}"},
+		{Name: "b", Value: "{a}"},
+	}
+
+	graph := resolver.BuildDependencyGraph(tokens)
+
+	_, err := graph.TopologicalSort()
+	if err == nil {
+		t.Error("expected error for cyclic graph")
+	}
+}
+
+func TestDependencyGraph_JSONPointerRef(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "color-primary", Value: "#FF6B35", SchemaVersion: schema.V2025_10},
+		{Name: "color-secondary", Value: "#/color/primary", SchemaVersion: schema.V2025_10},
+	}
+
+	graph := resolver.BuildDependencyGraph(tokens)
+
+	deps := graph.Dependencies("color-secondary")
+	if len(deps) != 1 || deps[0] != "color-primary" {
+		t.Errorf("expected [color-primary], got %v", deps)
+	}
+}
+
 func TestResolveAliases(t *testing.T) {
 	tokens := []*token.Token{
 		{Name: "base", Value: "#FF6B35"},

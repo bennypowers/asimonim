@@ -354,6 +354,52 @@ func TestStringColorValue_IsValid(t *testing.T) {
 	}
 }
 
+func TestClamp_EdgeCases(t *testing.T) {
+	// clamp is unexported; test via toHex with out-of-range sRGB components
+	tests := []struct {
+		name       string
+		components []any
+		expected   string
+	}{
+		{
+			name:       "values above 1.0 clamp to 255",
+			components: []any{1.5, 2.0, 1.1},
+			expected:   "#FFFFFF",
+		},
+		{
+			name:       "negative values clamp to 0",
+			components: []any{-0.5, -1.0, -0.1},
+			expected:   "#000000",
+		},
+		{
+			name:       "mixed clamping",
+			components: []any{-0.1, 0.5, 1.5},
+			expected:   "#0080FF",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			color := &common.ObjectColorValue{
+				ColorSpace: "srgb",
+				Components: tt.components,
+				Schema:     schema.V2025_10,
+			}
+			result := color.ToCSS()
+			if result != tt.expected {
+				t.Errorf("ToCSS() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseColorValue_UnknownVersion(t *testing.T) {
+	_, err := common.ParseColorValue("#FF0000", schema.Unknown)
+	if err == nil {
+		t.Error("expected error for unknown schema version")
+	}
+}
+
 func TestObjectColorValue_IsValid(t *testing.T) {
 	valid := &common.ObjectColorValue{
 		ColorSpace: "srgb",

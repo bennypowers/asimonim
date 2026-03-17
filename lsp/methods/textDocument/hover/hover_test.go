@@ -1121,6 +1121,370 @@ func parseTokensFile(t *testing.T, path string) map[string]*tokens.Token {
 	return byName
 }
 
+// TestHover_PlaintextUnknownToken tests the plaintext template for unknown tokens
+func TestHover_PlaintextUnknownToken(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	ctx.SetPreferredHoverFormat(protocol.MarkupKindPlainText)
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	uri := "file:///test.css"
+	cssContent := `.button { color: var(--unknown-token); }`
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
+
+	// unknown token with plaintext format
+	hover, err := Hover(req, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 0, Character: 28},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, hover)
+
+	content, ok := hover.Contents.(protocol.MarkupContent)
+	require.True(t, ok)
+	assert.Equal(t, protocol.MarkupKindPlainText, content.Kind)
+	assert.Contains(t, content.Value, "Unknown token")
+	assert.NotContains(t, content.Value, "**") // no markdown formatting
+}
+
+// TestHover_IsTokenFile_JSONC tests that jsonc files are recognized as token files
+func TestHover_IsTokenFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		langID   string
+		expected bool
+	}{
+		{"json", "json", true},
+		{"jsonc", "jsonc", true},
+		{"yaml", "yaml", true},
+		{"css", "css", false},
+		{"html", "html", false},
+		{"javascript", "javascript", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, isTokenFile(tt.langID))
+		})
+	}
+}
+
+// TestCalculateRangeSize tests calculateRangeSize for single-line and multi-line ranges
+func TestCalculateRangeSize(t *testing.T) {
+	t.Run("single line range", func(t *testing.T) {
+		r := css.Range{
+			Start: css.Position{Line: 0, Character: 5},
+			End:   css.Position{Line: 0, Character: 25},
+		}
+		// single line: just character difference = 20
+		assert.Equal(t, 20, calculateRangeSize(r))
+	})
+
+	t.Run("multi-line range", func(t *testing.T) {
+		r := css.Range{
+			Start: css.Position{Line: 0, Character: 10},
+			End:   css.Position{Line: 2, Character: 5},
+		}
+		// multi-line: 2*10000 + (5-10) = 19995
+		size := calculateRangeSize(r)
+		assert.Greater(t, size, 10000, "Multi-line range should be large")
+	})
+}
+
+// TestExtractColorDetails tests extractColorDetails with various edge cases
+func TestExtractColorDetails(t *testing.T) {
+	t.Run("non-color type returns nil", func(t *testing.T) {
+		token := &tokens.Token{
+			Name: "spacing.small",
+			Type: "dimension",
+			RawValue: map[string]any{
+				"colorSpace": "srgb",
+				"components": []any{1.0, 0.0, 0.0},
+			},
+		}
+		assert.Nil(t, extractColorDetails(token))
+	})
+
+	t.Run("string value returns nil", func(t *testing.T) {
+		// draft schema: color value is a string, not a map
+		token := &tokens.Token{
+			Name:     "color.simple",
+			Type:     "color",
+			RawValue: "#ff0000",
+		}
+		assert.Nil(t, extractColorDetails(token))
+	})
+
+	t.Run("missing colorSpace returns nil", func(t *testing.T) {
+		token := &tokens.Token{
+			Name: "color.bad",
+			Type: "color",
+			RawValue: map[string]any{
+				"components": []any{1.0, 0.0, 0.0},
+			},
+		}
+		assert.Nil(t, extractColorDetails(token))
+	})
+
+	t.Run("missing components returns nil", func(t *testing.T) {
+		token := &tokens.Token{
+			Name: "color.bad",
+			Type: "color",
+			RawValue: map[string]any{
+				"colorSpace": "srgb",
+			},
+		}
+		assert.Nil(t, extractColorDetails(token))
+	})
+
+	t.Run("uses resolved value when available", func(t *testing.T) {
+		token := &tokens.Token{
+			Name:       "color.alias",
+			Type:       "color",
+			IsResolved: true,
+			ResolvedValue: map[string]any{
+				"colorSpace": "display-p3",
+				"components": []any{0.5, 0.3, 0.1},
+				"alpha":      0.8,
+			},
+		}
+		cd := extractColorDetails(token)
+		require.NotNil(t, cd)
+		assert.Equal(t, "display-p3", cd.ColorSpace)
+		assert.Equal(t, "0.5, 0.3, 0.1", cd.Components)
+		assert.Equal(t, "0.8", cd.Alpha)
+	})
+
+	t.Run("color with hex field", func(t *testing.T) {
+		token := &tokens.Token{
+			Name: "color.brand",
+			Type: "color",
+			RawValue: map[string]any{
+				"colorSpace": "srgb",
+				"components": []any{1.0, 0.0, 0.0},
+				"hex":        "#ff0000",
+			},
+		}
+		cd := extractColorDetails(token)
+		require.NotNil(t, cd)
+		assert.Equal(t, "#ff0000", cd.Hex)
+	})
+}
+
+// TestFormatComponents tests formatComponents with various component types
+func TestFormatComponents(t *testing.T) {
+	t.Run("float64 components", func(t *testing.T) {
+		result := formatComponents([]any{1.0, 0.5, 0.0})
+		assert.Equal(t, "1, 0.5, 0", result)
+	})
+
+	t.Run("string components like none", func(t *testing.T) {
+		result := formatComponents([]any{0.5, 0.3, "none"})
+		assert.Equal(t, "0.5, 0.3, none", result)
+	})
+
+	t.Run("other types use default formatting", func(t *testing.T) {
+		// integer component (not float64 or string)
+		result := formatComponents([]any{42, true})
+		assert.Equal(t, "42, true", result)
+	})
+}
+
+// TestFindInnermostVarCall tests finding the innermost var() call at a position
+func TestFindInnermostVarCall(t *testing.T) {
+	t.Run("returns nil for empty list", func(t *testing.T) {
+		result := findInnermostVarCall(protocol.Position{Line: 0, Character: 5}, nil)
+		assert.Nil(t, result)
+	})
+
+	t.Run("returns nil when no var call contains position", func(t *testing.T) {
+		varCalls := []*css.VarCall{
+			{
+				TokenName: "--color-primary",
+				Range: css.Range{
+					Start: css.Position{Line: 0, Character: 10},
+					End:   css.Position{Line: 0, Character: 30},
+				},
+			},
+		}
+		result := findInnermostVarCall(protocol.Position{Line: 0, Character: 5}, varCalls)
+		assert.Nil(t, result)
+	})
+
+	t.Run("returns innermost when nested", func(t *testing.T) {
+		// outer: var(--outer, var(--inner))
+		outerCall := &css.VarCall{
+			TokenName: "--outer",
+			Range: css.Range{
+				Start: css.Position{Line: 0, Character: 5},
+				End:   css.Position{Line: 0, Character: 50},
+			},
+		}
+		innerCall := &css.VarCall{
+			TokenName: "--inner",
+			Range: css.Range{
+				Start: css.Position{Line: 0, Character: 20},
+				End:   css.Position{Line: 0, Character: 40},
+			},
+		}
+
+		// position inside both ranges, should return inner (smaller)
+		result := findInnermostVarCall(protocol.Position{Line: 0, Character: 25}, []*css.VarCall{outerCall, innerCall})
+		require.NotNil(t, result)
+		assert.Equal(t, "--inner", result.TokenName)
+	})
+}
+
+// TestFindInnermostVariable tests finding the innermost variable declaration at a position
+func TestFindInnermostVariable(t *testing.T) {
+	t.Run("returns nil for empty list", func(t *testing.T) {
+		result := findInnermostVariable(protocol.Position{Line: 0, Character: 5}, nil)
+		assert.Nil(t, result)
+	})
+
+	t.Run("returns variable when position is inside", func(t *testing.T) {
+		variables := []*css.Variable{
+			{
+				Name: "--color-primary",
+				Range: css.Range{
+					Start: css.Position{Line: 1, Character: 2},
+					End:   css.Position{Line: 1, Character: 17},
+				},
+			},
+		}
+		result := findInnermostVariable(protocol.Position{Line: 1, Character: 5}, variables)
+		require.NotNil(t, result)
+		assert.Equal(t, "--color-primary", result.Name)
+	})
+}
+
+// TestHover_TokenFileHover_PlaintextFormat tests plaintext hover for token references
+func TestHover_TokenFileHover_PlaintextFormat(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	ctx.SetPreferredHoverFormat(protocol.MarkupKindPlainText)
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
+		Name:        "color-primary",
+		Value:       "#ff0000",
+		Type:        "color",
+		Description: "Primary brand color",
+	}))
+
+	uri := "file:///tokens.json"
+	jsonContent := `{
+  "color": {
+    "secondary": {
+      "$value": "{color.primary}"
+    }
+  }
+}`
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "json", 1, jsonContent))
+
+	hover, err := Hover(req, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 3, Character: 20},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, hover)
+
+	content, ok := hover.Contents.(protocol.MarkupContent)
+	require.True(t, ok)
+	assert.Equal(t, protocol.MarkupKindPlainText, content.Kind)
+	assert.NotContains(t, content.Value, "**") // no markdown
+	assert.Contains(t, content.Value, "Value (CSS):")
+}
+
+// TestHover_PlaintextUnknownTokenRef tests the plaintext unknown token message for token references
+func TestHover_PlaintextUnknownTokenRef(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	ctx.SetPreferredHoverFormat(protocol.MarkupKindPlainText)
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	uri := "file:///tokens.json"
+	jsonContent := `{
+  "color": {
+    "alias": {
+      "$value": "{unknown.token}"
+    }
+  }
+}`
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "json", 1, jsonContent))
+
+	hover, err := Hover(req, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 3, Character: 20},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, hover)
+
+	content, ok := hover.Contents.(protocol.MarkupContent)
+	require.True(t, ok)
+	assert.Equal(t, protocol.MarkupKindPlainText, content.Kind)
+	assert.Contains(t, content.Value, "Unknown token")
+	assert.NotContains(t, content.Value, "**")
+}
+
+// TestHover_UnsupportedLanguage tests that hover returns nil for unsupported languages
+func TestHover_UnsupportedLanguage(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	uri := "file:///test.py"
+	content := `print("hello")`
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "python", 1, content))
+
+	hover, err := Hover(req, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 0, Character: 5},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Nil(t, hover)
+}
+
+// TestIsPositionInRange_MultiLine tests isPositionInRange with multi-line ranges
+func TestIsPositionInRange_MultiLine(t *testing.T) {
+	// Multi-line range: from line 1 char 5 to line 3 char 10
+	r := css.Range{
+		Start: css.Position{Line: 1, Character: 5},
+		End:   css.Position{Line: 3, Character: 10},
+	}
+
+	tests := []struct {
+		name     string
+		pos      protocol.Position
+		expected bool
+	}{
+		{"before start line", protocol.Position{Line: 0, Character: 5}, false},
+		{"on start line, before start char", protocol.Position{Line: 1, Character: 4}, false},
+		{"on start line, at start char", protocol.Position{Line: 1, Character: 5}, true},
+		{"on middle line", protocol.Position{Line: 2, Character: 0}, true},
+		{"on end line, before end char", protocol.Position{Line: 3, Character: 5}, true},
+		{"on end line, at end char (excluded)", protocol.Position{Line: 3, Character: 10}, false},
+		{"after end line", protocol.Position{Line: 4, Character: 0}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, isPositionInRange(tt.pos, r))
+		})
+	}
+}
+
 func TestRenderTokenHover_StructuredColor(t *testing.T) {
 	tokens2025 := parseTokensFile(t, "testdata/tokens-2025.json")
 	tokensDraft := parseTokensFile(t, "testdata/tokens-draft.json")

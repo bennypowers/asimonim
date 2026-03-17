@@ -630,6 +630,159 @@ func TestToken_DisplayValue(t *testing.T) {
 			},
 			expected: "150ms cubic-bezier(0, 0, 1, 1)",
 		},
+		// Edge cases: nil value
+		{
+			name:     "nil value returns empty",
+			token:    token.Token{Type: token.TypeColor},
+			expected: "",
+		},
+		// Edge cases: non-map dimension
+		{
+			name: "non-map dimension value falls back to JSON",
+			token: token.Token{
+				Type:     token.TypeDimension,
+				RawValue: 42,
+			},
+			expected: "42",
+		},
+		// Edge cases: non-map duration
+		{
+			name: "non-map duration value falls back to JSON",
+			token: token.Token{
+				Type:     token.TypeDuration,
+				RawValue: 100,
+			},
+			expected: "100",
+		},
+		// Edge cases: wrong array length for cubic bezier
+		{
+			name: "cubic bezier wrong length falls back to JSON",
+			token: token.Token{
+				Type:     token.TypeCubicBezier,
+				RawValue: []any{0.5, 0.5},
+			},
+			expected: "[0.5,0.5]",
+		},
+		// Edge cases: non-numeric cubic bezier elements
+		{
+			name: "cubic bezier non-numeric falls back to JSON",
+			token: token.Token{
+				Type:     token.TypeCubicBezier,
+				RawValue: []any{"a", "b", "c", "d"},
+			},
+			expected: `["a","b","c","d"]`,
+		},
+		// Edge cases: empty font family array
+		{
+			name: "font family empty array falls back to JSON",
+			token: token.Token{
+				Type:     token.TypeFontFamily,
+				RawValue: []any{},
+			},
+			expected: "[]",
+		},
+		// Edge cases: border with structured color
+		{
+			name: "border with structured color map",
+			token: token.Token{
+				Type: token.TypeBorder,
+				RawValue: map[string]any{
+					"width": "1px",
+					"style": "solid",
+					"color": map[string]any{
+						"colorSpace": "srgb",
+						"components": []any{1.0, 0.0, 0.0},
+						"alpha":      1.0,
+						"hex":        "#FF0000",
+					},
+				},
+				SchemaVersion: schema.V2025_10,
+			},
+			expected: "1px solid #FF0000",
+		},
+		// Edge cases: border with strokeStyle object
+		{
+			name: "border with strokeStyle dashArray",
+			token: token.Token{
+				Type: token.TypeBorder,
+				RawValue: map[string]any{
+					"width": "2px",
+					"style": map[string]any{
+						"dashArray": []any{"4px", "2px"},
+					},
+					"color": "#000",
+				},
+				SchemaVersion: schema.V2025_10,
+			},
+			expected: "2px dash:[4px 2px] #000",
+		},
+		// Edge cases: shadow with structured color
+		{
+			name: "shadow with structured color in map",
+			token: token.Token{
+				Type: token.TypeShadow,
+				RawValue: map[string]any{
+					"offsetX": "0px",
+					"offsetY": "4px",
+					"blur":    "8px",
+					"color": map[string]any{
+						"colorSpace": "srgb",
+						"components": []any{0.0, 0.0, 0.0},
+						"alpha":      1.0,
+						"hex":        "#000000",
+					},
+				},
+				SchemaVersion: schema.V2025_10,
+			},
+			expected: "0px 4px 8px #000000",
+		},
+		// Edge cases: transition with zero delay
+		{
+			name: "transition with zero delay omits delay",
+			token: token.Token{
+				Type: token.TypeTransition,
+				RawValue: map[string]any{
+					"duration":       "200ms",
+					"timingFunction": "ease",
+					"delay":          "0ms",
+				},
+			},
+			expected: "200ms ease",
+		},
+		// Edge cases: missing required fields
+		{
+			name: "border missing width returns empty, falls back to JSON",
+			token: token.Token{
+				Type: token.TypeBorder,
+				RawValue: map[string]any{
+					"style": "solid",
+					"color": "#000",
+				},
+			},
+			expected: `{"color":"#000","style":"solid"}`,
+		},
+		// Edge cases: transition missing duration
+		{
+			name: "transition missing duration returns empty, falls back to JSON",
+			token: token.Token{
+				Type: token.TypeTransition,
+				RawValue: map[string]any{
+					"timingFunction": "ease",
+				},
+			},
+			expected: `{"timingFunction":"ease"}`,
+		},
+		// Edge cases: dimension missing unit
+		{
+			name: "dimension missing unit falls back to JSON",
+			token: token.Token{
+				Type: token.TypeDimension,
+				RawValue: map[string]any{
+					"value": 16,
+				},
+			},
+			expected: `{"value":16}`,
+		},
 	}
 
 	for _, tt := range tests {

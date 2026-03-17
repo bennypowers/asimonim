@@ -354,7 +354,7 @@ func findSubstringRanges(content, substring string) []protocol.Range {
 }
 
 // findTokenDefinitionRange finds the range of a token definition in a JSON/YAML file
-func findTokenDefinitionRange(content string, path []string, languageID string) protocol.Range {
+func findTokenDefinitionRange(content string, path []string, _ string) protocol.Range {
 	// Simple approach: find the last key in the path
 	if len(path) == 0 {
 		return protocol.Range{

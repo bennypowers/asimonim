@@ -238,6 +238,135 @@ func TestParseVarFunctionWithNestedCommasInFallback(t *testing.T) {
 	assert.Equal(t, "1px 2px rgba(0, 0, 0, 0.5)", *varCall.Fallback)
 }
 
+// TestParserClose tests the Close method
+func TestParserClose(t *testing.T) {
+	parser := css.AcquireParser()
+	// Close should not panic
+	parser.Close()
+}
+
+// TestClosePool tests the ClosePool method drains the pool
+func TestClosePool(t *testing.T) {
+	// Put a couple parsers in the pool
+	p1 := css.AcquireParser()
+	p2 := css.AcquireParser()
+	css.ReleaseParser(p1)
+	css.ReleaseParser(p2)
+
+	// Drain pool - should not panic
+	css.ClosePool()
+
+	// Pool should still work after draining (New func is restored)
+	p3 := css.AcquireParser()
+	defer css.ReleaseParser(p3)
+	result, err := p3.Parse(`.btn { color: var(--c); }`)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.VarCalls)
+}
+
+// TestReleaseNilParser tests that releasing a nil parser does not panic
+func TestReleaseNilParser(t *testing.T) {
+	// Should not panic
+	css.ReleaseParser(nil)
+}
+
+// TestParseNonCustomPropertyDeclaration tests that regular CSS properties are skipped
+func TestParseNonCustomPropertyDeclaration(t *testing.T) {
+	cssCode := `.button {
+  color: red;
+  font-size: 16px;
+}`
+
+	parser := css.AcquireParser()
+	defer css.ReleaseParser(parser)
+	result, err := parser.Parse(cssCode)
+	require.NoError(t, err)
+
+	// Should find no variables (only custom properties count)
+	assert.Empty(t, result.Variables, "Regular CSS properties should not be counted as variables")
+	assert.Empty(t, result.VarCalls, "No var() calls in this CSS")
+}
+
+// TestParseNonVarFunctionCall tests that non-var() function calls are ignored
+func TestParseNonVarFunctionCall(t *testing.T) {
+	cssCode := `.button {
+  color: rgb(255, 0, 0);
+  background: linear-gradient(to right, red, blue);
+  transform: translateX(10px);
+}`
+
+	parser := css.AcquireParser()
+	defer css.ReleaseParser(parser)
+	result, err := parser.Parse(cssCode)
+	require.NoError(t, err)
+
+	// Should find no var() calls (rgb, linear-gradient, translateX are not var)
+	assert.Empty(t, result.VarCalls, "Non-var() function calls should be ignored")
+}
+
+// TestParseVarWithoutArguments tests var() with empty arguments
+func TestParseVarWithoutArguments(t *testing.T) {
+	// This is technically invalid CSS but tree-sitter is tolerant
+	cssCode := `.button {
+  color: var();
+}`
+
+	parser := css.AcquireParser()
+	defer css.ReleaseParser(parser)
+	result, err := parser.Parse(cssCode)
+	require.NoError(t, err)
+
+	// var() with no arguments should be skipped (tokenName will be "")
+	assert.Empty(t, result.VarCalls, "var() with no arguments should produce no var calls")
+}
+
+// TestParseDeclarationWithNoValue tests a custom property with no value node
+func TestParseDeclarationWithNoValue(t *testing.T) {
+	// Custom property declaration without a recognized value node
+	cssCode := `:root {
+  --empty-var: ;
+}`
+
+	parser := css.AcquireParser()
+	defer css.ReleaseParser(parser)
+	result, err := parser.Parse(cssCode)
+	require.NoError(t, err)
+
+	// Should still find the variable declaration even with empty value
+	found := false
+	for _, v := range result.Variables {
+		if v.Name == "--empty-var" {
+			found = true
+			assert.Equal(t, "", v.Value, "Empty value should be empty string")
+		}
+	}
+	assert.True(t, found, "Should find --empty-var declaration")
+}
+
+// TestParseMultilineDeclaration tests CSS with multi-line content
+func TestParseMultilineDeclaration(t *testing.T) {
+	cssCode := `:root {
+  --color-primary: #0000ff;
+}
+
+.button {
+  color: var(--color-primary);
+}
+
+.card {
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}`
+
+	parser := css.AcquireParser()
+	defer css.ReleaseParser(parser)
+	result, err := parser.Parse(cssCode)
+	require.NoError(t, err)
+
+	assert.Len(t, result.Variables, 1)
+	assert.Len(t, result.VarCalls, 3, "Should find 3 var() calls across multiple rules")
+}
+
 // TestParseVarFunctionWithComplexFontFallback tests various font-family patterns
 func TestParseVarFunctionWithComplexFontFallback(t *testing.T) {
 	testCases := []struct {

@@ -322,6 +322,306 @@ func TestComputeRowsWithNewFields(t *testing.T) {
 	}
 }
 
+func TestColumnWidths(t *testing.T) {
+	rows := []Row{
+		{Name: "--color-primary", Type: "color", Value: "#FF6B35"},
+		{Name: "--spacing-small", Type: "dimension", Value: "4px"},
+		{Name: "--a-very-long-name", Type: "a-long-type", Value: "a moderately long value"},
+	}
+
+	nameW, typeW, valW := ColumnWidths(rows)
+
+	// --a-very-long-name is 18 chars
+	if nameW != 18 {
+		t.Errorf("nameW = %d, want 18", nameW)
+	}
+	// "a-long-type" is 11 chars
+	if typeW != 11 {
+		t.Errorf("typeW = %d, want 11", typeW)
+	}
+	// "a moderately long value" is 23 chars
+	if valW != 23 {
+		t.Errorf("valW = %d, want 23", valW)
+	}
+}
+
+func TestColumnWidths_Empty(t *testing.T) {
+	nameW, typeW, valW := ColumnWidths(nil)
+	// minimums for headers
+	if nameW != 4 {
+		t.Errorf("nameW = %d, want 4", nameW)
+	}
+	if typeW != 4 {
+		t.Errorf("typeW = %d, want 4", typeW)
+	}
+	if valW != 5 {
+		t.Errorf("valW = %d, want 5", valW)
+	}
+}
+
+func TestColorSwatch(t *testing.T) {
+	// Valid color produces ANSI escape sequence
+	swatch := ColorSwatch("#FF0000")
+	if swatch == "" {
+		t.Error("expected non-empty swatch for valid color")
+	}
+	if !strings.Contains(swatch, "\x1b[48;2;") {
+		t.Error("expected 24-bit ANSI color escape sequence")
+	}
+
+	// Invalid color returns empty string
+	swatch = ColorSwatch("not-a-color")
+	if swatch != "" {
+		t.Errorf("expected empty swatch for invalid color, got %q", swatch)
+	}
+}
+
+func TestNameToCSSVar(t *testing.T) {
+	tests := []struct {
+		name, prefix, want string
+	}{
+		{"color-primary", "", "--color-primary"},
+		{"color-primary", "rh", "--rh-color-primary"},
+		{"a", "x", "--x-a"},
+	}
+
+	for _, tt := range tests {
+		got := NameToCSSVar(tt.name, tt.prefix)
+		if got != tt.want {
+			t.Errorf("NameToCSSVar(%q, %q) = %q, want %q", tt.name, tt.prefix, got, tt.want)
+		}
+	}
+}
+
+func TestConvertReferences(t *testing.T) {
+	tests := []struct {
+		name, input, prefix, want string
+	}{
+		{"no refs", "plain text", "", "plain text"},
+		{"with ref no prefix", "{color.primary}", "", "--color-primary"},
+		{"with ref and prefix", "{color.primary}", "rh", "--rh-color-primary"},
+		{"embedded ref", "var({color.primary})", "", "var(--color-primary)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := convertReferences(tt.input, tt.prefix)
+			if got != tt.want {
+				t.Errorf("convertReferences(%q, %q) = %q, want %q", tt.input, tt.prefix, got, tt.want)
+			}
+		})
+	}
+}
+
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	old := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+	os.Stdout = w
+	defer func() { os.Stdout = old }()
+	fn()
+	w.Close()
+	var buf bytes.Buffer
+	if _, readErr := buf.ReadFrom(r); readErr != nil {
+		t.Fatalf("failed to read captured output: %v", readErr)
+	}
+	return buf.String()
+}
+
+func TestTable(t *testing.T) {
+	rows := []Row{
+		{Name: "--color-primary", Type: "color", Value: "#FF6B35", IsColor: true},
+		{Name: "--spacing-small", Type: "dimension", Value: "4px"},
+	}
+
+	output := captureStdout(t, func() {
+		_ = Table(rows)
+	})
+
+	if !strings.Contains(output, "--color-primary") {
+		t.Error("table output should contain --color-primary")
+	}
+	if !strings.Contains(output, "4px") {
+		t.Error("table output should contain 4px")
+	}
+}
+
+func TestTable_Empty(t *testing.T) {
+	err := Table(nil)
+	if err != nil {
+		t.Errorf("Table(nil) returned error: %v", err)
+	}
+}
+
+func TestTable_WithRefChain(t *testing.T) {
+	rows := []Row{
+		{Name: "--color-secondary", Type: "color", Value: "#FF6B35", RefChain: []string{"--color-primary"}},
+	}
+
+	output := captureStdout(t, func() {
+		_ = Table(rows)
+	})
+
+	if !strings.Contains(output, "→") {
+		t.Error("table output should contain arrow for ref chain")
+	}
+}
+
+func TestCSS(t *testing.T) {
+	rows := []Row{
+		{Name: "--color-primary", Value: "#FF6B35"},
+		{Name: "--spacing-small", Value: "4px"},
+	}
+
+	output := captureStdout(t, func() {
+		_ = CSS(rows)
+	})
+
+	if !strings.Contains(output, ":root {") {
+		t.Error("CSS output should contain :root selector")
+	}
+	if !strings.Contains(output, "--color-primary: #FF6B35;") {
+		t.Error("CSS output should contain color property")
+	}
+	if !strings.Contains(output, "--spacing-small: 4px;") {
+		t.Error("CSS output should contain spacing property")
+	}
+}
+
+func TestCSS_SkipsMapValues(t *testing.T) {
+	rows := []Row{
+		{Name: "--structured", Value: `{"colorSpace": "srgb"}`},
+		{Name: "--simple", Value: "#FF6B35"},
+	}
+
+	output := captureStdout(t, func() {
+		_ = CSS(rows)
+	})
+
+	// Map-like values starting with { and containing : should be skipped
+	if strings.Contains(output, "--structured") {
+		t.Error("CSS should skip map-like values")
+	}
+	if !strings.Contains(output, "--simple") {
+		t.Error("CSS should include simple values")
+	}
+}
+
+func TestNames(t *testing.T) {
+	rows := []Row{
+		{Name: "--color-primary"},
+		{Name: "--spacing-small"},
+	}
+
+	output := captureStdout(t, func() {
+		_ = Names(rows)
+	})
+
+	if !strings.Contains(output, "--color-primary\n") {
+		t.Error("Names output should contain --color-primary")
+	}
+	if !strings.Contains(output, "--spacing-small\n") {
+		t.Error("Names output should contain --spacing-small")
+	}
+}
+
+func TestMarkdown(t *testing.T) {
+	rows := []Row{
+		{Name: "--color-primary", Type: "color", Value: "#FF6B35"},
+		{Name: "--spacing-small", Type: "dimension", Value: "4px"},
+	}
+
+	output := captureStdout(t, func() {
+		_ = Markdown(rows)
+	})
+
+	if !strings.Contains(output, "## color") {
+		t.Error("Markdown should contain color heading")
+	}
+	if !strings.Contains(output, "## dimension") {
+		t.Error("Markdown should contain dimension heading")
+	}
+	if !strings.Contains(output, "--color-primary") {
+		t.Error("Markdown should contain token name")
+	}
+}
+
+func TestMarkdown_Empty(t *testing.T) {
+	err := Markdown(nil)
+	if err != nil {
+		t.Errorf("Markdown(nil) returned error: %v", err)
+	}
+}
+
+func TestMarkdown_UntypedHeading(t *testing.T) {
+	rows := []Row{
+		{Name: "--mystery", Type: "-", Value: "42"},
+	}
+
+	output := captureStdout(t, func() {
+		_ = Markdown(rows)
+	})
+
+	if !strings.Contains(output, "## untyped") {
+		t.Error("Markdown should use 'untyped' heading for '-' type")
+	}
+}
+
+func TestMarkdown_WithRefChain(t *testing.T) {
+	rows := []Row{
+		{Name: "--color-primary", Type: "color", Value: "#FF6B35"},
+		{Name: "--color-secondary", Type: "color", Value: "#FF6B35", RefChain: []string{"--color-primary"}},
+	}
+
+	output := captureStdout(t, func() {
+		_ = Markdown(rows)
+	})
+
+	if !strings.Contains(output, "Reference") {
+		t.Error("Markdown should contain Reference column when refs are present")
+	}
+}
+
+func TestMarkdownWithOptions_Empty(t *testing.T) {
+	err := MarkdownWithOptions(nil, MarkdownOptions{})
+	if err != nil {
+		t.Errorf("MarkdownWithOptions(nil) returned error: %v", err)
+	}
+}
+
+func TestMarkdownWithOptions_WithTOC(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "color-brand-primary", Value: "#FF6B35", Type: "color", Path: []string{"color", "brand", "primary"}},
+		{Name: "spacing-small", Value: "4px", Type: "dimension", Path: []string{"spacing", "small"}},
+	}
+
+	rows := ComputeRows(tokens, false)
+	output := captureStdout(t, func() {
+		_ = MarkdownWithOptions(rows, MarkdownOptions{
+			IncludeTOC: true,
+			TOCDepth:   2,
+		})
+	})
+
+	if !strings.Contains(output, "## Table Of Contents") {
+		t.Error("output should contain TOC header")
+	}
+}
+
+func TestBuildHierarchy_EmptyPath(t *testing.T) {
+	rows := []Row{
+		{Name: "--orphan", Path: nil},
+	}
+
+	root := BuildHierarchy(rows)
+	if len(root.Tokens) != 1 {
+		t.Errorf("expected 1 root-level token, got %d", len(root.Tokens))
+	}
+}
+
 func TestMarkdownWithOptionsGolden(t *testing.T) {
 	expected := testutil.LoadFixtureFile(t, "fixtures/markdown/hierarchy/expected.md")
 

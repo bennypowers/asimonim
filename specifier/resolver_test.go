@@ -333,6 +333,168 @@ func TestChainResolver_CanResolve(t *testing.T) {
 	}
 }
 
+func TestDedupResolvedFiles(t *testing.T) {
+	files := []*ResolvedFile{
+		{Specifier: "npm:a/tokens.json", Path: "/project/node_modules/a/tokens.json", Kind: KindNPM},
+		{Specifier: "npm:b/tokens.json", Path: "/project/node_modules/b/tokens.json", Kind: KindNPM},
+		{Specifier: "npm:a/tokens.json", Path: "/project/node_modules/a/tokens.json", Kind: KindNPM},
+		{Specifier: "./local.json", Path: "/project/node_modules/b/tokens.json", Kind: KindLocal},
+	}
+
+	deduped := DedupResolvedFiles(files)
+
+	// Should keep first occurrence of each path
+	if len(deduped) != 2 {
+		t.Fatalf("expected 2 files after dedup, got %d", len(deduped))
+	}
+
+	if deduped[0].Specifier != "npm:a/tokens.json" {
+		t.Errorf("first file specifier = %q, want %q", deduped[0].Specifier, "npm:a/tokens.json")
+	}
+	if deduped[1].Specifier != "npm:b/tokens.json" {
+		t.Errorf("second file specifier = %q, want %q", deduped[1].Specifier, "npm:b/tokens.json")
+	}
+}
+
+func TestDedupResolvedFiles_Empty(t *testing.T) {
+	deduped := DedupResolvedFiles(nil)
+	if len(deduped) != 0 {
+		t.Errorf("expected 0 files, got %d", len(deduped))
+	}
+}
+
+func TestNewNodeModulesResolver_RelativePathError(t *testing.T) {
+	mfs := mapfs.New()
+	_, err := NewNodeModulesResolver(mfs, "relative/path")
+	if err == nil {
+		t.Fatal("expected error for relative rootDir")
+	}
+	if !strings.Contains(err.Error(), "absolute path") {
+		t.Errorf("error = %q, want to contain 'absolute path'", err.Error())
+	}
+}
+
+func TestNewJSRNodeModulesResolver_RelativePathError(t *testing.T) {
+	mfs := mapfs.New()
+	_, err := NewJSRNodeModulesResolver(mfs, "relative/path")
+	if err == nil {
+		t.Fatal("expected error for relative rootDir")
+	}
+	if !strings.Contains(err.Error(), "absolute path") {
+		t.Errorf("error = %q, want to contain 'absolute path'", err.Error())
+	}
+}
+
+func TestNewDefaultResolver_RelativePathError(t *testing.T) {
+	mfs := mapfs.New()
+	_, err := NewDefaultResolver(mfs, "relative/path")
+	if err == nil {
+		t.Fatal("expected error for relative rootDir")
+	}
+	if !strings.Contains(err.Error(), "absolute path") {
+		t.Errorf("error = %q, want to contain 'absolute path'", err.Error())
+	}
+}
+
+func TestIsInsideDir_PathTraversal(t *testing.T) {
+	// Path traversal via ".." should be rejected
+	if isInsideDir("/project/node_modules/../../etc/passwd", "/project/node_modules") {
+		t.Error("expected isInsideDir to return false for path traversal")
+	}
+}
+
+func TestIsInsideDir_ValidChild(t *testing.T) {
+	if !isInsideDir("/project/node_modules/@scope/pkg/file.json", "/project/node_modules") {
+		t.Error("expected isInsideDir to return true for valid child path")
+	}
+}
+
+func TestIsInsideDir_SamePath(t *testing.T) {
+	// A path equal to the base directory should be considered "inside"
+	if !isInsideDir("/project/node_modules", "/project/node_modules") {
+		t.Error("expected isInsideDir to return true for same path")
+	}
+}
+
+func TestNodeModulesResolver_NonNPMSpecifier(t *testing.T) {
+	mfs := mapfs.New()
+	resolver, err := NewNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
+
+	_, err = resolver.Resolve("jsr:@scope/pkg/file.json")
+	if err == nil {
+		t.Fatal("expected error for non-npm specifier")
+	}
+	if !strings.Contains(err.Error(), "not an npm specifier") {
+		t.Errorf("error = %q, want to contain 'not an npm specifier'", err.Error())
+	}
+}
+
+func TestJSRNodeModulesResolver_NonJSRSpecifier(t *testing.T) {
+	mfs := mapfs.New()
+	resolver, err := NewJSRNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
+
+	_, err = resolver.Resolve("npm:pkg/file.json")
+	if err == nil {
+		t.Fatal("expected error for non-jsr specifier")
+	}
+	if !strings.Contains(err.Error(), "not a jsr specifier") {
+		t.Errorf("error = %q, want to contain 'not a jsr specifier'", err.Error())
+	}
+}
+
+func TestNodeModulesResolver_PathTraversalProtection(t *testing.T) {
+	mfs := mapfs.New()
+	// Create a file that would be found via path traversal
+	mfs.AddFile("/project/secret.json", `{}`, 0644)
+
+	resolver, err := NewNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
+
+	_, err = resolver.Resolve("npm:../../secret.json")
+	if err == nil {
+		t.Fatal("expected error for path traversal attempt")
+	}
+}
+
+func TestChainResolver_NoResolverFound(t *testing.T) {
+	mfs := mapfs.New()
+	npmResolver, err := NewNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
+	// Chain with only npm resolver, no local resolver
+	chain := NewChainResolver(npmResolver)
+
+	_, err = chain.Resolve("./local.json")
+	if err == nil {
+		t.Fatal("expected error for unresolvable specifier")
+	}
+	if !strings.Contains(err.Error(), "no resolver found") {
+		t.Errorf("error = %q, want to contain 'no resolver found'", err.Error())
+	}
+}
+
+func TestChainResolver_CanResolve_NoMatch(t *testing.T) {
+	mfs := mapfs.New()
+	npmResolver, err := NewNodeModulesResolver(mfs, "/project")
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
+	chain := NewChainResolver(npmResolver)
+
+	if chain.CanResolve("./local.json") {
+		t.Error("expected CanResolve to return false for unresolvable specifier")
+	}
+}
+
 func TestDefaultResolver_EndToEnd(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddFile("/project/node_modules/@rhds/tokens/json/rhds.tokens.json", `{"color":{}}`, 0644)

@@ -647,6 +647,103 @@ func TestHandleWindowsUNCPath(t *testing.T) {
 	}
 }
 
+// TestHandleWindowsUNCPath_NonWindows tests that UNC path handling returns false on non-Windows
+func TestHandleWindowsUNCPath_NonWindows(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Non-Windows test")
+	}
+
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "UNC-like path on non-Windows",
+			input: `\\server\share\file.txt`,
+		},
+		{
+			name:  "Forward slash UNC on non-Windows",
+			input: `//server/share/file.txt`,
+		},
+		{
+			name:  "Normal POSIX path",
+			input: "/home/user/file.txt",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uri, ok := handleWindowsUNCPath(tt.input)
+			assert.False(t, ok, "UNC path handling should return false on non-Windows")
+			assert.Equal(t, "", uri)
+		})
+	}
+}
+
+// TestURIToPath_NonFileScheme tests URIToPath with non-file schemes falls back
+func TestURIToPath_NonFileScheme(t *testing.T) {
+	// http scheme should trigger uriFallback, returning the original URI
+	result := URIToPath("http://example.com/path")
+	assert.Equal(t, "http://example.com/path", result)
+}
+
+// TestURIToPath_PercentEncodedSpecialChars tests percent-decoding in URIs
+func TestURIToPath_PercentEncodedSpecialChars(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX-only test")
+	}
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Space in path",
+			input:    "file:///home/user/my%20project/file.txt",
+			expected: "/home/user/my project/file.txt",
+		},
+		{
+			name:     "Hash in path",
+			input:    "file:///home/user/%23tag/file.txt",
+			expected: "/home/user/#tag/file.txt",
+		},
+		{
+			name:     "Multiple encoded segments",
+			input:    "file:///home/user/my%20project/%E6%96%87%E4%BB%B6",
+			expected: "/home/user/my project/文件",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := URIToPath(tt.input)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+// TestURIToPath_DriveLetterInHost tests the edge case where a drive letter appears in the host position
+func TestURIToPath_DriveLetterInHost(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Platform-specific path format differs on Windows")
+	}
+	// file://C:/path is technically a drive letter in host position
+	result := URIToPath("file://C:/project/file.txt")
+	assert.Equal(t, filepath.FromSlash("C:/project/file.txt"), result)
+}
+
+// TestPathToURI_TrailingSlash tests paths with trailing slashes
+func TestPathToURI_TrailingSlash(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX-only test")
+	}
+
+	uri := PathToURI("/home/user/project/")
+	// PathToURI normalizes away trailing slashes
+	assert.Equal(t, "file:///home/user/project", uri)
+}
+
 // TestNormalizeAndEncodeSegments tests segment normalization and encoding
 func TestNormalizeAndEncodeSegments(t *testing.T) {
 	tests := []struct {

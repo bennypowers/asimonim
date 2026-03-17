@@ -1,0 +1,9 @@
+{
+  "color-bg": {
+    "prefix": "color-bg",
+    "body": [
+      "var(--color-bg)"
+    ],
+    "description": "Background color"
+  }
+}

@@ -24,3 +24,4 @@ extensions/zed/target/
 
 # Allow node_modules in config test fixtures
 !testdata/fixtures/config/**/node_modules/
+*.html
