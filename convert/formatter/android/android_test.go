@@ -327,3 +327,40 @@ func TestFormat_WithHeader(t *testing.T) {
 		t.Errorf("expected custom header in output, got:\n%s", output)
 	}
 }
+
+func TestFormat_LowValueColorSpaces(t *testing.T) {
+	// Colors with very low component values exercise the linear transfer
+	// function branches (srgbToLinear c <= 0.04045, prophotoToLinear c <= 16/512,
+	// a98ToLinear c < 0, rec2020ToLinear c < beta*4.5)
+	allTokens := testutil.ParseFixtureTokens(t, "fixtures/low-value-colors", schema.V2025_10)
+
+	tokens := []*token.Token{
+		testutil.TokenByPath(t, allTokens, "color.srgb-low"),      // srgb [0.01, 0.02, 0.03]
+		testutil.TokenByPath(t, allTokens, "color.a98-negative"),  // a98-rgb [-0.1, 0.01, 0.5]
+		testutil.TokenByPath(t, allTokens, "color.prophoto-low"),  // prophoto-rgb [0.02, 0.01, 0.03]
+		testutil.TokenByPath(t, allTokens, "color.rec2020-low"),   // rec2020 [0.01, 0.02, 0.03]
+	}
+
+	f := android.New()
+	result, err := f.Format(tokens, formatter.Options{})
+	if err != nil {
+		t.Fatalf("Format() error = %v", err)
+	}
+
+	output := string(result)
+
+	// All must produce hex output (no CSS functions)
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "<color") && strings.Contains(line, ">") {
+			start := strings.Index(line, ">") + 1
+			end := strings.LastIndex(line, "<")
+			if start > 0 && end > start {
+				val := line[start:end]
+				// low value colors → near-black hex values
+				if !strings.HasPrefix(val, "#") {
+					t.Errorf("non-hex color value: %q in line: %s", val, line)
+				}
+			}
+		}
+	}
+}

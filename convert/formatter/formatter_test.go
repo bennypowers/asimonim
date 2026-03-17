@@ -324,6 +324,16 @@ func TestMarshalFallback(t *testing.T) {
 	}
 }
 
+func TestMarshalFallback_Unmarshalable(t *testing.T) {
+	// json.Marshal fails on channels, triggering the fmt.Sprintf fallback
+	m := map[string]any{"ch": make(chan int)}
+	result := formatter.MarshalFallback(m)
+	// Should use fmt.Sprintf fallback, producing Go map literal
+	if result == "" {
+		t.Error("expected non-empty fallback string")
+	}
+}
+
 func TestEscapeXML(t *testing.T) {
 	tests := []struct {
 		input    string
