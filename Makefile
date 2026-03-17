@@ -1,4 +1,4 @@
-.PHONY: all test lint clean install release patch minor major
+.PHONY: all test test-coverage lint clean install release patch minor major
 .PHONY: linux-x64 linux-arm64 darwin-x64 darwin-arm64 win32-x64 win32-arm64
 
 BINARY_NAME := asimonim
@@ -32,6 +32,9 @@ clean:
 
 test:
 	go test -race $(RACE_LDFLAGS) ./...
+
+test-coverage:
+	go test -race $(RACE_LDFLAGS) -coverprofile=coverage.out ./...
 
 lint:
 	go vet ./...

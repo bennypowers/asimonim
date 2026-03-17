@@ -55,8 +55,14 @@ jobs:
       - name: Lint
         run: make lint
 
-      - name: Test
-        run: make test
+      - name: Test with coverage
+        run: make test-coverage
+
+      - uses: codecov/codecov-action@v5
+        with:
+          files: coverage.out
+          token: ${{ secrets.CODECOV_PAT }}
+          fail_ci_if_error: true
 
   build:
     needs: test
