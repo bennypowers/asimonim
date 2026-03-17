@@ -421,11 +421,13 @@ func captureStdout(t *testing.T, fn func()) string {
 		t.Fatalf("failed to create pipe: %v", err)
 	}
 	os.Stdout = w
+	defer func() { os.Stdout = old }()
 	fn()
 	w.Close()
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	os.Stdout = old
+	if _, readErr := buf.ReadFrom(r); readErr != nil {
+		t.Fatalf("failed to read captured output: %v", readErr)
+	}
 	return buf.String()
 }
 

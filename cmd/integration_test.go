@@ -34,6 +34,7 @@ func captureAndExecute(t *testing.T, args ...string) (string, error) {
 		t.Fatalf("failed to create pipe: %v", pipeErr)
 	}
 	os.Stdout = w
+	defer func() { os.Stdout = oldStdout }()
 
 	rootCmd := cmd.RootCmd
 	rootCmd.SetArgs(args)
@@ -41,8 +42,9 @@ func captureAndExecute(t *testing.T, args ...string) (string, error) {
 
 	w.Close()
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	os.Stdout = oldStdout
+	if _, readErr := buf.ReadFrom(r); readErr != nil {
+		t.Fatalf("failed to read captured output: %v", readErr)
+	}
 
 	return buf.String(), err
 }
