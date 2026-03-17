@@ -130,9 +130,7 @@ func structuredColorToAndroid(m map[string]any, tokenName string) string {
 		return formatAndroidHex(components[0], components[1], components[2], alpha)
 	}
 
-	if obj.ColorSpace != "srgb" {
-		logger.Warn("downsampling %s from %s to sRGB for Android", tokenName, obj.ColorSpace)
-	}
+	logger.Warn("downsampling %s from %s to sRGB for Android", tokenName, obj.ColorSpace)
 
 	// Try csscolorparser first — handles oklch, oklab, hsl, hwb, lab, lch
 	css := colorVal.ToCSS()
