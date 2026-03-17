@@ -208,6 +208,13 @@ func colorSpaceToSRGB(space string, c []float64) (r, g, b float64) {
 
 // --- Transfer functions ---
 // Standard OETF/EOTF from CSS Color Level 4 §12.
+// https://www.w3.org/TR/css-color-4/#color-conversion-code
+//
+// These are needed because csscolorparser and go-colorful don't support
+// the CSS color() function spaces (display-p3, a98-rgb, prophoto-rgb,
+// rec2020) directly. We linearize with the spec-defined transfer
+// functions, multiply by the spec-defined primaries→XYZ matrix, then
+// hand off to go-colorful for XYZ D65 → sRGB conversion.
 
 func srgbToLinear(c float64) float64 {
 	if c <= 0.04045 {
@@ -242,8 +249,12 @@ func rec2020ToLinear(c float64) float64 {
 }
 
 // --- Matrix conversions ---
-// Primaries→XYZ matrices from CSS Color Level 4 §10.
-// https://www.w3.org/TR/css-color-4/#color-conversion-code
+// Primaries→XYZ matrices from CSS Color Level 4.
+// Display P3:   https://www.w3.org/TR/css-color-4/#valdef-color-display-p3
+// A98 RGB:      https://www.w3.org/TR/css-color-4/#valdef-color-a98-rgb
+// ProPhoto RGB: https://www.w3.org/TR/css-color-4/#valdef-color-prophoto-rgb
+// Rec. 2020:    https://www.w3.org/TR/css-color-4/#valdef-color-rec2020
+// Conversion code: https://www.w3.org/TR/css-color-4/#color-conversion-code
 
 type mat3 [3][3]float64
 
