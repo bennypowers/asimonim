@@ -177,12 +177,28 @@ func UpdateGoldenFile(t *testing.T, goldenPath string, actual []byte) {
 }
 
 // findTestdataOrCreate locates a path under testdata/, creating it if needed.
+// Walks ancestor directories to find the deepest existing subtree before
+// falling back to the testdata root.
 func findTestdataOrCreate(t *testing.T, relPath string) string {
 	t.Helper()
 	if path := probeTestdata(relPath); path != "" {
 		return path
 	}
-	// Fallback: create under the nearest testdata/ that exists
+	// Walk ancestors to find the deepest existing subtree
+	for parent := filepath.Dir(relPath); parent != "." && parent != relPath; parent = filepath.Dir(parent) {
+		if base := probeTestdata(parent); base != "" {
+			suffix, err := filepath.Rel(parent, relPath)
+			if err != nil {
+				t.Fatalf("Failed to resolve %s relative to %s: %v", relPath, parent, err)
+			}
+			target := filepath.Join(base, suffix)
+			if err := os.MkdirAll(target, 0755); err != nil {
+				t.Fatalf("Failed to create %s: %v", target, err)
+			}
+			return target
+		}
+	}
+	// Fallback: create under the nearest testdata/ root
 	if root := probeTestdataRoot(); root != "" {
 		target := filepath.Join(root, relPath)
 		if err := os.MkdirAll(target, 0755); err != nil {
