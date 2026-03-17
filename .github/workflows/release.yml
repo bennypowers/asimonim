@@ -135,7 +135,9 @@ jobs:
         id: update-zed
         working-directory: zed-extensions
         run: |
-          # Initialize only the design-tokens submodule
+          # Point submodule to asimonim (upstream may still reference old dtls repo)
+          git config --file .gitmodules submodule.extensions/design-tokens.url https://github.com/${{ github.repository }}.git
+          git submodule sync extensions/design-tokens
           git submodule update --init extensions/design-tokens
           # Update submodule to latest release tag
           cd extensions/design-tokens
@@ -144,7 +146,7 @@ jobs:
           cd ../..
           # Update version in extensions.toml for design-tokens section only
           sed -i '/^\[design-tokens\]/,/^\[/ s/^version = .*/version = "${{ steps.version.outputs.version }}"/' extensions.toml
-          git add extensions/design-tokens extensions.toml
+          git add extensions/design-tokens extensions.toml .gitmodules
           if git diff --staged --quiet; then
             echo "No changes to commit — submodule already at this version"
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
@@ -173,16 +175,3 @@ jobs:
             --repo zed-industries/extensions \
             --title "Update design-tokens to v${{ steps.version.outputs.version }}" \
             --body "Updates design-tokens extension to [version ${{ steps.version.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }})."
-
-  sync-dtls:
-    name: Sync DTLS Release
-    needs: [build]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger DTLS sync
-        env:
-          GH_TOKEN: ${{ secrets.DTLS_DISPATCH_TOKEN }}
-        run: |
-          gh workflow run sync-asimonim.yaml \
-            --repo bennypowers/design-tokens-language-server \
-            --field asimonim_version=${{ github.event.release.tag_name }}
