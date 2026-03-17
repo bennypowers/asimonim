@@ -13,67 +13,21 @@ import (
 	"bennypowers.dev/asimonim/convert/formatter"
 	"bennypowers.dev/asimonim/convert/formatter/android"
 	"bennypowers.dev/asimonim/schema"
+	"bennypowers.dev/asimonim/testutil"
 	"bennypowers.dev/asimonim/token"
 )
 
 func TestFormat_V2025_10_StructuredColors(t *testing.T) {
+	allTokens := testutil.ParseFixtureTokens(t, "fixtures/v2025_10/all-color-spaces", schema.V2025_10)
+
+	// Select representative color tokens for Android hex conversion tests
 	tokens := []*token.Token{
-		{
-			Name:          "color.srgb-hex",
-			Path:          []string{"color", "srgb-hex"},
-			Type:          token.TypeColor,
-			SchemaVersion: schema.V2025_10,
-			RawValue: map[string]any{
-				"colorSpace": "srgb",
-				"components": []any{1.0, 0.42, 0.21},
-				"alpha":      1.0,
-				"hex":        "#FF6B36",
-			},
-		},
-		{
-			Name:          "color.srgb-no-hex",
-			Path:          []string{"color", "srgb-no-hex"},
-			Type:          token.TypeColor,
-			SchemaVersion: schema.V2025_10,
-			RawValue: map[string]any{
-				"colorSpace": "srgb",
-				"components": []any{1.0, 0.5, 0.25},
-				"alpha":      1.0,
-			},
-		},
-		{
-			Name:          "color.oklch",
-			Path:          []string{"color", "oklch"},
-			Type:          token.TypeColor,
-			SchemaVersion: schema.V2025_10,
-			RawValue: map[string]any{
-				"colorSpace": "oklch",
-				"components": []any{0.7, 0.15, 180.0},
-				"alpha":      1.0,
-			},
-		},
-		{
-			Name:          "color.display-p3",
-			Path:          []string{"color", "display-p3"},
-			Type:          token.TypeColor,
-			SchemaVersion: schema.V2025_10,
-			RawValue: map[string]any{
-				"colorSpace": "display-p3",
-				"components": []any{1.0, 0.5, 0.25},
-				"alpha":      1.0,
-			},
-		},
-		{
-			Name:          "color.srgb-alpha",
-			Path:          []string{"color", "srgb-alpha"},
-			Type:          token.TypeColor,
-			SchemaVersion: schema.V2025_10,
-			RawValue: map[string]any{
-				"colorSpace": "srgb",
-				"components": []any{1.0, 0.0, 0.0},
-				"alpha":      0.5,
-			},
-		},
+		testutil.TokenByPath(t, allTokens, "color.srgb-hex"),       // srgb, hex: "#FF6B36"
+		testutil.TokenByPath(t, allTokens, "color.srgb-no-hex"),    // srgb, [1, 0.5, 0.25] → #FF8040
+		testutil.TokenByPath(t, allTokens, "color.srgb-alpha"),     // srgb, [1, 0.5, 0.25], alpha: 0.5
+		testutil.TokenByPath(t, allTokens, "color.oklch"),          // oklch, [0.988281, 0.0046875, 20]
+		testutil.TokenByPath(t, allTokens, "color.display-p3"),     // display-p3, [1, 0.5, 0.25]
+		testutil.TokenByPath(t, allTokens, "color.a98-rgb"),        // a98-rgb, [0.8, 0.4, 0.2]
 	}
 
 	f := android.New()
@@ -89,12 +43,12 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 		t.Errorf("Android output contains CSS color functions:\n%s", output)
 	}
 
-	// sRGB with hex field should use it
+	// sRGB with hex field should use it: srgb [1, 0.42, 0.21] hex "#FF6B36"
 	if !strings.Contains(output, "#FF6B36") {
 		t.Errorf("expected #FF6B36 for srgb-hex, got:\n%s", output)
 	}
 
-	// sRGB without hex should convert to hex
+	// sRGB without hex should convert to hex: srgb [1, 0.5, 0.25] → #FF8040
 	if !strings.Contains(output, "#FF8040") {
 		t.Errorf("expected #FF8040 for srgb-no-hex, got:\n%s", output)
 	}
@@ -102,7 +56,6 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 	// All values must be hex format
 	for _, line := range strings.Split(output, "\n") {
 		if strings.Contains(line, "<color") && strings.Contains(line, ">") {
-			// Extract value between > and <
 			start := strings.Index(line, ">") + 1
 			end := strings.LastIndex(line, "<")
 			if start > 0 && end > start {
@@ -114,26 +67,22 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 		}
 	}
 
-	// Alpha should produce #AARRGGBB format
-	if !strings.Contains(output, "#80FF0000") {
-		t.Errorf("expected #80FF0000 for srgb with alpha 0.5, got:\n%s", output)
+	// Alpha should produce #AARRGGBB: srgb [1, 0.5, 0.25] alpha 0.5
+	if !strings.Contains(output, "#80FF8040") {
+		t.Errorf("expected #80FF8040 for srgb-alpha, got:\n%s", output)
 	}
 
-	// Ensure no Go map literals in output
 	if strings.Contains(output, "map[") {
 		t.Errorf("output contains Go map literal:\n%s", output)
 	}
 }
 
 func TestFormat_V2025_10_StructuredDimensions(t *testing.T) {
+	allTokens := testutil.ParseFixtureTokens(t, "fixtures/v2025_10/all-color-spaces", schema.V2025_10)
+
 	tokens := []*token.Token{
-		{
-			Name:          "spacing.small",
-			Path:          []string{"spacing", "small"},
-			Type:          token.TypeDimension,
-			SchemaVersion: schema.V2025_10,
-			RawValue:      map[string]any{"value": 4.0, "unit": "px"},
-		},
+		testutil.TokenByPath(t, allTokens, "spacing.small"),  // {value: 4, unit: "px"}
+		testutil.TokenByPath(t, allTokens, "spacing.medium"), // {value: 1.5, unit: "rem"}
 	}
 
 	f := android.New()
@@ -144,8 +93,14 @@ func TestFormat_V2025_10_StructuredDimensions(t *testing.T) {
 
 	output := string(result)
 
+	// spacing.small: {value: 4, unit: "px"} → 4px
 	if !strings.Contains(output, "4px") {
 		t.Errorf("expected 4px for structured dimension, got:\n%s", output)
+	}
+
+	// spacing.medium: {value: 1.5, unit: "rem"} → 1.5rem
+	if !strings.Contains(output, "1.5rem") {
+		t.Errorf("expected 1.5rem for structured dimension, got:\n%s", output)
 	}
 
 	if strings.Contains(output, "map[") {

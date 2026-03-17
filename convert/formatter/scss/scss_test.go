@@ -13,89 +13,20 @@ import (
 	"bennypowers.dev/asimonim/convert/formatter"
 	"bennypowers.dev/asimonim/convert/formatter/scss"
 	"bennypowers.dev/asimonim/schema"
+	"bennypowers.dev/asimonim/testutil"
 	"bennypowers.dev/asimonim/token"
 )
 
 func TestFormat_V2025_10_StructuredColors(t *testing.T) {
+	allTokens := testutil.ParseFixtureTokens(t, "fixtures/v2025_10/all-color-spaces", schema.V2025_10)
+
 	tokens := []*token.Token{
-		{
-			Name:          "color.srgb-hex",
-			Path:          []string{"color", "srgb-hex"},
-			Type:          token.TypeColor,
-			SchemaVersion: schema.V2025_10,
-			RawValue: map[string]any{
-				"colorSpace": "srgb",
-				"components": []any{1.0, 0.42, 0.21},
-				"alpha":      1.0,
-				"hex":        "#FF6B36",
-			},
-		},
-		{
-			Name:          "color.oklch",
-			Path:          []string{"color", "oklch"},
-			Type:          token.TypeColor,
-			SchemaVersion: schema.V2025_10,
-			RawValue: map[string]any{
-				"colorSpace": "oklch",
-				"components": []any{0.7, 0.15, 180.0},
-				"alpha":      1.0,
-			},
-		},
-		{
-			Name:          "color.oklch-alpha",
-			Path:          []string{"color", "oklch-alpha"},
-			Type:          token.TypeColor,
-			SchemaVersion: schema.V2025_10,
-			RawValue: map[string]any{
-				"colorSpace": "oklch",
-				"components": []any{0.7, 0.15, 180.0},
-				"alpha":      0.8,
-			},
-		},
-		{
-			Name:          "color.display-p3",
-			Path:          []string{"color", "display-p3"},
-			Type:          token.TypeColor,
-			SchemaVersion: schema.V2025_10,
-			RawValue: map[string]any{
-				"colorSpace": "display-p3",
-				"components": []any{1.0, 0.5, 0.25},
-				"alpha":      1.0,
-			},
-		},
-		{
-			Name:          "color.hsl",
-			Path:          []string{"color", "hsl"},
-			Type:          token.TypeColor,
-			SchemaVersion: schema.V2025_10,
-			RawValue: map[string]any{
-				"colorSpace": "hsl",
-				"components": []any{210.0, 50.0, 60.0},
-				"alpha":      1.0,
-			},
-		},
-		{
-			Name:          "color.srgb-no-hex",
-			Path:          []string{"color", "srgb-no-hex"},
-			Type:          token.TypeColor,
-			SchemaVersion: schema.V2025_10,
-			RawValue: map[string]any{
-				"colorSpace": "srgb",
-				"components": []any{1.0, 0.5, 0.25},
-				"alpha":      1.0,
-			},
-		},
-		{
-			Name:          "color.none-component",
-			Path:          []string{"color", "none-component"},
-			Type:          token.TypeColor,
-			SchemaVersion: schema.V2025_10,
-			RawValue: map[string]any{
-				"colorSpace": "oklch",
-				"components": []any{0.5, "none", 180.0},
-				"alpha":      1.0,
-			},
-		},
+		testutil.TokenByPath(t, allTokens, "color.srgb-hex"),       // srgb, hex: "#FF6B36"
+		testutil.TokenByPath(t, allTokens, "color.srgb-no-hex"),    // srgb, [1, 0.5, 0.25]
+		testutil.TokenByPath(t, allTokens, "color.oklch-alpha"),    // oklch, [0.7, 0.15, 180], alpha: 0.8
+		testutil.TokenByPath(t, allTokens, "color.display-p3"),     // display-p3, [1, 0.5, 0.25]
+		testutil.TokenByPath(t, allTokens, "color.hsl"),            // hsl, [210, 50, 60]
+		testutil.TokenByPath(t, allTokens, "color.none-component"), // oklch, [0.5, "none", 180]
 	}
 
 	f := scss.New()
@@ -107,13 +38,12 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 	output := string(result)
 
 	expectations := map[string]string{
-		"$color-srgb-hex":        "#FF6B36",
-		"$color-oklch":           "oklch(0.7 0.15 180)",
-		"$color-oklch-alpha":     "oklch(0.7 0.15 180 / 0.8)",
-		"$color-display-p3":      "color(display-p3 1 0.5 0.25)",
-		"$color-hsl":             "hsl(210 50 60)",
-		"$color-srgb-no-hex":     "#FF8040",
-		"$color-none-component":  "oklch(0.5 none 180)",
+		"$color-srgb-hex":       "#FF6B36",                       // srgb [1, 0.42, 0.21] hex "#FF6B36"
+		"$color-srgb-no-hex":    "#FF8040",                       // srgb [1, 0.5, 0.25] → hex
+		"$color-oklch-alpha":    "oklch(0.7 0.15 180 / 0.8)",     // oklch [0.7, 0.15, 180] alpha 0.8
+		"$color-display-p3":     "color(display-p3 1 0.5 0.25)",  // display-p3 [1, 0.5, 0.25]
+		"$color-hsl":            "hsl(210 50 60)",                 // hsl [210, 50, 60]
+		"$color-none-component": "oklch(0.5 none 180)",           // oklch [0.5, "none", 180]
 	}
 
 	for varName, expectedValue := range expectations {
@@ -123,28 +53,17 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 		}
 	}
 
-	// Ensure no Go map literals in output
 	if strings.Contains(output, "map[") {
 		t.Errorf("output contains Go map literal:\n%s", output)
 	}
 }
 
 func TestFormat_V2025_10_StructuredDimensions(t *testing.T) {
+	allTokens := testutil.ParseFixtureTokens(t, "fixtures/v2025_10/all-color-spaces", schema.V2025_10)
+
 	tokens := []*token.Token{
-		{
-			Name:          "spacing.small",
-			Path:          []string{"spacing", "small"},
-			Type:          token.TypeDimension,
-			SchemaVersion: schema.V2025_10,
-			RawValue:      map[string]any{"value": 4.0, "unit": "px"},
-		},
-		{
-			Name:          "spacing.medium",
-			Path:          []string{"spacing", "medium"},
-			Type:          token.TypeDimension,
-			SchemaVersion: schema.V2025_10,
-			RawValue:      map[string]any{"value": 1.5, "unit": "rem"},
-		},
+		testutil.TokenByPath(t, allTokens, "spacing.small"),  // {value: 4, unit: "px"}
+		testutil.TokenByPath(t, allTokens, "spacing.medium"), // {value: 1.5, unit: "rem"}
 	}
 
 	f := scss.New()
@@ -155,9 +74,11 @@ func TestFormat_V2025_10_StructuredDimensions(t *testing.T) {
 
 	output := string(result)
 
+	// spacing.small: {value: 4, unit: "px"} → 4px
 	if !strings.Contains(output, "$spacing-small: 4px;") {
 		t.Errorf("expected $spacing-small: 4px;, got:\n%s", output)
 	}
+	// spacing.medium: {value: 1.5, unit: "rem"} → 1.5rem
 	if !strings.Contains(output, "$spacing-medium: 1.5rem;") {
 		t.Errorf("expected $spacing-medium: 1.5rem;, got:\n%s", output)
 	}

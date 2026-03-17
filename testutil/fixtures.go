@@ -12,9 +12,14 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"bennypowers.dev/asimonim/internal/mapfs"
+	"bennypowers.dev/asimonim/parser"
+	"bennypowers.dev/asimonim/resolver"
+	"bennypowers.dev/asimonim/schema"
+	"bennypowers.dev/asimonim/token"
 )
 
 // updateGolden enables updating golden files with actual output when -update flag is set.
@@ -28,22 +33,7 @@ func NewFixtureFS(t *testing.T, fixtureDir string, rootPath string) *mapfs.MapFi
 	mfs := mapfs.New()
 
 	// Try multiple possible paths since Go test changes working directory
-	possiblePaths := []string{
-		filepath.Join("testdata", fixtureDir),
-		filepath.Join("..", "testdata", fixtureDir),
-		filepath.Join("..", "..", "testdata", fixtureDir),
-	}
-
-	var fixturePath string
-	for _, path := range possiblePaths {
-		if _, err := os.Stat(path); err == nil {
-			fixturePath = path
-			break
-		}
-	}
-	if fixturePath == "" {
-		t.Fatalf("Could not find fixtures at %s (tried all paths)", fixtureDir)
-	}
+	fixturePath := findTestdata(t, fixtureDir)
 
 	// Walk fixture directory and load all files
 	err := filepath.WalkDir(fixturePath, func(path string, d fs.DirEntry, err error) error {
@@ -81,19 +71,62 @@ func NewFixtureFS(t *testing.T, fixtureDir string, rootPath string) *mapfs.MapFi
 func LoadFixtureFile(t *testing.T, fixturePath string) []byte {
 	t.Helper()
 
-	possiblePaths := []string{
-		filepath.Join("testdata", fixturePath),
-		filepath.Join("..", "testdata", fixturePath),
-		filepath.Join("..", "..", "testdata", fixturePath),
+	fullPath := findTestdata(t, fixturePath)
+	content, err := os.ReadFile(fullPath)
+	if err != nil {
+		t.Fatalf("Failed to read fixture %s: %v", fixturePath, err)
 	}
+	return content
+}
 
-	for _, path := range possiblePaths {
-		content, err := os.ReadFile(path)
-		if err == nil {
-			return content
+// findTestdata locates a path under testdata/ by walking up parent directories.
+func findTestdata(t *testing.T, relPath string) string {
+	t.Helper()
+	for i := range 5 {
+		prefix := strings.Repeat("../", i)
+		candidate := filepath.Join(prefix+"testdata", relPath)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
 		}
 	}
-	t.Fatalf("Failed to read fixture %s (tried all paths)", fixturePath)
+	t.Fatalf("Could not find testdata/%s (tried up to 4 parent dirs)", relPath)
+	return ""
+}
+
+// ParseFixtureTokens loads a fixture file, parses tokens, and resolves aliases.
+// The fixtureDir is relative to testdata/ (e.g., "fixtures/v2025-10-colors").
+// Returns the parsed and resolved tokens.
+func ParseFixtureTokens(t *testing.T, fixtureDir string, schemaVersion schema.Version) []*token.Token {
+	t.Helper()
+
+	mfs := NewFixtureFS(t, fixtureDir, "/test")
+
+	p := parser.NewJSONParser()
+	tokens, err := p.ParseFile(mfs, "/test/tokens.json", parser.Options{
+		SchemaVersion: schemaVersion,
+		SkipPositions: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to parse %s/tokens.json: %v", fixtureDir, err)
+	}
+
+	if err := resolver.ResolveAliases(tokens, schemaVersion); err != nil {
+		t.Fatalf("failed to resolve aliases in %s: %v", fixtureDir, err)
+	}
+
+	return tokens
+}
+
+// TokenByPath returns the first token matching the given dot-separated path
+// (e.g., "color.oklch"). Fails the test if not found.
+func TokenByPath(t *testing.T, tokens []*token.Token, dotPath string) *token.Token {
+	t.Helper()
+	for _, tok := range tokens {
+		if strings.Join(tok.Path, ".") == dotPath {
+			return tok
+		}
+	}
+	t.Fatalf("token not found: %s", dotPath)
 	return nil
 }
 
