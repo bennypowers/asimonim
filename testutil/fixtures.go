@@ -137,23 +137,10 @@ func UpdateGoldenFile(t *testing.T, goldenPath string, actual []byte) {
 		return
 	}
 
-	possiblePaths := []string{
-		filepath.Join("testdata", goldenPath),
-		filepath.Join("..", "testdata", goldenPath),
-		filepath.Join("..", "..", "testdata", goldenPath),
-	}
-
-	var targetPath string
-	for _, path := range possiblePaths {
-		parentDir := filepath.Dir(path)
-		if _, err := os.Stat(parentDir); err == nil {
-			targetPath = path
-			break
-		}
-	}
-	if targetPath == "" {
-		targetPath = possiblePaths[0]
-	}
+	// Find the testdata root by locating the parent directory
+	parentDir := filepath.Dir(goldenPath)
+	targetDir := findTestdataOrCreate(t, parentDir)
+	targetPath := filepath.Join(targetDir, filepath.Base(goldenPath))
 
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		t.Fatalf("Failed to create directory for golden file %s: %v", goldenPath, err)
@@ -164,4 +151,30 @@ func UpdateGoldenFile(t *testing.T, goldenPath string, actual []byte) {
 	}
 
 	t.Logf("Updated golden file: %s", targetPath)
+}
+
+// findTestdataOrCreate locates a path under testdata/, creating it if needed.
+func findTestdataOrCreate(t *testing.T, relPath string) string {
+	t.Helper()
+	for i := range 5 {
+		prefix := strings.Repeat("../", i)
+		candidate := filepath.Join(prefix+"testdata", relPath)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	// Fallback: create under the nearest testdata/ that exists
+	for i := range 5 {
+		prefix := strings.Repeat("../", i)
+		candidate := prefix + "testdata"
+		if _, err := os.Stat(candidate); err == nil {
+			target := filepath.Join(candidate, relPath)
+			if err := os.MkdirAll(target, 0755); err != nil {
+				t.Fatalf("Failed to create %s: %v", target, err)
+			}
+			return target
+		}
+	}
+	t.Fatalf("Could not find testdata/ directory for golden file %s", relPath)
+	return ""
 }

@@ -99,10 +99,7 @@ func structuredColorToAndroid(m map[string]any, tokenName string) string {
 		return formatter.MarshalFallback(m)
 	}
 
-	obj, ok := colorVal.(*common.ObjectColorValue)
-	if !ok {
-		return colorVal.ToCSS()
-	}
+	obj := colorVal.(*common.ObjectColorValue)
 
 	// If it has a hex field, use it directly
 	if obj.Hex != nil && *obj.Hex != "" {
