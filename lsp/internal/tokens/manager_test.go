@@ -126,6 +126,70 @@ func TestTokenManagerRemove(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// TestTokenManagerRemoveCompositeKey tests removing tokens stored with composite keys
+func TestTokenManagerRemoveCompositeKey(t *testing.T) {
+	manager := tokens.NewManager()
+
+	// Add token with file path (creates composite key "filePath:tokenName")
+	err := manager.Add(&tokens.Token{
+		Name:     "color-primary",
+		Value:    "#0000ff",
+		FilePath: "/test/tokens.json",
+	})
+	require.NoError(t, err)
+
+	// Remove by token name only (should find via composite key search)
+	err = manager.Remove("color-primary")
+	require.NoError(t, err)
+
+	// Token should be gone
+	assert.Equal(t, 0, manager.Count())
+}
+
+// TestTokenManagerRemoveLegacyKey tests removing tokens stored with legacy (non-composite) keys
+func TestTokenManagerRemoveLegacyKey(t *testing.T) {
+	manager := tokens.NewManager()
+
+	// Add token without file path (legacy key)
+	err := manager.Add(&tokens.Token{
+		Name:  "spacing-small",
+		Value: "8px",
+	})
+	require.NoError(t, err)
+
+	// Direct key lookup should work
+	err = manager.Remove("spacing-small")
+	require.NoError(t, err)
+	assert.Equal(t, 0, manager.Count())
+}
+
+// TestTokenManagerRemoveByNameFromMultipleFiles tests removing by name when same name exists in multiple files
+func TestTokenManagerRemoveByNameFromMultipleFiles(t *testing.T) {
+	manager := tokens.NewManager()
+
+	// Add same-named token in two files
+	err := manager.Add(&tokens.Token{
+		Name:     "color-primary",
+		Value:    "#0000ff",
+		FilePath: "/file1.json",
+	})
+	require.NoError(t, err)
+
+	err = manager.Add(&tokens.Token{
+		Name:     "color-primary",
+		Value:    "#ff0000",
+		FilePath: "/file2.json",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, 2, manager.Count())
+
+	// Remove by name removes one of them
+	err = manager.Remove("color-primary")
+	require.NoError(t, err)
+	assert.Equal(t, 1, manager.Count())
+}
+
 // TestTokenManagerClear tests clearing all tokens
 func TestTokenManagerClear(t *testing.T) {
 	manager := tokens.NewManager()

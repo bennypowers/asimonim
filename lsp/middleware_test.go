@@ -170,6 +170,126 @@ func TestNotify_PanicRecovery(t *testing.T) {
 	assert.Contains(t, logBuf.String(), "PANIC")
 }
 
+func TestNotify_ErrorWrapping(t *testing.T) {
+	var logBuf bytes.Buffer
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(nil)
+
+	errHandler := func(req *types.RequestContext, params int) error {
+		return errors.New("notify error")
+	}
+
+	server := &mockServerContext{}
+	wrapped := notify(server, "testNotify", errHandler)
+
+	err := wrapped(nil, 42)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "testNotify")
+	assert.Contains(t, err.Error(), "notify error")
+	assert.Contains(t, logBuf.String(), "error")
+}
+
+func TestNotify_Success(t *testing.T) {
+	var logBuf bytes.Buffer
+	log.SetOutput(&logBuf)
+	log.SetLevel(log.LevelDebug)
+	defer func() {
+		log.SetOutput(nil)
+		log.SetLevel(log.LevelInfo)
+	}()
+
+	successHandler := func(req *types.RequestContext, params int) error {
+		return nil
+	}
+
+	server := &mockServerContext{}
+	wrapped := notify(server, "testNotify", successHandler)
+
+	err := wrapped(nil, 42)
+
+	assert.NoError(t, err)
+	assert.Contains(t, logBuf.String(), "started")
+	assert.Contains(t, logBuf.String(), "completed")
+}
+
+func TestNotify_Warnings(t *testing.T) {
+	var logBuf bytes.Buffer
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(nil)
+
+	warningHandler := func(req *types.RequestContext, params int) error {
+		req.AddWarning(errors.New("something is deprecated"))
+		return nil
+	}
+
+	server := &mockServerContext{}
+	wrapped := notify(server, "testNotify", warningHandler)
+
+	err := wrapped(nil, 42)
+
+	assert.NoError(t, err)
+	assert.Contains(t, logBuf.String(), "deprecated")
+}
+
+func TestMethod_Warnings(t *testing.T) {
+	var logBuf bytes.Buffer
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(nil)
+
+	warningHandler := func(req *types.RequestContext, params string) (string, error) {
+		req.AddWarning(errors.New("something is deprecated"))
+		return "result", nil
+	}
+
+	server := &mockServerContext{}
+	wrapped := method(server, "testMethod", warningHandler)
+
+	result, err := wrapped(nil, "params")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "result", result)
+	assert.Contains(t, logBuf.String(), "deprecated")
+}
+
+func TestNoParam_ErrorWrapping(t *testing.T) {
+	var logBuf bytes.Buffer
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(nil)
+
+	errHandler := func(req *types.RequestContext) error {
+		return errors.New("shutdown error")
+	}
+
+	server := &mockServerContext{}
+	wrapped := noParam(server, "shutdown", errHandler)
+
+	err := wrapped(nil)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "shutdown")
+	assert.Contains(t, err.Error(), "shutdown error")
+}
+
+func TestNoParam_Warnings(t *testing.T) {
+	var logBuf bytes.Buffer
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(nil)
+
+	warningHandler := func(req *types.RequestContext) error {
+		req.AddWarning(errors.New("config issue"))
+		return nil
+	}
+
+	server := &mockServerContext{}
+	wrapped := noParam(server, "shutdown", warningHandler)
+
+	err := wrapped(nil)
+
+	assert.NoError(t, err)
+	assert.Contains(t, logBuf.String(), "config issue")
+}
+
 func TestNoParam_PanicRecovery(t *testing.T) {
 	var logBuf bytes.Buffer
 	log.SetOutput(&logBuf)

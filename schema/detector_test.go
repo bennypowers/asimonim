@@ -12,6 +12,168 @@ import (
 	"bennypowers.dev/asimonim/schema"
 )
 
+func TestDetectVersion_HasFeatureInSlice(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected schema.Version
+	}{
+		{
+			name: "$ref inside array element",
+			content: `{
+				"group": {
+					"$value": [
+						{"$ref": "#/other/token"}
+					]
+				}
+			}`,
+			expected: schema.V2025_10,
+		},
+		{
+			name: "$extends inside nested array",
+			content: `{
+				"tokens": {
+					"list": [
+						[{"$extends": "#/base"}]
+					]
+				}
+			}`,
+			expected: schema.V2025_10,
+		},
+		{
+			name: "array with no features",
+			content: `{
+				"group": {
+					"$value": [1, 2, 3]
+				}
+			}`,
+			expected: schema.Draft,
+		},
+		{
+			name: "array with string elements only",
+			content: `{
+				"tags": ["color", "brand"]
+			}`,
+			expected: schema.Draft,
+		},
+		{
+			name: "deeply nested array with $ref",
+			content: `{
+				"a": {
+					"b": {
+						"$value": [
+							{"nested": [{"$ref": "#/x"}]}
+						]
+					}
+				}
+			}`,
+			expected: schema.V2025_10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := schema.DetectVersion([]byte(tt.content), nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.expected {
+				t.Errorf("DetectVersion() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDetectVersion_StructuredColors(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected schema.Version
+	}{
+		{
+			name: "structured color with colorSpace",
+			content: `{
+				"brand": {
+					"primary": {
+						"$type": "color",
+						"$value": {"colorSpace": "srgb", "channels": [1, 0, 0]}
+					}
+				}
+			}`,
+			expected: schema.V2025_10,
+		},
+		{
+			name: "deeply nested structured color",
+			content: `{
+				"theme": {
+					"dark": {
+						"surface": {
+							"$type": "color",
+							"$value": {"colorSpace": "oklch", "channels": [0.5, 0.1, 200]}
+						}
+					}
+				}
+			}`,
+			expected: schema.V2025_10,
+		},
+		{
+			name: "structured color in array context",
+			content: `{
+				"palette": {
+					"$value": [
+						{"colorSpace": "srgb", "channels": [1, 0, 0]}
+					]
+				}
+			}`,
+			// The $value is an array, not a map with colorSpace, so no structured color detection
+			expected: schema.Draft,
+		},
+		{
+			name: "string color value (not structured)",
+			content: `{
+				"color": {
+					"$type": "color",
+					"$value": "#ff0000"
+				}
+			}`,
+			expected: schema.Draft,
+		},
+		{
+			name: "map $value without colorSpace",
+			content: `{
+				"spacing": {
+					"$type": "dimension",
+					"$value": {"value": 4, "unit": "px"}
+				}
+			}`,
+			expected: schema.Draft,
+		},
+		{
+			name: "colorSpace at wrong nesting level",
+			content: `{
+				"color": {
+					"colorSpace": "srgb",
+					"$value": "#ff0000"
+				}
+			}`,
+			// colorSpace is a sibling of $value, not inside $value
+			expected: schema.Draft,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := schema.DetectVersion([]byte(tt.content), nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.expected {
+				t.Errorf("DetectVersion() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestDetectVersion(t *testing.T) {
 	tests := []struct {
 		name     string

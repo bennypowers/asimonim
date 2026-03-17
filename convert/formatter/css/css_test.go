@@ -441,7 +441,79 @@ func TestToCSSValue_DimensionNilValue(t *testing.T) {
 	}
 }
 
-func TestToCSSValue_DimensionMissingUnit(t *testing.T) {
+func TestToCSSValue_MapFallback(t *testing.T) {
+	// Non-color maps should JSON serialize
+	value := map[string]any{"fontFamily": "Arial", "fontSize": "16px"}
+	result := css.ToCSSValue("typography", value)
+	if !strings.Contains(result, "fontFamily") {
+		t.Errorf("expected JSON-serialized map, got %q", result)
+	}
+}
+
+func TestToCSSValue_ArrayFallback(t *testing.T) {
+	// Non-cubic-bezier arrays should JSON serialize
+	value := []any{"item1", "item2"}
+	result := css.ToCSSValue("", value)
+	if result != `["item1","item2"]` {
+		t.Errorf("expected JSON array, got %q", result)
+	}
+}
+
+func TestToCSSValue_IntNumber(t *testing.T) {
+	result := css.ToCSSValue(token.TypeNumber, 42)
+	if result != "42" {
+		t.Errorf("expected \"42\", got %q", result)
+	}
+}
+
+func TestToCSSValue_FontWeight(t *testing.T) {
+	result := css.ToCSSValue(token.TypeFontWeight, 700.0)
+	if result != "700" {
+		t.Errorf("expected \"700\", got %q", result)
+	}
+}
+
+func TestToCSSValue_FontFamilyNoSpaces(t *testing.T) {
+	// Font name without spaces should not be quoted
+	result := css.ToCSSValue(token.TypeFontFamily, "Arial")
+	if result != "Arial" {
+		t.Errorf("expected \"Arial\", got %q", result)
+	}
+}
+
+func TestToCSSValue_SingleQuotedFont(t *testing.T) {
+	// Already single-quoted font should pass through
+	result := css.ToCSSValue(token.TypeFontFamily, "'Helvetica Neue'")
+	if result != "'Helvetica Neue'" {
+		t.Errorf("expected \"'Helvetica Neue'\", got %q", result)
+	}
+}
+
+func TestToCSSValue_CSSUnits(t *testing.T) {
+	units := []string{"10px", "2rem", "1.5em", "50%", "100ms", "2s", "90deg", "1.57rad", "100vw", "50vh"}
+	for _, val := range units {
+		result := css.ToCSSValue("", val)
+		if result != val {
+			t.Errorf("ToCSSValue(%q) = %q, want %q", val, result, val)
+		}
+	}
+}
+
+func TestNew_DefaultSelector(t *testing.T) {
+	f := css.New()
+	tokens := []*token.Token{
+		{Name: "a", Path: []string{"a"}, Value: "1"},
+	}
+	result, err := f.Format(tokens, formatter.Options{})
+	if err != nil {
+		t.Fatalf("Format error: %v", err)
+	}
+	if !strings.Contains(string(result), ":root {") {
+		t.Errorf("expected :root selector in default output")
+	}
+}
+
+func TestDimensionMissingUnit(t *testing.T) {
 	// Structured dimension without unit should fall through gracefully
 	value := map[string]any{"value": 4.0}
 	result := css.ToCSSValue(token.TypeDimension, value)

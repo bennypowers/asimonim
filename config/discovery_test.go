@@ -224,6 +224,107 @@ func TestDiscoverResolvers_CorruptPackageJSON(t *testing.T) {
 	}
 }
 
+func TestFindDepDir(t *testing.T) {
+	t.Run("finds dep in immediate node_modules", func(t *testing.T) {
+		mfs := mapfs.New()
+		mfs.AddFile("/project/node_modules/@acme/tokens/package.json", `{"name":"@acme/tokens"}`, 0644)
+
+		dir := findDepDir(mfs, "/project", "@acme/tokens")
+		if dir != "/project/node_modules/@acme/tokens" {
+			t.Errorf("expected /project/node_modules/@acme/tokens, got %q", dir)
+		}
+	})
+
+	t.Run("finds dep in parent node_modules (hoisted)", func(t *testing.T) {
+		mfs := mapfs.New()
+		// dep is hoisted to parent
+		mfs.AddFile("/parent/node_modules/lodash/package.json", `{"name":"lodash"}`, 0644)
+
+		dir := findDepDir(mfs, "/parent/project", "lodash")
+		if dir != "/parent/node_modules/lodash" {
+			t.Errorf("expected /parent/node_modules/lodash, got %q", dir)
+		}
+	})
+
+	t.Run("returns empty when dep not found", func(t *testing.T) {
+		mfs := mapfs.New()
+
+		dir := findDepDir(mfs, "/project", "nonexistent")
+		if dir != "" {
+			t.Errorf("expected empty string, got %q", dir)
+		}
+	})
+
+	t.Run("prefers closer node_modules", func(t *testing.T) {
+		mfs := mapfs.New()
+		mfs.AddFile("/parent/node_modules/pkg/package.json", `{"name":"pkg"}`, 0644)
+		mfs.AddFile("/parent/project/node_modules/pkg/package.json", `{"name":"pkg"}`, 0644)
+
+		dir := findDepDir(mfs, "/parent/project", "pkg")
+		if dir != "/parent/project/node_modules/pkg" {
+			t.Errorf("expected /parent/project/node_modules/pkg, got %q", dir)
+		}
+	})
+}
+
+func TestUnquoteExportValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "simple string",
+			input:    `"tokens.json"`,
+			expected: "tokens.json",
+		},
+		{
+			name:     "dot-slash prefix stripped",
+			input:    `"./tokens.resolver.json"`,
+			expected: "tokens.resolver.json",
+		},
+		{
+			name:     "non-string value",
+			input:    `42`,
+			expected: "",
+		},
+		{
+			name:     "null value",
+			input:    `null`,
+			expected: "",
+		},
+		{
+			name:     "object value",
+			input:    `{"import":"./index.js"}`,
+			expected: "",
+		},
+		{
+			name:     "array value",
+			input:    `["./a.js","./b.js"]`,
+			expected: "",
+		},
+		{
+			name:     "empty string",
+			input:    `""`,
+			expected: "",
+		},
+		{
+			name:     "path without dot-slash",
+			input:    `"dist/resolver.json"`,
+			expected: "dist/resolver.json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := unquoteExportValue(json.RawMessage(tt.input))
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
+
 func TestResolveExportCondition(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -426,6 +426,109 @@ func TestDefinition_HTMLDocument(t *testing.T) {
 	assert.Equal(t, "file:///tokens.json", locations[0].URI)
 }
 
+func TestDefinition_TokenWithDefinitionURIButNoPath(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	// Token has DefinitionURI but empty Path
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:          "color.primary",
+		Value:         "#ff0000",
+		DefinitionURI: "file:///tokens.json",
+		Path:          []string{}, // empty path
+	})
+
+	uri := "file:///test.css"
+	cssContent := `.button { color: var(--color-primary); }`
+	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+
+	result, err := Definition(req, &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 0, Character: 24},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Nil(t, result, "Token with empty Path should not return definition")
+}
+
+func TestDefinition_UnsupportedLanguage(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	uri := "file:///test.py"
+	_ = ctx.DocumentManager().DidOpen(uri, "python", 1, `print("hello")`)
+
+	result, err := Definition(req, &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 0, Character: 5},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Nil(t, result, "Unsupported language should return nil")
+}
+
+// TestIsPositionInVarCall_MultiLine tests multi-line var() call positions
+func TestIsPositionInVarCall_MultiLine(t *testing.T) {
+	// Multi-line var call range: from line 1 char 5 to line 3 char 10
+	varCall := &css.VarCall{
+		TokenName: "--my-token",
+		Range: css.Range{
+			Start: css.Position{Line: 1, Character: 5},
+			End:   css.Position{Line: 3, Character: 10},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		pos      protocol.Position
+		expected bool
+	}{
+		{"before start line", protocol.Position{Line: 0, Character: 5}, false},
+		{"on start line, before start char", protocol.Position{Line: 1, Character: 4}, false},
+		{"on start line, at start char", protocol.Position{Line: 1, Character: 5}, true},
+		{"on middle line", protocol.Position{Line: 2, Character: 0}, true},
+		{"on end line, before end char", protocol.Position{Line: 3, Character: 5}, true},
+		{"on end line, at end char (excluded)", protocol.Position{Line: 3, Character: 10}, false},
+		{"after end line", protocol.Position{Line: 4, Character: 0}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, isPositionInVarCall(tt.pos, varCall))
+		})
+	}
+}
+
+func TestDefinition_JSONTokenFile_NotTokenFile(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	// Override ShouldProcessAsTokenFile to return false
+	ctx.ShouldProcessAsTokenFileFunc = func(uri string) bool {
+		return false
+	}
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	uri := "file:///package.json"
+	jsonContent := `{"name": "my-package"}`
+	_ = ctx.DocumentManager().DidOpen(uri, "json", 1, jsonContent)
+
+	result, err := Definition(req, &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 0, Character: 5},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Nil(t, result, "Non-token JSON file should return nil")
+}
+
 func TestDefinition_HTMLNoCSS(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	glspCtx := &glsp.Context{}

@@ -9,7 +9,9 @@ package config
 import (
 	"testing"
 
+	"bennypowers.dev/asimonim/internal/mapfs"
 	"bennypowers.dev/asimonim/schema"
+	"bennypowers.dev/asimonim/specifier"
 	"bennypowers.dev/asimonim/testutil"
 )
 
@@ -236,6 +238,66 @@ func TestFileSpec_UnmarshalJSON_Object(t *testing.T) {
 	}
 }
 
+func TestFileSpec_UnmarshalJSON_StringValue(t *testing.T) {
+	var spec FileSpec
+	err := spec.UnmarshalJSON([]byte(`"./tokens.json"`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if spec.Path != "./tokens.json" {
+		t.Errorf("expected path './tokens.json', got %q", spec.Path)
+	}
+	if spec.Prefix != "" {
+		t.Errorf("expected empty prefix, got %q", spec.Prefix)
+	}
+}
+
+func TestFileSpec_UnmarshalJSON_ObjectValue(t *testing.T) {
+	var spec FileSpec
+	err := spec.UnmarshalJSON([]byte(`{"path":"./tokens.json","prefix":"rh","groupMarkers":["_"]}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if spec.Path != "./tokens.json" {
+		t.Errorf("expected path './tokens.json', got %q", spec.Path)
+	}
+	if spec.Prefix != "rh" {
+		t.Errorf("expected prefix 'rh', got %q", spec.Prefix)
+	}
+	if len(spec.GroupMarkers) != 1 || spec.GroupMarkers[0] != "_" {
+		t.Errorf("expected groupMarkers ['_'], got %v", spec.GroupMarkers)
+	}
+}
+
+func TestFileSpec_UnmarshalJSON_InvalidJSON(t *testing.T) {
+	var spec FileSpec
+	err := spec.UnmarshalJSON([]byte(`{not valid`))
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+func TestFileSpec_UnmarshalJSON_NullValue(t *testing.T) {
+	var spec FileSpec
+	err := spec.UnmarshalJSON([]byte(`null`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// null should result in zero-value FileSpec
+	if spec.Path != "" {
+		t.Errorf("expected empty path, got %q", spec.Path)
+	}
+}
+
+func TestFileSpec_UnmarshalJSON_NumberValue(t *testing.T) {
+	var spec FileSpec
+	// A number is not a valid string or object, so it should fail
+	err := spec.UnmarshalJSON([]byte(`42`))
+	if err == nil {
+		t.Fatal("expected error for numeric JSON value")
+	}
+}
+
 func TestConfig_SchemaVersion_Invalid(t *testing.T) {
 	cfg := &Config{Schema: "invalid"}
 	if cfg.SchemaVersion() != schema.Unknown {
@@ -248,6 +310,263 @@ func TestConfig_SchemaVersion_Empty(t *testing.T) {
 	if cfg.SchemaVersion() != schema.Unknown {
 		t.Errorf("expected Unknown for empty schema, got %v", cfg.SchemaVersion())
 	}
+}
+
+func TestExpandFiles_GlobPattern(t *testing.T) {
+	mfs := testutil.NewFixtureFS(t, "fixtures/config/with-globs", "/project")
+
+	cfg, err := Load(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expanded, err := cfg.ExpandFiles(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error expanding files: %v", err)
+	}
+
+	if len(expanded) != 2 {
+		t.Fatalf("expected 2 expanded files, got %d: %v", len(expanded), expanded)
+	}
+
+	// Both YAML files from the tokens/ dir should be found
+	found := map[string]bool{}
+	for _, p := range expanded {
+		found[p] = true
+	}
+	if !found["project/tokens/colors.yaml"] && !found["/project/tokens/colors.yaml"] {
+		t.Errorf("expected colors.yaml in expanded files, got %v", expanded)
+	}
+	if !found["project/tokens/spacing.yaml"] && !found["/project/tokens/spacing.yaml"] {
+		t.Errorf("expected spacing.yaml in expanded files, got %v", expanded)
+	}
+}
+
+func TestExpandFiles_NpmPassthrough(t *testing.T) {
+	cfg := &Config{
+		Files: []FileSpec{
+			{Path: "npm:@acme/tokens/tokens.json"},
+		},
+	}
+
+	mfs := mapfs.New()
+	expanded, err := cfg.ExpandFiles(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(expanded) != 1 {
+		t.Fatalf("expected 1 path, got %d", len(expanded))
+	}
+	if expanded[0] != "npm:@acme/tokens/tokens.json" {
+		t.Errorf("expected npm: path passthrough, got %q", expanded[0])
+	}
+}
+
+func TestExpandFiles_RelativePath(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/tokens.json", `{}`, 0644)
+
+	cfg := &Config{
+		Files: []FileSpec{
+			{Path: "tokens.json"},
+		},
+	}
+
+	expanded, err := cfg.ExpandFiles(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(expanded) != 1 {
+		t.Fatalf("expected 1 path, got %d", len(expanded))
+	}
+	// Relative paths should be made absolute relative to rootDir
+	if expanded[0] != "/project/tokens.json" {
+		t.Errorf("expected /project/tokens.json, got %q", expanded[0])
+	}
+}
+
+func TestExpandFiles_AbsolutePath(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/absolute/tokens.json", `{}`, 0644)
+
+	cfg := &Config{
+		Files: []FileSpec{
+			{Path: "/absolute/tokens.json"},
+		},
+	}
+
+	expanded, err := cfg.ExpandFiles(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(expanded) != 1 {
+		t.Fatalf("expected 1 path, got %d", len(expanded))
+	}
+	if expanded[0] != "/absolute/tokens.json" {
+		t.Errorf("expected /absolute/tokens.json, got %q", expanded[0])
+	}
+}
+
+func TestExpandFiles_EmptyFiles(t *testing.T) {
+	cfg := &Config{}
+
+	mfs := mapfs.New()
+	expanded, err := cfg.ExpandFiles(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(expanded) != 0 {
+		t.Errorf("expected 0 expanded files, got %d", len(expanded))
+	}
+}
+
+func TestExpandGlob_NoMatches(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/tokens.json", `{}`, 0644)
+
+	cfg := &Config{
+		Files: []FileSpec{
+			{Path: "/project/*.yaml"},
+		},
+	}
+
+	expanded, err := cfg.ExpandFiles(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// No YAML files exist, so glob should return empty
+	if len(expanded) != 0 {
+		t.Errorf("expected 0 expanded files, got %d: %v", len(expanded), expanded)
+	}
+}
+
+func TestExpandGlob_DoubleStarPattern(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/tokens/a.json", `{}`, 0644)
+	mfs.AddFile("/project/tokens/sub/b.json", `{}`, 0644)
+	mfs.AddFile("/project/tokens/sub/deep/c.json", `{}`, 0644)
+
+	cfg := &Config{
+		Files: []FileSpec{
+			{Path: "/project/tokens/**/*.json"},
+		},
+	}
+
+	expanded, err := cfg.ExpandFiles(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(expanded) != 3 {
+		t.Fatalf("expected 3 expanded files, got %d: %v", len(expanded), expanded)
+	}
+}
+
+func TestResolveFiles_WithMockResolver(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/tokens.json", `{}`, 0644)
+
+	cfg := &Config{
+		Files: []FileSpec{
+			{Path: "tokens.json"},
+			{Path: "npm:@acme/tokens/tokens.json"},
+		},
+	}
+
+	resolver := &mockResolver{
+		resolveFunc: func(spec string) (*specifier.ResolvedFile, error) {
+			if spec == "npm:@acme/tokens/tokens.json" {
+				return &specifier.ResolvedFile{
+					Specifier: spec,
+					Path:      "/project/node_modules/@acme/tokens/tokens.json",
+					Kind:      specifier.KindNPM,
+				}, nil
+			}
+			return &specifier.ResolvedFile{
+				Specifier: spec,
+				Path:      spec,
+				Kind:      specifier.KindLocal,
+			}, nil
+		},
+	}
+
+	results, err := cfg.ResolveFiles(resolver, mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Fatalf("expected 2 resolved files, got %d", len(results))
+	}
+
+	// First should be local
+	if results[0].Kind != specifier.KindLocal {
+		t.Errorf("expected first result to be KindLocal, got %v", results[0].Kind)
+	}
+
+	// Second should be npm
+	if results[1].Kind != specifier.KindNPM {
+		t.Errorf("expected second result to be KindNPM, got %v", results[1].Kind)
+	}
+	if results[1].Path != "/project/node_modules/@acme/tokens/tokens.json" {
+		t.Errorf("expected npm resolved path, got %q", results[1].Path)
+	}
+}
+
+func TestResolveResolvers_WithMockResolver(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/resolver.json", `{}`, 0644)
+
+	cfg := &Config{
+		Resolvers: []string{
+			"resolver.json",
+			"npm:@acme/tokens/tokens.resolver.json",
+		},
+	}
+
+	resolver := &mockResolver{
+		resolveFunc: func(spec string) (*specifier.ResolvedFile, error) {
+			if spec == "npm:@acme/tokens/tokens.resolver.json" {
+				return &specifier.ResolvedFile{
+					Specifier: spec,
+					Path:      "/project/node_modules/@acme/tokens/tokens.resolver.json",
+					Kind:      specifier.KindNPM,
+				}, nil
+			}
+			return &specifier.ResolvedFile{
+				Specifier: spec,
+				Path:      spec,
+				Kind:      specifier.KindLocal,
+			}, nil
+		},
+	}
+
+	results, err := cfg.ResolveResolvers(resolver, mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Fatalf("expected 2 resolved resolvers, got %d", len(results))
+	}
+}
+
+// mockResolver implements specifier.Resolver for tests.
+type mockResolver struct {
+	resolveFunc func(spec string) (*specifier.ResolvedFile, error)
+}
+
+func (m *mockResolver) Resolve(spec string) (*specifier.ResolvedFile, error) {
+	return m.resolveFunc(spec)
+}
+
+func (m *mockResolver) CanResolve(string) bool {
+	return true
 }
 
 func TestLoad_WithResolvers(t *testing.T) {

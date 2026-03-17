@@ -348,6 +348,131 @@ func TestStringLengthUTF16Uint32(t *testing.T) {
 	}
 }
 
+func TestByteOffsetToUTF16_MidRuneBoundary(t *testing.T) {
+	// When byte offset falls in the middle of a multi-byte rune,
+	// the conversion should stop before crossing that rune
+	tests := []struct {
+		name        string
+		s           string
+		byteOffset  int
+		expectUTF16 int
+	}{
+		{
+			// "颜" is 3 bytes; offset 1 is mid-rune
+			name:        "mid-CJK character (byte 1 of 3)",
+			s:           "颜色",
+			byteOffset:  1,
+			expectUTF16: 0, // Can't count partial rune
+		},
+		{
+			// "颜" is 3 bytes; offset 2 is mid-rune
+			name:        "mid-CJK character (byte 2 of 3)",
+			s:           "颜色",
+			byteOffset:  2,
+			expectUTF16: 0, // Can't count partial rune
+		},
+		{
+			// "👍" is 4 bytes; offset 2 is mid-rune
+			name:        "mid-emoji (byte 2 of 4)",
+			s:           "👍hello",
+			byteOffset:  2,
+			expectUTF16: 0, // Can't count partial rune
+		},
+		{
+			// After "hello" (5 bytes), "👍" starts at byte 5
+			// byte offset 7 is mid-emoji
+			name:        "mid-emoji after ASCII",
+			s:           "hello👍",
+			byteOffset:  7,
+			expectUTF16: 5, // Only "hello" counted
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ByteOffsetToUTF16(tt.s, tt.byteOffset)
+			assert.Equal(t, tt.expectUTF16, result)
+		})
+	}
+}
+
+func TestByteOffsetToUTF16_EndOfString(t *testing.T) {
+	// Byte offset 0 on empty string with size=0 RuneError
+	result := ByteOffsetToUTF16("", 0)
+	assert.Equal(t, 0, result)
+
+	// Beyond string length should be clamped
+	result = ByteOffsetToUTF16("hi", 100)
+	assert.Equal(t, 2, result)
+}
+
+func TestByteOffsetToUTF16Uint32_MoreCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		s           string
+		byteOffset  int
+		expectUTF16 uint32
+	}{
+		{
+			name:        "zero offset",
+			s:           "hello",
+			byteOffset:  0,
+			expectUTF16: 0,
+		},
+		{
+			name:        "beyond end clamps to string length",
+			s:           "hello",
+			byteOffset:  100,
+			expectUTF16: 5,
+		},
+		{
+			name:        "CJK characters",
+			s:           "颜色test",
+			byteOffset:  6, // after both CJK chars
+			expectUTF16: 2,
+		},
+		{
+			name:        "multiple emoji",
+			s:           "👍🎨",
+			byteOffset:  8, // after both emoji
+			expectUTF16: 4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ByteOffsetToUTF16Uint32(tt.s, tt.byteOffset)
+			assert.Equal(t, tt.expectUTF16, result)
+		})
+	}
+}
+
+func TestStringLengthUTF16Uint32_Various(t *testing.T) {
+	tests := []struct {
+		name      string
+		s         string
+		expectLen uint32
+	}{
+		{
+			name:      "mixed emoji and ASCII",
+			s:         "hello 👍 world",
+			expectLen: 14, // 6 + 2 + 6
+		},
+		{
+			name:      "only surrogate pairs",
+			s:         "👍🎨🚀",
+			expectLen: 6, // 3 * 2
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := StringLengthUTF16Uint32(tt.s)
+			assert.Equal(t, tt.expectLen, result)
+		})
+	}
+}
+
 // BenchmarkUTF16ToByteOffset benchmarks the UTF-16 conversion
 func BenchmarkUTF16ToByteOffset(b *testing.B) {
 	tests := []struct {

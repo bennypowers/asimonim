@@ -114,6 +114,99 @@ func TestDidChangeConfiguration_WithoutGLSPContext(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestDidChangeConfiguration_PublishesDiagnosticsForOpenDocs(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+	ctx.SetGLSPContext(glspCtx)
+
+	// Open a document
+	_ = ctx.DocumentManager().DidOpen("file:///workspace/test.css", "css", 1, ".test { color: red; }")
+
+	// Track PublishDiagnostics calls
+	publishedURIs := []string{}
+	ctx.PublishDiagnosticsFunc = func(context *glsp.Context, uri string) error {
+		publishedURIs = append(publishedURIs, uri)
+		return nil
+	}
+
+	settings := map[string]any{
+		"designTokensLanguageServer": map[string]any{
+			"prefix": "--new",
+		},
+	}
+
+	params := &protocol.DidChangeConfigurationParams{
+		Settings: settings,
+	}
+
+	err := DidChangeConfiguration(req, params)
+	require.NoError(t, err)
+
+	// Should have published diagnostics for the open document
+	assert.Len(t, publishedURIs, 1)
+	assert.Equal(t, "file:///workspace/test.css", publishedURIs[0])
+}
+
+func TestDidChangeConfiguration_SkipsDiagnosticsWithPullModel(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+	ctx.SetGLSPContext(glspCtx)
+
+	// Enable pull diagnostics
+	ctx.SetUsePullDiagnostics(true)
+
+	// Open a document
+	_ = ctx.DocumentManager().DidOpen("file:///workspace/test.css", "css", 1, ".test { color: red; }")
+
+	// Track PublishDiagnostics calls
+	publishCalled := false
+	ctx.PublishDiagnosticsFunc = func(context *glsp.Context, uri string) error {
+		publishCalled = true
+		return nil
+	}
+
+	settings := map[string]any{
+		"designTokensLanguageServer": map[string]any{
+			"prefix": "--new",
+		},
+	}
+
+	params := &protocol.DidChangeConfigurationParams{
+		Settings: settings,
+	}
+
+	err := DidChangeConfiguration(req, params)
+	require.NoError(t, err)
+
+	// Should NOT have published diagnostics
+	assert.False(t, publishCalled, "Should not publish diagnostics with pull model")
+}
+
+func TestDidChangeConfiguration_WithGroupMarkers(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	settings := map[string]any{
+		"designTokensLanguageServer": map[string]any{
+			"groupMarkers": []any{"value", "DEFAULT"},
+		},
+	}
+
+	params := &protocol.DidChangeConfigurationParams{
+		Settings: settings,
+	}
+
+	err := DidChangeConfiguration(req, params)
+	require.NoError(t, err)
+
+	config := ctx.GetConfig()
+	assert.True(t, config.GroupMarkersSet)
+	assert.Equal(t, []string{"value", "DEFAULT"}, config.GroupMarkers)
+}
+
 func TestParseConfiguration_DefaultConfig(t *testing.T) {
 	config, err := parseConfiguration(nil)
 	require.NoError(t, err)

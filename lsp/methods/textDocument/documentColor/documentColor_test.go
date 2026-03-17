@@ -570,6 +570,256 @@ func TestDocumentColor_HTMLDocument(t *testing.T) {
 	assert.InDelta(t, 1.0, colors[0].Color.Red, 0.01)
 }
 
+func TestDocumentColor_UnparseableColorToken(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	// Add a color token with an unparseable value
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:  "color.weird",
+		Value: "not-a-valid-color-value-xyz",
+		Type:  "color",
+	})
+
+	uri := "file:///test.css"
+	cssContent := `.button { color: var(--color-weird); }`
+	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+
+	result, err := DocumentColor(req, &protocol.DocumentColorParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+	})
+
+	// Should not error, just skip the unparseable color
+	require.NoError(t, err)
+	assert.Empty(t, result, "Unparseable color should be skipped")
+	// Should have a warning
+	assert.NotEmpty(t, req.Warnings(), "Should have a warning for unparseable color")
+}
+
+func TestDocumentColor_UnparseableColorInDeclaration(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	// Add a color token with an unparseable value
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:  "color.bad",
+		Value: "not-a-color!!",
+		Type:  "color",
+	})
+
+	uri := "file:///test.css"
+	cssContent := `:root { --color-bad: something; }`
+	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+
+	result, err := DocumentColor(req, &protocol.DocumentColorParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, result, "Unparseable color in declaration should be skipped")
+	assert.NotEmpty(t, req.Warnings(), "Should have a warning for unparseable declaration color")
+}
+
+func TestDocumentColor_NonColorTokenInDeclaration(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	// Add a non-color token
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:  "spacing.small",
+		Value: "8px",
+		Type:  "dimension",
+	})
+
+	uri := "file:///test.css"
+	cssContent := `:root { --spacing-small: 8px; }`
+	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+
+	result, err := DocumentColor(req, &protocol.DocumentColorParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, result, "Non-color token in declaration should not produce color info")
+}
+
+func TestDocumentColor_UnknownTokenInDeclaration(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	// Don't add any tokens - --local-var is unknown
+	uri := "file:///test.css"
+	cssContent := `:root { --local-var: blue; }`
+	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+
+	result, err := DocumentColor(req, &protocol.DocumentColorParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, result, "Unknown token in declaration should not produce color info")
+}
+
+func TestDocumentColor_UnknownTokenInVarCall(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	// No tokens loaded
+	uri := "file:///test.css"
+	cssContent := `.button { color: var(--unknown-thing); }`
+	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+
+	result, err := DocumentColor(req, &protocol.DocumentColorParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, result, "Unknown token var() call should not produce color info")
+}
+
+func TestDocumentColor_MultipleColorsAndNonColors(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:  "color.primary",
+		Value: "#ff0000",
+		Type:  "color",
+	})
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:  "spacing.large",
+		Value: "2rem",
+		Type:  "dimension",
+	})
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:  "color.secondary",
+		Value: "#0000ff",
+		Type:  "color",
+	})
+
+	uri := "file:///test.css"
+	cssContent := `.card {
+  color: var(--color-primary);
+  padding: var(--spacing-large);
+  background: var(--color-secondary);
+}`
+	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+
+	result, err := DocumentColor(req, &protocol.DocumentColorParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+	})
+
+	require.NoError(t, err)
+	// Should find 2 colors (not the spacing token)
+	assert.Len(t, result, 2)
+}
+
+func TestColorPresentation_NoMatchingTokens(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:  "color.primary",
+		Value: "#ff0000",
+		Type:  "color",
+	})
+
+	// Request presentations for green - no tokens should match
+	result, err := ColorPresentation(req, &protocol.ColorPresentationParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
+		Color: protocol.Color{
+			Red:   0.0,
+			Green: 1.0,
+			Blue:  0.0,
+			Alpha: 1.0,
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, result)
+}
+
+func TestColorPresentation_NonColorTokensIgnored(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:  "spacing.small",
+		Value: "8px",
+		Type:  "dimension",
+	})
+
+	result, err := ColorPresentation(req, &protocol.ColorPresentationParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
+		Color: protocol.Color{
+			Red:   1.0,
+			Green: 0.0,
+			Blue:  0.0,
+			Alpha: 1.0,
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, result, "Non-color tokens should not appear in color presentations")
+}
+
+func TestColorPresentation_UnparseableTokenColor(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:  "color.weird",
+		Value: "not-a-parseable-color",
+		Type:  "color",
+	})
+
+	result, err := ColorPresentation(req, &protocol.ColorPresentationParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
+		Color: protocol.Color{
+			Red:   1.0,
+			Green: 0.0,
+			Blue:  0.0,
+			Alpha: 1.0,
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, result, "Unparseable color tokens should be skipped")
+	assert.NotEmpty(t, req.Warnings(), "Should have a warning for unparseable color")
+}
+
+func TestDocumentColor_JSDocument(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:  "color.primary",
+		Value: "#ff0000",
+		Type:  "color",
+	})
+
+	uri := "file:///test.js"
+	content := "const s = css`\n  .card { color: var(--color-primary); }\n`;"
+	_ = ctx.DocumentManager().DidOpen(uri, "javascript", 1, content)
+
+	colors, err := DocumentColor(req, &protocol.DocumentColorParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+	})
+	require.NoError(t, err)
+	require.Len(t, colors, 1)
+	assert.InDelta(t, 1.0, colors[0].Color.Red, 0.01)
+}
+
 func TestDocumentColor_HTMLNoCSS(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	glspCtx := &glsp.Context{}

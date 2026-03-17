@@ -727,6 +727,317 @@ func TestServer_SupportsDiagnosticRelatedInfo(t *testing.T) {
 	})
 }
 
+func TestNewServer(t *testing.T) {
+	t.Run("creates server with default values", func(t *testing.T) {
+		s, err := NewServer()
+		require.NoError(t, err)
+		assert.NotNil(t, s)
+		assert.Equal(t, "dev", s.Version())
+		assert.NotNil(t, s.DocumentManager())
+		assert.NotNil(t, s.TokenManager())
+		assert.Equal(t, 0, s.TokenCount())
+		assert.Nil(t, s.ClientDiagnosticCapability())
+		assert.Nil(t, s.ClientCapabilities())
+		assert.False(t, s.UsePullDiagnostics())
+		assert.NotNil(t, s.SemanticTokenCache())
+	})
+
+	t.Run("applies WithVersion option", func(t *testing.T) {
+		s, err := NewServer(WithVersion("1.2.3"))
+		require.NoError(t, err)
+		assert.Equal(t, "1.2.3", s.Version())
+	})
+}
+
+func TestServer_SetGLSPContext(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	// Initially nil
+	assert.Nil(t, s.GLSPContext())
+
+	// Set and retrieve
+	ctx := &glsp.Context{}
+	s.SetGLSPContext(ctx)
+	assert.Equal(t, ctx, s.GLSPContext())
+}
+
+func TestServer_ClientDiagnosticCapability(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	// Initially nil (not detected yet)
+	assert.Nil(t, s.ClientDiagnosticCapability())
+
+	// Set to true
+	s.SetClientDiagnosticCapability(true)
+	cap := s.ClientDiagnosticCapability()
+	require.NotNil(t, cap)
+	assert.True(t, *cap)
+
+	// Set to false
+	s.SetClientDiagnosticCapability(false)
+	cap = s.ClientDiagnosticCapability()
+	require.NotNil(t, cap)
+	assert.False(t, *cap)
+}
+
+func TestServer_ClientCapabilities(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	// Initially nil
+	assert.Nil(t, s.ClientCapabilities())
+
+	// Set and retrieve
+	caps := protocol.ClientCapabilities{
+		TextDocument: &protocol.TextDocumentClientCapabilities{},
+	}
+	s.SetClientCapabilities(caps)
+	got := s.ClientCapabilities()
+	require.NotNil(t, got)
+	assert.NotNil(t, got.TextDocument)
+}
+
+func TestServer_SetUsePullDiagnostics(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	assert.False(t, s.UsePullDiagnostics())
+
+	s.SetUsePullDiagnostics(true)
+	assert.True(t, s.UsePullDiagnostics())
+
+	s.SetUsePullDiagnostics(false)
+	assert.False(t, s.UsePullDiagnostics())
+}
+
+func TestServer_RemoveLoadedFile(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	// Add a loaded file
+	s.loadedFiles["/workspace/tokens.json"] = &TokenFileOptions{Prefix: "ds"}
+	assert.True(t, s.IsTokenFile("/workspace/tokens.json"))
+
+	// Remove it
+	s.RemoveLoadedFile("/workspace/tokens.json")
+	assert.False(t, s.IsTokenFile("/workspace/tokens.json"))
+}
+
+func TestServer_RemoveLoadedFile_NormalizesPath(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	// Add a loaded file with normalized path
+	s.loadedFiles["/workspace/tokens.json"] = &TokenFileOptions{}
+	assert.True(t, s.IsTokenFile("/workspace/tokens.json"))
+
+	// Remove with unnormalized path (has /./)
+	s.RemoveLoadedFile("/workspace/./tokens.json")
+	assert.False(t, s.IsTokenFile("/workspace/tokens.json"))
+}
+
+func TestPublishDiagnostics_PullDiagnosticsSkips(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	// Enable pull diagnostics
+	s.SetUsePullDiagnostics(true)
+
+	// Even with a valid context, PublishDiagnostics should be a no-op
+	ctx := &glsp.Context{}
+	s.SetGLSPContext(ctx)
+
+	err = s.PublishDiagnostics(ctx, "file:///test.css")
+	// Should return nil (skipped, not error)
+	assert.NoError(t, err)
+}
+
+func TestServer_RegisterFileWatchers_NilContext(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	// Should return nil without panicking when context is nil
+	err = s.RegisterFileWatchers(nil)
+	assert.NoError(t, err)
+}
+
+func TestServer_RegisterFileWatchers_EmptyContext(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	// An empty context (Call is nil) should also skip registration
+	ctx := &glsp.Context{}
+	err = s.RegisterFileWatchers(ctx)
+	assert.NoError(t, err)
+}
+
+func TestServer_RegisterFileWatchers_NoWatchers(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	// No token files configured, so no watchers to register
+	s.config.TokensFiles = []any{}
+
+	// We need a context with a non-nil Call to pass the guard,
+	// but we can't create a real one without a server.
+	// The nil/empty context path is already tested above.
+}
+
+func TestServer_BuildFileWatchers(t *testing.T) {
+	t.Run("builds watchers for string token file paths", func(t *testing.T) {
+		s, err := NewServer()
+		require.NoError(t, err)
+
+		s.rootPath = "/workspace"
+		s.config.TokensFiles = []any{
+			"tokens.json",
+			"design-tokens.json",
+		}
+
+		watchers := s.buildFileWatchers()
+		require.Len(t, watchers, 2)
+		// Relative paths joined with rootPath
+		assert.Equal(t, "/workspace/tokens.json", watchers[0].GlobPattern)
+		assert.Equal(t, "/workspace/design-tokens.json", watchers[1].GlobPattern)
+	})
+
+	t.Run("builds watchers for object token file paths", func(t *testing.T) {
+		s, err := NewServer()
+		require.NoError(t, err)
+
+		s.rootPath = "/workspace"
+		s.config.TokensFiles = []any{
+			map[string]any{"path": "tokens.json", "prefix": "ds"},
+		}
+
+		watchers := s.buildFileWatchers()
+		require.Len(t, watchers, 1)
+		assert.Equal(t, "/workspace/tokens.json", watchers[0].GlobPattern)
+	})
+
+	t.Run("skips entries with empty path", func(t *testing.T) {
+		s, err := NewServer()
+		require.NoError(t, err)
+
+		s.rootPath = "/workspace"
+		s.config.TokensFiles = []any{
+			"",                            // empty string
+			map[string]any{"path": ""},    // empty path in object
+			map[string]any{"prefix": "ds"}, // no path key at all
+		}
+
+		watchers := s.buildFileWatchers()
+		assert.Empty(t, watchers)
+	})
+
+	t.Run("handles absolute token file paths", func(t *testing.T) {
+		s, err := NewServer()
+		require.NoError(t, err)
+
+		s.rootPath = "/workspace"
+		s.config.TokensFiles = []any{
+			"/absolute/path/to/tokens.json",
+		}
+
+		watchers := s.buildFileWatchers()
+		require.Len(t, watchers, 1)
+		assert.Equal(t, "/absolute/path/to/tokens.json", watchers[0].GlobPattern)
+	})
+
+	t.Run("handles relative paths with no root path", func(t *testing.T) {
+		s, err := NewServer()
+		require.NoError(t, err)
+
+		// No rootPath set
+		s.config.TokensFiles = []any{
+			"tokens.json",
+		}
+
+		watchers := s.buildFileWatchers()
+		require.Len(t, watchers, 1)
+		assert.Equal(t, "tokens.json", watchers[0].GlobPattern)
+	})
+
+	t.Run("returns empty for no configured files", func(t *testing.T) {
+		s, err := NewServer()
+		require.NoError(t, err)
+
+		s.config.TokensFiles = []any{}
+
+		watchers := s.buildFileWatchers()
+		assert.Empty(t, watchers)
+	})
+
+	t.Run("cleans redundant path separators", func(t *testing.T) {
+		s, err := NewServer()
+		require.NoError(t, err)
+
+		s.rootPath = "/workspace"
+		s.config.TokensFiles = []any{
+			"./sub/../tokens.json",
+		}
+
+		watchers := s.buildFileWatchers()
+		require.Len(t, watchers, 1)
+		// filepath.Clean should normalize the path
+		assert.Equal(t, "/workspace/tokens.json", watchers[0].GlobPattern)
+	})
+}
+
+func TestPublishDiagnostics_UsesPassedContext(t *testing.T) {
+	t.Run("skips when pull diagnostics enabled with passed context", func(t *testing.T) {
+		s, err := NewServer()
+		require.NoError(t, err)
+
+		s.SetUsePullDiagnostics(true)
+
+		// Even with a passed context, should skip
+		ctx := &glsp.Context{}
+		err = s.PublishDiagnostics(ctx, "file:///test.json")
+		assert.NoError(t, err)
+	})
+
+	t.Run("falls back to server context when passed nil", func(t *testing.T) {
+		s, err := NewServer()
+		require.NoError(t, err)
+
+		// No server context set either -- should error
+		err = s.PublishDiagnostics(nil, "file:///test.json")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no client context available")
+	})
+}
+
+func TestServer_IsTokenFile_ObjectWithMissingPath(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	s.rootPath = "/workspace"
+	// Object entry without "path" key
+	s.config.TokensFiles = []any{
+		map[string]any{"prefix": "ds"},
+	}
+
+	result := s.IsTokenFile("/workspace/tokens.json")
+	assert.False(t, result)
+}
+
+func TestServer_IsTokenFile_ObjectWithEmptyPath(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	s.rootPath = "/workspace"
+	// Object entry with empty "path" value
+	s.config.TokensFiles = []any{
+		map[string]any{"path": ""},
+	}
+
+	result := s.IsTokenFile("/workspace/tokens.json")
+	assert.False(t, result)
+}
+
 func TestServer_SupportsCodeActionLiterals(t *testing.T) {
 	t.Run("returns false when capabilities are nil", func(t *testing.T) {
 		s, err := NewServer()

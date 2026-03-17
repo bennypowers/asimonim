@@ -654,6 +654,57 @@ func TestDocumentManagerStartCharClamp(t *testing.T) {
 	assert.Equal(t, "hi world", doc.Content())
 }
 
+// TestDocumentManagerStartLineBeyondDocument tests start line out-of-bounds after normalization
+func TestDocumentManagerStartLineBeyondDocument(t *testing.T) {
+	manager := documents.NewManager()
+	uri := "file:///test.css"
+
+	// A document with 2 lines (line 0 and line 1)
+	content := "line1\nline2"
+	err := manager.DidOpen(uri, "css", 1, content)
+	require.NoError(t, err)
+
+	// Start line 3 is beyond EOF (len(lines) == 2, so line 3 > len(lines))
+	changes := []protocol.TextDocumentContentChangeEvent{
+		{
+			Range: &protocol.Range{
+				Start: protocol.Position{Line: 3, Character: 0},
+				End:   protocol.Position{Line: 3, Character: 0},
+			},
+			Text: "invalid",
+		},
+	}
+
+	err = manager.DidChange(uri, 2, changes)
+	assert.Error(t, err, "Should reject start line beyond document bounds")
+	assert.Contains(t, err.Error(), "out of bounds")
+}
+
+// TestDocumentManagerEndLineOnlyBeyondDocument tests end line out-of-bounds while start is valid
+func TestDocumentManagerEndLineOnlyBeyondDocument(t *testing.T) {
+	manager := documents.NewManager()
+	uri := "file:///test.css"
+
+	content := "line1\nline2\nline3"
+	err := manager.DidOpen(uri, "css", 1, content)
+	require.NoError(t, err)
+
+	// Start line valid (1), end line out-of-bounds after normalization
+	// Line 5 > len(lines)==3, so it fails the initial > check
+	changes := []protocol.TextDocumentContentChangeEvent{
+		{
+			Range: &protocol.Range{
+				Start: protocol.Position{Line: 1, Character: 0},
+				End:   protocol.Position{Line: 5, Character: 0},
+			},
+			Text: "invalid",
+		},
+	}
+
+	err = manager.DidChange(uri, 2, changes)
+	assert.Error(t, err, "Should reject end line beyond document bounds")
+}
+
 // TestDocumentManagerCharBeyondLineLength tests character position validation
 func TestDocumentManagerCharBeyondLineLength(t *testing.T) {
 	manager := documents.NewManager()

@@ -1,0 +1,14 @@
+{
+  "color-brand": {
+    "scope": "css,scss,less,stylus,postcss",
+    "prefix": [
+      "color-brand",
+      "colorBrand",
+      "color_brand",
+      "ff6b35"
+    ],
+    "body": [
+      "var(--color-brand)"
+    ]
+  }
+}

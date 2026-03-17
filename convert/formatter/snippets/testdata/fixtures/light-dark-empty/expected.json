@@ -1,0 +1,13 @@
+{
+  "color-accent": {
+    "scope": "css,scss,less,stylus,postcss",
+    "prefix": [
+      "color-accent",
+      "colorAccent",
+      "color_accent"
+    ],
+    "body": [
+      "var(--color-accent)"
+    ]
+  }
+}

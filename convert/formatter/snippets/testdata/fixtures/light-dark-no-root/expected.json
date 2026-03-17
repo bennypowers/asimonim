@@ -1,0 +1,13 @@
+{
+  "color-surface": {
+    "scope": "css,scss,less,stylus,postcss",
+    "prefix": [
+      "color-surface",
+      "colorSurface",
+      "color_surface"
+    ],
+    "body": [
+      "var(--color-surface, light-dark(\n  var(--color-surface-light, #f5f5f5),\n  var(--color-surface-dark, #1a1a1a)\n))"
+    ]
+  }
+}

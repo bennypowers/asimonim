@@ -507,20 +507,13 @@ func (s *Server) RemoveLoadedFile(path string) {
 	s.loadedFilesMu.Unlock()
 }
 
-// RegisterFileWatchers registers file watchers with the client
-func (s *Server) RegisterFileWatchers(context *glsp.Context) error {
-	// Guard against nil or empty context (can happen in tests without real LSP connection)
-	// An empty context (created with &glsp.Context{}) won't have Call initialized
-	if context == nil || context.Call == nil {
-		log.Info("Skipping file watcher registration (no client context)")
-		return nil
-	}
-
-	// Get config and state snapshots for thread-safe access
+// buildFileWatchers constructs file system watchers from the server's
+// configured token files. It resolves relative paths against the workspace
+// root and normalizes all patterns to use forward slashes.
+func (s *Server) buildFileWatchers() []protocol.FileSystemWatcher {
 	cfg := s.GetConfig()
 	state := s.GetState()
 
-	// Build file watchers for configured token files
 	watchers := []protocol.FileSystemWatcher{}
 
 	if len(cfg.TokensFiles) > 0 {
@@ -560,6 +553,21 @@ func (s *Server) RegisterFileWatchers(context *glsp.Context) error {
 			})
 		}
 	}
+
+	return watchers
+}
+
+// RegisterFileWatchers registers file watchers with the client
+func (s *Server) RegisterFileWatchers(context *glsp.Context) error {
+	// Guard against nil or empty context (can happen in tests without real LSP connection)
+	// An empty context (created with &glsp.Context{}) won't have Call initialized
+	if context == nil || context.Call == nil {
+		log.Info("Skipping file watcher registration (no client context)")
+		return nil
+	}
+
+	// Build file watchers for configured token files
+	watchers := s.buildFileWatchers()
 
 	if len(watchers) == 0 {
 		log.Info("No file watchers to register")

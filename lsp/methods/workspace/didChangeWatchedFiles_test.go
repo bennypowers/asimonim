@@ -182,6 +182,108 @@ func TestHandleDidChangeWatchedFiles_NewlyCreatedFile(t *testing.T) {
 	// call LoadTokensFromConfig, which would discover the new file
 }
 
+func TestHandleDidChangeWatchedFiles_SkipsDiagnosticsWithPullModel(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	req := types.NewRequestContext(ctx, nil)
+	ctx.SetRootPath("/workspace")
+
+	// Enable pull diagnostics
+	ctx.SetUsePullDiagnostics(true)
+
+	// Set up GLSP context
+	glspCtx := &glsp.Context{}
+	ctx.SetGLSPContext(glspCtx)
+
+	// Track PublishDiagnostics calls - should NOT be called
+	publishCalled := false
+	ctx.PublishDiagnosticsFunc = func(context *glsp.Context, uri string) error {
+		publishCalled = true
+		return nil
+	}
+
+	ctx.IsTokenFileFunc = func(path string) bool {
+		return path == "/workspace/tokens.json"
+	}
+
+	config := ctx.GetConfig()
+	config.TokensFiles = []any{"/workspace/tokens.json"}
+	ctx.SetConfig(config)
+
+	// Open a document
+	_ = ctx.DocumentManager().DidOpen("file:///workspace/test.css", "css", 1, ".test { color: red; }")
+
+	params := &protocol.DidChangeWatchedFilesParams{
+		Changes: []protocol.FileEvent{
+			{
+				URI:  "file:///workspace/tokens.json",
+				Type: protocol.FileChangeTypeChanged,
+			},
+		},
+	}
+
+	err := DidChangeWatchedFiles(req, params)
+	if err != nil {
+		t.Errorf("DidChangeWatchedFiles failed: %v", err)
+	}
+
+	// Should NOT have published diagnostics because pull model is active
+	if publishCalled {
+		t.Error("Expected PublishDiagnostics NOT to be called with pull diagnostics enabled")
+	}
+}
+
+func TestHandleDidChangeWatchedFiles_EmptyChanges(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	req := types.NewRequestContext(ctx, nil)
+
+	params := &protocol.DidChangeWatchedFilesParams{
+		Changes: []protocol.FileEvent{},
+	}
+
+	err := DidChangeWatchedFiles(req, params)
+	if err != nil {
+		t.Errorf("DidChangeWatchedFiles failed: %v", err)
+	}
+
+	// Should not have triggered a reload
+	if ctx.LoadTokensCalled {
+		t.Error("Expected LoadTokensFromConfig NOT to be called with empty changes")
+	}
+}
+
+func TestHandleDidChangeWatchedFiles_DeleteClearsTokens(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	req := types.NewRequestContext(ctx, nil)
+	ctx.SetRootPath("/workspace")
+
+	ctx.IsTokenFileFunc = func(path string) bool {
+		return path == "/workspace/tokens.json"
+	}
+
+	config := ctx.GetConfig()
+	config.TokensFiles = []any{"/workspace/tokens.json"}
+	ctx.SetConfig(config)
+
+	params := &protocol.DidChangeWatchedFilesParams{
+		Changes: []protocol.FileEvent{
+			{
+				URI:  "file:///workspace/tokens.json",
+				Type: protocol.FileChangeTypeDeleted,
+			},
+		},
+	}
+
+	err := DidChangeWatchedFiles(req, params)
+	if err != nil {
+		t.Errorf("DidChangeWatchedFiles failed: %v", err)
+	}
+
+	// Should have called LoadTokensFromConfig after deletion
+	if !ctx.LoadTokensCalled {
+		t.Error("Expected LoadTokensFromConfig to be called after token file deletion")
+	}
+}
+
 func TestHandleDidChangeWatchedFiles_PublishesDiagnostics(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	req := types.NewRequestContext(ctx, nil)
