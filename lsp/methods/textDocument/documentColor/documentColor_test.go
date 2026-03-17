@@ -567,7 +567,11 @@ func TestDocumentColor_HTMLDocument(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, colors, 1)
+	// #ff0000 -> R=1, G=0, B=0, A=1
 	assert.InDelta(t, 1.0, colors[0].Color.Red, 0.01)
+	assert.InDelta(t, 0.0, colors[0].Color.Green, 0.01)
+	assert.InDelta(t, 0.0, colors[0].Color.Blue, 0.01)
+	assert.InDelta(t, 1.0, colors[0].Color.Alpha, 0.01)
 }
 
 func TestDocumentColor_UnparseableColorToken(t *testing.T) {
@@ -831,7 +835,11 @@ func TestDocumentColor_JSDocument(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, colors, 1)
+	// #ff0000 -> R=1, G=0, B=0, A=1
 	assert.InDelta(t, 1.0, colors[0].Color.Red, 0.01)
+	assert.InDelta(t, 0.0, colors[0].Color.Green, 0.01)
+	assert.InDelta(t, 0.0, colors[0].Color.Blue, 0.01)
+	assert.InDelta(t, 1.0, colors[0].Color.Alpha, 0.01)
 }
 
 func TestDocumentColor_HTMLNoCSS(t *testing.T) {
