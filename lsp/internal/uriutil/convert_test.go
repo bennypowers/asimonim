@@ -725,10 +725,12 @@ func TestURIToPath_PercentEncodedSpecialChars(t *testing.T) {
 
 // TestURIToPath_DriveLetterInHost tests the edge case where a drive letter appears in the host position
 func TestURIToPath_DriveLetterInHost(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Platform-specific path format differs on Windows")
+	}
 	// file://C:/path is technically a drive letter in host position
 	result := URIToPath("file://C:/project/file.txt")
-	// On non-Windows, the C: host gets folded into the path
-	assert.Equal(t, "C:/project/file.txt", result)
+	assert.Equal(t, filepath.FromSlash("C:/project/file.txt"), result)
 }
 
 // TestPathToURI_TrailingSlash tests paths with trailing slashes

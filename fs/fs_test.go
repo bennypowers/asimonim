@@ -9,6 +9,7 @@ package fs_test
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"bennypowers.dev/asimonim/fs"
@@ -108,7 +109,12 @@ func TestOSFileSystem_ReadDir(t *testing.T) {
 		t.Fatalf("ReadDir error: %v", err)
 	}
 	if len(entries) != 2 {
-		t.Errorf("expected 2 entries, got %d", len(entries))
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+	names := []string{entries[0].Name(), entries[1].Name()}
+	sort.Strings(names)
+	if names[0] != "a.txt" || names[1] != "b.txt" {
+		t.Errorf("expected [a.txt, b.txt], got %v", names)
 	}
 }
 
@@ -133,7 +139,14 @@ func TestOSFileSystem_TempDir(t *testing.T) {
 	osfs := fs.NewOSFileSystem()
 	td := osfs.TempDir()
 	if td == "" {
-		t.Error("TempDir returned empty string")
+		t.Fatal("TempDir returned empty string")
+	}
+	info, err := os.Stat(td)
+	if err != nil {
+		t.Fatalf("TempDir path does not exist: %v", err)
+	}
+	if !info.IsDir() {
+		t.Errorf("TempDir path is not a directory: %s", td)
 	}
 }
 

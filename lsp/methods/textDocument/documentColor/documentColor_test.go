@@ -576,15 +576,15 @@ func TestDocumentColor_UnparseableColorToken(t *testing.T) {
 	req := types.NewRequestContext(ctx, glspCtx)
 
 	// Add a color token with an unparseable value
-	_ = ctx.TokenManager().Add(&tokens.Token{
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.weird",
 		Value: "not-a-valid-color-value-xyz",
 		Type:  "color",
-	})
+	}))
 
 	uri := "file:///test.css"
 	cssContent := `.button { color: var(--color-weird); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
@@ -718,15 +718,20 @@ func TestDocumentColor_MultipleColorsAndNonColors(t *testing.T) {
 	require.NoError(t, err)
 	// Should find 2 colors (not the spacing token)
 	require.Len(t, result, 2)
-	// Verify the found colors are the expected ones (red and blue)
+	// Verify exactly one red and one blue (no duplicates)
+	seenRed, seenBlue := false, false
 	for _, ci := range result {
 		r, g, b := ci.Color.Red, ci.Color.Green, ci.Color.Blue
-		isRed := r > 0.9 && g < 0.1 && b < 0.1
-		isBlue := r < 0.1 && g < 0.1 && b > 0.9
-		if !isRed && !isBlue {
+		if r > 0.9 && g < 0.1 && b < 0.1 {
+			seenRed = true
+		} else if r < 0.1 && g < 0.1 && b > 0.9 {
+			seenBlue = true
+		} else {
 			t.Errorf("unexpected color: R=%.2f G=%.2f B=%.2f", r, g, b)
 		}
 	}
+	assert.True(t, seenRed, "expected red color")
+	assert.True(t, seenBlue, "expected blue color")
 }
 
 func TestColorPresentation_NoMatchingTokens(t *testing.T) {
