@@ -58,7 +58,7 @@ asimonim/
 
 ## asimonim CLI usage
 
-When running asimonim commands against test fixtures, use the `-p` flag:
+When running asimonim commands against test fixtures:
 
 ```shell
 $ make
@@ -113,7 +113,13 @@ For lower-level tests that need a MapFileSystem directly, use `testutil.NewFixtu
 
 ```go
 mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
-tokens, _ := parser.ParseFile(mfs, "/test/tokens.json", opts)
+tokens, err := parser.ParseFile(mfs, "/test/tokens.json", parser.Options{
+    SchemaVersion: schema.Draft,
+    SkipPositions: true,
+})
+if err != nil {
+    t.Fatalf("failed to parse: %v", err)
+}
 ```
 
 ### Assertions

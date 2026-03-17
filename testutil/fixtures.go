@@ -79,17 +79,40 @@ func LoadFixtureFile(t *testing.T, fixturePath string) []byte {
 	return content
 }
 
-// findTestdata locates a path under testdata/ by walking up parent directories.
-func findTestdata(t *testing.T, relPath string) string {
-	t.Helper()
-	for i := range 5 {
+// maxParentProbe is the maximum number of parent directories to search for testdata/.
+const maxParentProbe = 5
+
+// probeTestdata searches for relPath under testdata/ by walking up parent directories.
+// Returns the found path or empty string if not found.
+func probeTestdata(relPath string) string {
+	for i := range maxParentProbe {
 		prefix := strings.Repeat("../", i)
 		candidate := filepath.Join(prefix+"testdata", relPath)
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate
 		}
 	}
-	t.Fatalf("Could not find testdata/%s (tried up to 4 parent dirs)", relPath)
+	return ""
+}
+
+// probeTestdataRoot returns the nearest testdata/ directory by walking up parents.
+func probeTestdataRoot() string {
+	for i := range maxParentProbe {
+		candidate := strings.Repeat("../", i) + "testdata"
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	return ""
+}
+
+// findTestdata locates a path under testdata/ by walking up parent directories.
+func findTestdata(t *testing.T, relPath string) string {
+	t.Helper()
+	if path := probeTestdata(relPath); path != "" {
+		return path
+	}
+	t.Fatalf("Could not find testdata/%s (tried up to %d parent dirs)", relPath, maxParentProbe-1)
 	return ""
 }
 
@@ -156,24 +179,16 @@ func UpdateGoldenFile(t *testing.T, goldenPath string, actual []byte) {
 // findTestdataOrCreate locates a path under testdata/, creating it if needed.
 func findTestdataOrCreate(t *testing.T, relPath string) string {
 	t.Helper()
-	for i := range 5 {
-		prefix := strings.Repeat("../", i)
-		candidate := filepath.Join(prefix+"testdata", relPath)
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
+	if path := probeTestdata(relPath); path != "" {
+		return path
 	}
 	// Fallback: create under the nearest testdata/ that exists
-	for i := range 5 {
-		prefix := strings.Repeat("../", i)
-		candidate := prefix + "testdata"
-		if _, err := os.Stat(candidate); err == nil {
-			target := filepath.Join(candidate, relPath)
-			if err := os.MkdirAll(target, 0755); err != nil {
-				t.Fatalf("Failed to create %s: %v", target, err)
-			}
-			return target
+	if root := probeTestdataRoot(); root != "" {
+		target := filepath.Join(root, relPath)
+		if err := os.MkdirAll(target, 0755); err != nil {
+			t.Fatalf("Failed to create %s: %v", target, err)
 		}
+		return target
 	}
 	t.Fatalf("Could not find testdata/ directory for golden file %s", relPath)
 	return ""
