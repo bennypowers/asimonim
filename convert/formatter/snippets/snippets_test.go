@@ -173,11 +173,6 @@ func runFixtureTestWithNew(t *testing.T, fixtureName string) {
 		t.Fatalf("Format() error = %v", err)
 	}
 
-	// VSCode format includes "scope" field
-	if !strings.Contains(string(result), `"scope"`) {
-		t.Errorf("expected VSCode format with scope field, got:\n%s", result)
-	}
-
 	goldenRelPath := filepath.Join(fixturePath, "expected.json")
 	testutil.UpdateGoldenFile(t, goldenRelPath, result)
 

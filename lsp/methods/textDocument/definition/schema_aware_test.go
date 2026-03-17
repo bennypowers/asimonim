@@ -368,7 +368,7 @@ func TestDefinition_TokenFile_GetLineTextFromDocument(t *testing.T) {
 
 	// getLineText should have retrieved the line from the document manager
 	// and converted byte offset to UTF-16
-	assert.Equal(t, "file:///tokens.json", locations[0].URI)
+	assert.Equal(t, "file:///tokens.json", string(locations[0].URI))
 	assert.Equal(t, uint32(2), locations[0].Range.Start.Line)
 }
 
@@ -466,7 +466,7 @@ func TestDefinition_TokenFile_GetLineTextFromDisk(t *testing.T) {
 	locations, ok := result.([]protocol.Location)
 	require.True(t, ok)
 	require.Len(t, locations, 1)
-	assert.Equal(t, "file:///nonexistent-definition-file.json", locations[0].URI)
+	assert.Equal(t, "file:///nonexistent-definition-file.json", string(locations[0].URI))
 	assert.Equal(t, uint32(5), locations[0].Range.Start.Line)
 	assert.Equal(t, uint32(0), locations[0].Range.Start.Character, "Should fallback to 0 when file is unreadable")
 }

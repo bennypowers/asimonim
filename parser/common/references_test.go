@@ -40,6 +40,7 @@ func TestExtractReferences(t *testing.T) {
 			content: "plain text",
 			version: schema.Draft,
 			want:    0,
+			paths:   []string{},
 		},
 		{
 			name:    "v2025_10 curly brace",

@@ -334,11 +334,11 @@ func TestExpandFiles_GlobPattern(t *testing.T) {
 	for _, p := range expanded {
 		found[p] = true
 	}
-	if !found["project/tokens/colors.yaml"] && !found["/project/tokens/colors.yaml"] {
-		t.Errorf("expected colors.yaml in expanded files, got %v", expanded)
+	if !found["/project/tokens/colors.yaml"] {
+		t.Errorf("expected /project/tokens/colors.yaml in expanded files, got %v", expanded)
 	}
-	if !found["project/tokens/spacing.yaml"] && !found["/project/tokens/spacing.yaml"] {
-		t.Errorf("expected spacing.yaml in expanded files, got %v", expanded)
+	if !found["/project/tokens/spacing.yaml"] {
+		t.Errorf("expected /project/tokens/spacing.yaml in expanded files, got %v", expanded)
 	}
 }
 

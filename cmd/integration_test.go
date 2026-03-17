@@ -29,7 +29,10 @@ func testdataDir(t *testing.T) string {
 func captureAndExecute(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
+	r, w, pipeErr := os.Pipe()
+	if pipeErr != nil {
+		t.Fatalf("failed to create pipe: %v", pipeErr)
+	}
 	os.Stdout = w
 
 	rootCmd := cmd.RootCmd

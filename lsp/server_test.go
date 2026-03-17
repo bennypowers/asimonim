@@ -874,15 +874,7 @@ func TestServer_RegisterFileWatchers_EmptyContext(t *testing.T) {
 }
 
 func TestServer_RegisterFileWatchers_NoWatchers(t *testing.T) {
-	s, err := NewServer()
-	require.NoError(t, err)
-
-	// No token files configured, so no watchers to register
-	s.config.TokensFiles = []any{}
-
-	// We need a context with a non-nil Call to pass the guard,
-	// but we can't create a real one without a server.
-	// The nil/empty context path is already tested above.
+	t.Skip("Cannot test without real GLSP context; empty watchers case covered by TestServer_BuildFileWatchers")
 }
 
 func TestServer_BuildFileWatchers(t *testing.T) {
