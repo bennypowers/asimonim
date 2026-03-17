@@ -52,6 +52,28 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 				"alpha":      1.0,
 			},
 		},
+		{
+			Name:          "color.display-p3",
+			Path:          []string{"color", "display-p3"},
+			Type:          token.TypeColor,
+			SchemaVersion: schema.V2025_10,
+			RawValue: map[string]any{
+				"colorSpace": "display-p3",
+				"components": []any{1.0, 0.5, 0.25},
+				"alpha":      1.0,
+			},
+		},
+		{
+			Name:          "color.srgb-alpha",
+			Path:          []string{"color", "srgb-alpha"},
+			Type:          token.TypeColor,
+			SchemaVersion: schema.V2025_10,
+			RawValue: map[string]any{
+				"colorSpace": "srgb",
+				"components": []any{1.0, 0.0, 0.0},
+				"alpha":      0.5,
+			},
+		},
 	}
 
 	f := android.New()
@@ -62,7 +84,12 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 
 	output := string(result)
 
-	// sRGB with hex field should use the hex value
+	// All colors must be hex — no CSS functions allowed in Android XML
+	if strings.Contains(output, "oklch(") || strings.Contains(output, "color(") {
+		t.Errorf("Android output contains CSS color functions:\n%s", output)
+	}
+
+	// sRGB with hex field should use it
 	if !strings.Contains(output, "#FF6B36") {
 		t.Errorf("expected #FF6B36 for srgb-hex, got:\n%s", output)
 	}
@@ -72,9 +99,24 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 		t.Errorf("expected #FF8040 for srgb-no-hex, got:\n%s", output)
 	}
 
-	// Non-sRGB colors emit CSS functions as best-effort
-	if !strings.Contains(output, "oklch(0.7 0.15 180)") {
-		t.Errorf("expected oklch CSS value for oklch color, got:\n%s", output)
+	// All values must be hex format
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "<color") && strings.Contains(line, ">") {
+			// Extract value between > and <
+			start := strings.Index(line, ">") + 1
+			end := strings.LastIndex(line, "<")
+			if start > 0 && end > start {
+				val := line[start:end]
+				if !strings.HasPrefix(val, "#") {
+					t.Errorf("non-hex color value in Android XML: %q", val)
+				}
+			}
+		}
+	}
+
+	// Alpha should produce #AARRGGBB format
+	if !strings.Contains(output, "#80FF0000") {
+		t.Errorf("expected #80FF0000 for srgb with alpha 0.5, got:\n%s", output)
 	}
 
 	// Ensure no Go map literals in output
@@ -106,7 +148,6 @@ func TestFormat_V2025_10_StructuredDimensions(t *testing.T) {
 		t.Errorf("expected 4px for structured dimension, got:\n%s", output)
 	}
 
-	// Ensure no Go map literals in output
 	if strings.Contains(output, "map[") {
 		t.Errorf("output contains Go map literal:\n%s", output)
 	}
