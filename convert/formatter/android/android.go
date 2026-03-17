@@ -16,6 +16,7 @@ license that can be found in the LICENSE file.
 package android
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -83,6 +84,15 @@ func toAndroidValue(tok *token.Token) string {
 				}
 			}
 			return formatter.MarshalFallback(m)
+		}
+	}
+
+	switch v := value.(type) {
+	case map[string]any:
+		return formatter.MarshalFallback(v)
+	case []any:
+		if data, err := json.Marshal(v); err == nil {
+			return string(data)
 		}
 	}
 
