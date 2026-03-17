@@ -139,6 +139,7 @@ func toSwiftValue(tokenType string, value any) string {
 				}
 			}
 			logger.Warn("dimension token has map structure but missing valid value")
+			return fmt.Sprintf("%q", formatter.MarshalFallback(m))
 		}
 		if s, ok := value.(string); ok {
 			s = strings.TrimSuffix(s, "px")

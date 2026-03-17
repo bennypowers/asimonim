@@ -31,6 +31,17 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 			},
 		},
 		{
+			Name:          "color.srgb-no-hex",
+			Path:          []string{"color", "srgb-no-hex"},
+			Type:          token.TypeColor,
+			SchemaVersion: schema.V2025_10,
+			RawValue: map[string]any{
+				"colorSpace": "srgb",
+				"components": []any{1.0, 0.5, 0.25},
+				"alpha":      1.0,
+			},
+		},
+		{
 			Name:          "color.oklch",
 			Path:          []string{"color", "oklch"},
 			Type:          token.TypeColor,
@@ -38,17 +49,6 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 			RawValue: map[string]any{
 				"colorSpace": "oklch",
 				"components": []any{0.7, 0.15, 180.0},
-				"alpha":      1.0,
-			},
-		},
-		{
-			Name:          "color.display-p3",
-			Path:          []string{"color", "display-p3"},
-			Type:          token.TypeColor,
-			SchemaVersion: schema.V2025_10,
-			RawValue: map[string]any{
-				"colorSpace": "display-p3",
-				"components": []any{1.0, 0.5, 0.25},
 				"alpha":      1.0,
 			},
 		},
@@ -62,15 +62,19 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 
 	output := string(result)
 
-	// Android XML should contain proper color values
+	// sRGB with hex field should use the hex value
 	if !strings.Contains(output, "#FF6B36") {
 		t.Errorf("expected #FF6B36 for srgb-hex, got:\n%s", output)
 	}
+
+	// sRGB without hex should convert to hex
+	if !strings.Contains(output, "#FF8040") {
+		t.Errorf("expected #FF8040 for srgb-no-hex, got:\n%s", output)
+	}
+
+	// Non-sRGB colors emit CSS functions as best-effort
 	if !strings.Contains(output, "oklch(0.7 0.15 180)") {
 		t.Errorf("expected oklch CSS value for oklch color, got:\n%s", output)
-	}
-	if !strings.Contains(output, "color(display-p3 1 0.5 0.25)") {
-		t.Errorf("expected color() function for display-p3, got:\n%s", output)
 	}
 
 	// Ensure no Go map literals in output

@@ -51,6 +51,11 @@ func TestFormat_V2025_10_Colors(t *testing.T) {
 	runFixtureTestV2025(t, "v2025-10-colors", css.Options{})
 }
 
+// Regression test for issue #17: exact scenario from the bug report.
+func TestFormat_V2025_10_Issue17(t *testing.T) {
+	runFixtureTestV2025(t, "v2025-10-issue-17", css.Options{})
+}
+
 // runFixtureTest runs a fixture-based test for the CSS formatter using draft schema.
 func runFixtureTest(t *testing.T, fixtureName string, cssOpts css.Options) {
 	t.Helper()
@@ -424,36 +429,6 @@ func TestToCSSValue_StringDimension(t *testing.T) {
 	result := css.ToCSSValue(token.TypeDimension, "16px")
 	if result != "16px" {
 		t.Errorf("expected \"16px\", got %q", result)
-	}
-}
-
-// Regression tests for issue #17: structured values must never render as Go map literals.
-
-func TestToCSSValue_Issue17_NoGoMapLiterals(t *testing.T) {
-	// This is the exact scenario from issue #17: a v2025.10 structured color
-	// was rendered as "map[alpha:1 colorSpace:oklch components:[...]]"
-	value := map[string]any{
-		"colorSpace": "oklch",
-		"components": []any{0.988281, 0.0046875, 20.0},
-		"alpha":      1.0,
-	}
-	result := css.ToCSSValue(token.TypeColor, value)
-	if strings.Contains(result, "map[") {
-		t.Errorf("regression: structured color rendered as Go map literal: %q", result)
-	}
-	if result != "oklch(0.9883 0.004687 20)" {
-		t.Errorf("expected valid CSS oklch(), got %q", result)
-	}
-}
-
-func TestToCSSValue_Issue17_DimensionNoGoMapLiteral(t *testing.T) {
-	value := map[string]any{"value": 4.0, "unit": "px"}
-	result := css.ToCSSValue(token.TypeDimension, value)
-	if strings.Contains(result, "map[") {
-		t.Errorf("regression: structured dimension rendered as Go map literal: %q", result)
-	}
-	if result != "4px" {
-		t.Errorf("expected \"4px\", got %q", result)
 	}
 }
 

@@ -126,10 +126,11 @@ func ToCSSValue(tokenType string, value any) string {
 	switch tokenType {
 	case token.TypeColor:
 		if m, ok := value.(map[string]any); ok {
+			// Structured color objects are a v2025.10 feature; draft colors are always strings.
 			if colorVal, err := common.ParseColorValue(m, schema.V2025_10); err == nil {
 				return colorVal.ToCSS()
 			}
-			return marshalFallback(m)
+			return formatter.MarshalFallback(m)
 		}
 		return fmt.Sprintf("%v", value)
 	case token.TypeDimension:
@@ -139,7 +140,7 @@ func ToCSSValue(tokenType string, value any) string {
 					return fmt.Sprintf("%v%s", v, u)
 				}
 			}
-			return marshalFallback(m)
+			return formatter.MarshalFallback(m)
 		}
 		return fmt.Sprintf("%v", value)
 	case token.TypeNumber, token.TypeFontWeight:
@@ -181,7 +182,7 @@ func ToCSSValue(tokenType string, value any) string {
 
 	// Avoid rendering maps/slices as Go literals
 	if m, ok := value.(map[string]any); ok {
-		return marshalFallback(m)
+		return formatter.MarshalFallback(m)
 	}
 	if a, ok := value.([]any); ok {
 		if data, err := json.Marshal(a); err == nil {
@@ -190,12 +191,4 @@ func ToCSSValue(tokenType string, value any) string {
 	}
 
 	return fmt.Sprintf("%v", value)
-}
-
-// marshalFallback serializes a map to JSON, preventing Go map literal output.
-func marshalFallback(m map[string]any) string {
-	if data, err := json.Marshal(m); err == nil {
-		return string(data)
-	}
-	return fmt.Sprintf("%v", m)
 }

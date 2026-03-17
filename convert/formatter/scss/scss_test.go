@@ -163,7 +163,7 @@ func TestFormat_V2025_10_StructuredDimensions(t *testing.T) {
 	}
 }
 
-// Regression test: nil dimension value should not produce "nilpx"
+// Regression test: nil dimension value should produce JSON fallback, not "nilpx"
 func TestFormat_DimensionNilValue(t *testing.T) {
 	tokens := []*token.Token{
 		{
@@ -184,5 +184,9 @@ func TestFormat_DimensionNilValue(t *testing.T) {
 	output := string(result)
 	if strings.Contains(output, "nilpx") || strings.Contains(output, "<nil>px") {
 		t.Errorf("nil dimension value produced invalid SCSS: %s", output)
+	}
+	// Should contain JSON fallback serialization
+	if !strings.Contains(output, `{"unit":"px","value":null}`) {
+		t.Errorf("expected JSON fallback for nil dimension, got:\n%s", output)
 	}
 }
