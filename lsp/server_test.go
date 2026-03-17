@@ -873,8 +873,19 @@ func TestServer_RegisterFileWatchers_EmptyContext(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestServer_RegisterFileWatchers_NoWatchers(t *testing.T) {
-	t.Skip("Cannot test without real GLSP context; empty watchers case covered by TestServer_BuildFileWatchers")
+func TestServer_RegisterFileWatchers_WithCallContext(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	// Configure some token files so watchers are generated
+	s.config.TokensFiles = []any{"tokens.json"}
+
+	ctx := &glsp.Context{
+		Call: func(_ string, _ any, _ any) {},
+	}
+
+	err = s.RegisterFileWatchers(ctx)
+	assert.NoError(t, err)
 }
 
 func TestServer_BuildFileWatchers(t *testing.T) {
@@ -1000,6 +1011,30 @@ func TestPublishDiagnostics_UsesPassedContext(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no client context available")
 	})
+}
+
+func TestPublishDiagnostics_NotifiesClient(t *testing.T) {
+	s, err := NewServer()
+	require.NoError(t, err)
+
+	// Open a CSS document so GetDiagnostics has something to work with
+	s.DocumentManager().DidOpen("file:///test.css", "css", 1, ".btn { color: var(--c); }")
+
+	// Add a token so diagnostics can resolve
+	tok := &tokens.Token{Name: "c", Value: "#ff0000", Type: "color"}
+	_ = s.TokenManager().Add(tok)
+
+	// Non-nil context with no-op Notify exercises the notification branch
+	notified := false
+	ctx := &glsp.Context{
+		Notify: func(_ string, _ any) {
+			notified = true
+		},
+	}
+
+	err = s.PublishDiagnostics(ctx, "file:///test.css")
+	assert.NoError(t, err)
+	assert.True(t, notified, "expected Notify to be called")
 }
 
 func TestServer_IsTokenFile_ObjectWithMissingPath(t *testing.T) {

@@ -81,3 +81,22 @@ func TestLogError_MultipleFormatArgs(t *testing.T) {
 func TestLogWarning_MultipleFormatArgs(t *testing.T) {
 	LogWarning(nil, "warning %s in %s at line %d: %v", "deprecation", "tokens.json", 10, false)
 }
+
+// noopNotify is a no-op Notify function for testing the non-nil context path
+func noopNotify(_ string, _ any) {}
+
+func TestLogError_WithNonNilContext(t *testing.T) {
+	// Non-nil context with no-op Notify exercises the goroutine branch
+	ctx := &glsp.Context{Notify: noopNotify}
+	LogError(ctx, "error %s", "test")
+}
+
+func TestLogWarning_WithNonNilContext(t *testing.T) {
+	ctx := &glsp.Context{Notify: noopNotify}
+	LogWarning(ctx, "warning %s", "test")
+}
+
+func TestShowMessage_WithNonNilContext(t *testing.T) {
+	ctx := &glsp.Context{Notify: noopNotify}
+	ShowMessage(ctx, protocol.MessageTypeInfo, "test message")
+}
