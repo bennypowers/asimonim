@@ -717,7 +717,16 @@ func TestDocumentColor_MultipleColorsAndNonColors(t *testing.T) {
 
 	require.NoError(t, err)
 	// Should find 2 colors (not the spacing token)
-	assert.Len(t, result, 2)
+	require.Len(t, result, 2)
+	// Verify the found colors are the expected ones (red and blue)
+	for _, ci := range result {
+		r, g, b := ci.Color.Red, ci.Color.Green, ci.Color.Blue
+		isRed := r > 0.9 && g < 0.1 && b < 0.1
+		isBlue := r < 0.1 && g < 0.1 && b > 0.9
+		if !isRed && !isBlue {
+			t.Errorf("unexpected color: R=%.2f G=%.2f B=%.2f", r, g, b)
+		}
+	}
 }
 
 func TestColorPresentation_NoMatchingTokens(t *testing.T) {

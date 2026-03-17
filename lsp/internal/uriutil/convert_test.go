@@ -727,8 +727,8 @@ func TestURIToPath_PercentEncodedSpecialChars(t *testing.T) {
 func TestURIToPath_DriveLetterInHost(t *testing.T) {
 	// file://C:/path is technically a drive letter in host position
 	result := URIToPath("file://C:/project/file.txt")
-	assert.Contains(t, result, "project")
-	assert.Contains(t, result, "C:")
+	// On non-Windows, the C: host gets folded into the path
+	assert.Equal(t, "C:/project/file.txt", result)
 }
 
 // TestPathToURI_TrailingSlash tests paths with trailing slashes
@@ -738,7 +738,8 @@ func TestPathToURI_TrailingSlash(t *testing.T) {
 	}
 
 	uri := PathToURI("/home/user/project/")
-	assert.True(t, strings.HasPrefix(uri, "file:///"))
+	// PathToURI normalizes away trailing slashes
+	assert.Equal(t, "file:///home/user/project", uri)
 }
 
 // TestNormalizeAndEncodeSegments tests segment normalization and encoding

@@ -62,7 +62,9 @@ func TestOSFileSystem_Stat(t *testing.T) {
 	osfs := fs.NewOSFileSystem()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "stat-test.txt")
-	os.WriteFile(path, []byte("test"), 0644)
+	if err := os.WriteFile(path, []byte("test"), 0644); err != nil {
+		t.Fatalf("setup WriteFile error: %v", err)
+	}
 
 	info, err := osfs.Stat(path)
 	if err != nil {
@@ -82,7 +84,9 @@ func TestOSFileSystem_Exists(t *testing.T) {
 		t.Error("Exists returned true for nonexistent file")
 	}
 
-	os.WriteFile(path, []byte("test"), 0644)
+	if err := os.WriteFile(path, []byte("test"), 0644); err != nil {
+		t.Fatalf("setup WriteFile error: %v", err)
+	}
 
 	if !osfs.Exists(path) {
 		t.Error("Exists returned false for existing file")
@@ -92,8 +96,12 @@ func TestOSFileSystem_Exists(t *testing.T) {
 func TestOSFileSystem_ReadDir(t *testing.T) {
 	osfs := fs.NewOSFileSystem()
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a"), 0644)
-	os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b"), 0644)
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a"), 0644); err != nil {
+		t.Fatalf("setup WriteFile error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b"), 0644); err != nil {
+		t.Fatalf("setup WriteFile error: %v", err)
+	}
 
 	entries, err := osfs.ReadDir(dir)
 	if err != nil {
@@ -108,7 +116,9 @@ func TestOSFileSystem_Remove(t *testing.T) {
 	osfs := fs.NewOSFileSystem()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "remove-test.txt")
-	os.WriteFile(path, []byte("test"), 0644)
+	if err := os.WriteFile(path, []byte("test"), 0644); err != nil {
+		t.Fatalf("setup WriteFile error: %v", err)
+	}
 
 	if err := osfs.Remove(path); err != nil {
 		t.Fatalf("Remove error: %v", err)
@@ -131,7 +141,9 @@ func TestOSFileSystem_Open(t *testing.T) {
 	osfs := fs.NewOSFileSystem()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "open-test.txt")
-	os.WriteFile(path, []byte("test content"), 0644)
+	if err := os.WriteFile(path, []byte("test content"), 0644); err != nil {
+		t.Fatalf("setup WriteFile error: %v", err)
+	}
 
 	f, err := osfs.Open(path)
 	if err != nil {
