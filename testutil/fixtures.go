@@ -145,7 +145,7 @@ func ParseFixtureTokens(t *testing.T, fixtureDir string, schemaVersion schema.Ve
 func TokenByPath(t *testing.T, tokens []*token.Token, dotPath string) *token.Token {
 	t.Helper()
 	for _, tok := range tokens {
-		if strings.Join(tok.Path, ".") == dotPath {
+		if tok.DotPath() == dotPath {
 			return tok
 		}
 	}
