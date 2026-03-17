@@ -8,12 +8,15 @@ license that can be found in the LICENSE file.
 package scss
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
 	"strings"
 
 	"bennypowers.dev/asimonim/convert/formatter"
+	"bennypowers.dev/asimonim/parser/common"
+	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/token"
 )
 
@@ -78,8 +81,23 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 func toSCSSValue(tokenType string, value any) string {
 	switch tokenType {
 	case token.TypeColor:
+		if m, ok := value.(map[string]any); ok {
+			// Structured color objects are a v2025.10 feature; draft colors are always strings.
+			if colorVal, err := common.ParseColorValue(m, schema.V2025_10); err == nil {
+				return colorVal.ToCSS()
+			}
+			return formatter.MarshalFallback(m)
+		}
 		return fmt.Sprintf("%v", value)
 	case token.TypeDimension:
+		if m, ok := value.(map[string]any); ok {
+			if v, hasValue := m["value"]; hasValue && v != nil {
+				if u, hasUnit := m["unit"].(string); hasUnit {
+					return fmt.Sprintf("%v%s", v, u)
+				}
+			}
+			return formatter.MarshalFallback(m)
+		}
 		return fmt.Sprintf("%v", value)
 	case token.TypeNumber, token.TypeFontWeight:
 		switch v := value.(type) {
@@ -104,6 +122,16 @@ func toSCSSValue(tokenType string, value any) string {
 			strings.HasSuffix(s, "%") || strings.HasSuffix(s, "ms") ||
 			secondsDurationPattern.MatchString(s) {
 			return s
+		}
+	}
+
+	// Avoid rendering maps/slices as Go literals
+	if m, ok := value.(map[string]any); ok {
+		return formatter.MarshalFallback(m)
+	}
+	if a, ok := value.([]any); ok {
+		if data, err := json.Marshal(a); err == nil {
+			return string(data)
 		}
 	}
 

@@ -4,6 +4,7 @@ go 1.25.5
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.9.2
+	github.com/lucasb-eyer/go-colorful v1.3.0
 	github.com/mazznoer/csscolorparser v0.1.8
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
@@ -26,7 +27,6 @@ require (
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-pointer v0.0.1 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect

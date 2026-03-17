@@ -12,9 +12,14 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"bennypowers.dev/asimonim/internal/mapfs"
+	"bennypowers.dev/asimonim/parser"
+	"bennypowers.dev/asimonim/resolver"
+	"bennypowers.dev/asimonim/schema"
+	"bennypowers.dev/asimonim/token"
 )
 
 // updateGolden enables updating golden files with actual output when -update flag is set.
@@ -28,22 +33,7 @@ func NewFixtureFS(t *testing.T, fixtureDir string, rootPath string) *mapfs.MapFi
 	mfs := mapfs.New()
 
 	// Try multiple possible paths since Go test changes working directory
-	possiblePaths := []string{
-		filepath.Join("testdata", fixtureDir),
-		filepath.Join("..", "testdata", fixtureDir),
-		filepath.Join("..", "..", "testdata", fixtureDir),
-	}
-
-	var fixturePath string
-	for _, path := range possiblePaths {
-		if _, err := os.Stat(path); err == nil {
-			fixturePath = path
-			break
-		}
-	}
-	if fixturePath == "" {
-		t.Fatalf("Could not find fixtures at %s (tried all paths)", fixtureDir)
-	}
+	fixturePath := findTestdata(t, fixtureDir)
 
 	// Walk fixture directory and load all files
 	err := filepath.WalkDir(fixturePath, func(path string, d fs.DirEntry, err error) error {
@@ -81,19 +71,85 @@ func NewFixtureFS(t *testing.T, fixtureDir string, rootPath string) *mapfs.MapFi
 func LoadFixtureFile(t *testing.T, fixturePath string) []byte {
 	t.Helper()
 
-	possiblePaths := []string{
-		filepath.Join("testdata", fixturePath),
-		filepath.Join("..", "testdata", fixturePath),
-		filepath.Join("..", "..", "testdata", fixturePath),
+	fullPath := findTestdata(t, fixturePath)
+	content, err := os.ReadFile(fullPath)
+	if err != nil {
+		t.Fatalf("Failed to read fixture %s: %v", fixturePath, err)
 	}
+	return content
+}
 
-	for _, path := range possiblePaths {
-		content, err := os.ReadFile(path)
-		if err == nil {
-			return content
+// maxParentProbe is the maximum number of parent directories to search for testdata/.
+const maxParentProbe = 5
+
+// probeTestdata searches for relPath under testdata/ by walking up parent directories.
+// Returns the found path or empty string if not found.
+func probeTestdata(relPath string) string {
+	for i := range maxParentProbe {
+		prefix := strings.Repeat("../", i)
+		candidate := filepath.Join(prefix+"testdata", relPath)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
 		}
 	}
-	t.Fatalf("Failed to read fixture %s (tried all paths)", fixturePath)
+	return ""
+}
+
+// probeTestdataRoot returns the nearest testdata/ directory by walking up parents.
+func probeTestdataRoot() string {
+	for i := range maxParentProbe {
+		candidate := strings.Repeat("../", i) + "testdata"
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	return ""
+}
+
+// findTestdata locates a path under testdata/ by walking up parent directories.
+func findTestdata(t *testing.T, relPath string) string {
+	t.Helper()
+	if path := probeTestdata(relPath); path != "" {
+		return path
+	}
+	t.Fatalf("Could not find testdata/%s (tried up to %d parent dirs)", relPath, maxParentProbe-1)
+	return ""
+}
+
+// ParseFixtureTokens loads a fixture file, parses tokens, and resolves aliases.
+// The fixtureDir is relative to testdata/ (e.g., "fixtures/v2025-10-colors").
+// Returns the parsed and resolved tokens.
+func ParseFixtureTokens(t *testing.T, fixtureDir string, schemaVersion schema.Version) []*token.Token {
+	t.Helper()
+
+	mfs := NewFixtureFS(t, fixtureDir, "/test")
+
+	p := parser.NewJSONParser()
+	tokens, err := p.ParseFile(mfs, "/test/tokens.json", parser.Options{
+		SchemaVersion: schemaVersion,
+		SkipPositions: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to parse %s/tokens.json: %v", fixtureDir, err)
+	}
+
+	if err := resolver.ResolveAliases(tokens, schemaVersion); err != nil {
+		t.Fatalf("failed to resolve aliases in %s: %v", fixtureDir, err)
+	}
+
+	return tokens
+}
+
+// TokenByPath returns the first token matching the given dot-separated path
+// (e.g., "color.oklch"). Fails the test if not found.
+func TokenByPath(t *testing.T, tokens []*token.Token, dotPath string) *token.Token {
+	t.Helper()
+	for _, tok := range tokens {
+		if tok.DotPath() == dotPath {
+			return tok
+		}
+	}
+	t.Fatalf("token not found: %s", dotPath)
 	return nil
 }
 
@@ -104,23 +160,10 @@ func UpdateGoldenFile(t *testing.T, goldenPath string, actual []byte) {
 		return
 	}
 
-	possiblePaths := []string{
-		filepath.Join("testdata", goldenPath),
-		filepath.Join("..", "testdata", goldenPath),
-		filepath.Join("..", "..", "testdata", goldenPath),
-	}
-
-	var targetPath string
-	for _, path := range possiblePaths {
-		parentDir := filepath.Dir(path)
-		if _, err := os.Stat(parentDir); err == nil {
-			targetPath = path
-			break
-		}
-	}
-	if targetPath == "" {
-		targetPath = possiblePaths[0]
-	}
+	// Find the testdata root by locating the parent directory
+	parentDir := filepath.Dir(goldenPath)
+	targetDir := findTestdataOrCreate(t, parentDir)
+	targetPath := filepath.Join(targetDir, filepath.Base(goldenPath))
 
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		t.Fatalf("Failed to create directory for golden file %s: %v", goldenPath, err)
@@ -131,4 +174,38 @@ func UpdateGoldenFile(t *testing.T, goldenPath string, actual []byte) {
 	}
 
 	t.Logf("Updated golden file: %s", targetPath)
+}
+
+// findTestdataOrCreate locates a path under testdata/, creating it if needed.
+// Walks ancestor directories to find the deepest existing subtree before
+// falling back to the testdata root.
+func findTestdataOrCreate(t *testing.T, relPath string) string {
+	t.Helper()
+	if path := probeTestdata(relPath); path != "" {
+		return path
+	}
+	// Walk ancestors to find the deepest existing subtree
+	for parent := filepath.Dir(relPath); parent != "." && parent != relPath; parent = filepath.Dir(parent) {
+		if base := probeTestdata(parent); base != "" {
+			suffix, err := filepath.Rel(parent, relPath)
+			if err != nil {
+				t.Fatalf("Failed to resolve %s relative to %s: %v", relPath, parent, err)
+			}
+			target := filepath.Join(base, suffix)
+			if err := os.MkdirAll(target, 0755); err != nil {
+				t.Fatalf("Failed to create %s: %v", target, err)
+			}
+			return target
+		}
+	}
+	// Fallback: create under the nearest testdata/ root
+	if root := probeTestdataRoot(); root != "" {
+		target := filepath.Join(root, relPath)
+		if err := os.MkdirAll(target, 0755); err != nil {
+			t.Fatalf("Failed to create %s: %v", target, err)
+		}
+		return target
+	}
+	t.Fatalf("Could not find testdata/ directory for golden file %s", relPath)
+	return ""
 }

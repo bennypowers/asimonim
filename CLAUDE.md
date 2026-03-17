@@ -58,22 +58,12 @@ asimonim/
 
 ## asimonim CLI usage
 
-When running asimonim commands against test fixtures, use the `-p` flag:
+When running asimonim commands against test fixtures:
 
 ```shell
 $ make
 $ dist/bin/asimonim validate testdata/fixtures/draft/simple/tokens.json
 ```
-
-## Go
-
-Getter methods should be named `Foo()`, not `GetFoo()`.
-
-Use go 1.25+ features. Run `go vet` to surface gopls suggestions:
-- replace `interface{}` with `any`
-- replace `if/else` with `min`
-- replace `m[k]=v` loop with `maps.Copy`
-- use `slices.Contains` instead of manual loops
 
 ## Debugging
 
@@ -86,30 +76,63 @@ Run `make lint` and `make test` to verify changes.
 Practice TDD. When writing tests, always use the fixture/golden patterns:
 
 - **Fixtures**: Input test data in `testdata/` directories
-- **Goldens**: Expected output files to compare against (e.g., `expected.json`)
+- **Goldens**: Expected output files to compare against (e.g., `expected.css`)
 - Tests should support `--update` flag to regenerate golden files when intentional changes occur
 
-### Fixture Structure
+### Fixture Philosophy
 
-Each test scenario is a subdirectory containing:
-- Input files (`.json`, `.yaml`, `.tokens.json`)
-- `expected.json` (required for assertions)
+Prefer **few, large omnibus fixtures** over many small ones. Fixture files
+should resemble realistic projects (colors, typography, spacing) and double as
+resources for manual testing and exploration. The shared fixture at
+`testdata/fixtures/v2025_10/all-color-spaces/tokens.json` covers all DTCG
+color spaces and dimensions.
 
-### Using NewFixtureFS
+### Loading Fixtures
 
-**Always use `testutil.NewFixtureFS` for tests**, never use `NewOSFileSystem()` in tests:
+Use `testutil.ParseFixtureTokens` to parse fixture files and
+`testutil.TokenByPath` to select individual tokens:
 
 ```go
 func TestSomething(t *testing.T) {
-    // Load fixtures into MapFileSystem
-    mfs := testutil.NewFixtureFS(t, "draft/simple", "/test")
+    // Parse tokens from shared fixture
+    allTokens := testutil.ParseFixtureTokens(t, "fixtures/v2025_10/all-color-spaces", schema.V2025_10)
 
-    // Read fixture files from the virtual filesystem
-    input, err := mfs.ReadFile("/test/tokens.json")
-    expected, err := mfs.ReadFile("/test/expected.json")
+    // Select tokens by dot-path
+    tokens := []*token.Token{
+        testutil.TokenByPath(t, allTokens, "color.oklch"),    // oklch [0.988281, 0.0046875, 20]
+        testutil.TokenByPath(t, allTokens, "spacing.small"),  // {value: 4, unit: "px"}
+    }
 
-    // Pass the MapFileSystem to functions under test
-    result, err := parser.ParseFile(mfs, "/test/tokens.json", opts)
+    // Format and assert
+    f := css.New()
+    result, err := f.Format(tokens, formatter.Options{})
+}
+```
+
+For lower-level tests that need a MapFileSystem directly, use `testutil.NewFixtureFS`:
+
+```go
+mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
+tokens, err := parser.ParseFile(mfs, "/test/tokens.json", parser.Options{
+    SchemaVersion: schema.Draft,
+    SkipPositions: true,
+})
+if err != nil {
+    t.Fatalf("failed to parse: %v", err)
+}
+```
+
+### Assertions
+
+- **Specific token outputs**: use strict string equality, not `strings.Contains`
+- **Large-scale conversions**: use golden files with `-update` flag
+- **Edge cases** (nil values, injection, malformed input): inline token construction is acceptable
+- **Comment inputs** in test assertions for maintainability:
+
+```go
+// spacing.small: {value: 4, unit: "px"} → 4px
+if result != "4px" {
+    t.Errorf(...)
 }
 ```
 
@@ -123,16 +146,16 @@ func TestSomething(t *testing.T) {
 
 ### Avoiding Inline Test Data
 
-**Don't inline source code in tests:**
+**Don't inline token data in tests** — load from fixture files instead:
 
 ```go
 // Bad - inline source
 json := []byte(`{"color": {"$value": "#fff"}}`)
 tokens, _ := parser.ParseBytes(json, opts)
 
-// Good - use fixture file
-mfs := testutil.NewFixtureFS(t, "draft/simple", "/test")
-tokens, _ := parser.ParseFile(mfs, "/test/tokens.json", opts)
+// Good - use shared fixture
+allTokens := testutil.ParseFixtureTokens(t, "fixtures/v2025_10/all-color-spaces", schema.V2025_10)
+tok := testutil.TokenByPath(t, allTokens, "color.srgb-hex")
 ```
 
 ## FileSystem Interface

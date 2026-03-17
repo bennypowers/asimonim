@@ -8,6 +8,8 @@ license that can be found in the LICENSE file.
 package formatter
 
 import (
+	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 	"unicode"
@@ -165,6 +167,14 @@ func SplitIntoWords(s string) []string {
 	}
 
 	return words
+}
+
+// MarshalFallback serializes a map to JSON, preventing Go map literal output.
+func MarshalFallback(m map[string]any) string {
+	if data, err := json.Marshal(m); err == nil {
+		return string(data)
+	}
+	return fmt.Sprintf("%v", m)
 }
 
 // EscapeXML escapes special XML characters.
