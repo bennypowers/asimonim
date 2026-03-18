@@ -4,13 +4,15 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/parser/css"
 	"bennypowers.dev/asimonim/lsp/internal/parser/html"
 	"bennypowers.dev/asimonim/lsp/internal/parser/js"
+	"bennypowers.dev/asimonim/lsp/internal/parser/php"
 )
 
 // cssLanguages maps language IDs to the parser category they use.
-// "css" → direct CSS, "html" → HTML parser, "js" → JS parser.
+// "css" → direct CSS, "html" → HTML parser, "php" → PHP parser, "js" → JS parser.
 var cssLanguages = map[string]string{
 	"css":             "css",
 	"html":            "html",
+	"php":             "php",
 	"javascript":      "js",
 	"javascriptreact": "js",
 	"typescript":      "js",
@@ -37,6 +39,11 @@ func ParseCSSFromDocument(content, languageID string) (*css.ParseResult, error) 
 		defer html.ReleaseParser(p)
 		return p.ParseCSS(content)
 
+	case "php":
+		p := php.AcquireParser()
+		defer php.ReleaseParser(p)
+		return p.ParseCSS(content)
+
 	case "js":
 		p := js.AcquireParser()
 		defer js.ReleaseParser(p)
@@ -59,6 +66,16 @@ func CSSContentSpans(content, languageID string) []string {
 	case "html":
 		p := html.AcquireParser()
 		defer html.ReleaseParser(p)
+		regions := p.ParseCSSRegions(content)
+		spans := make([]string, 0, len(regions))
+		for _, r := range regions {
+			spans = append(spans, cssRegionSpan(r))
+		}
+		return spans
+
+	case "php":
+		p := php.AcquireParser()
+		defer php.ReleaseParser(p)
 		regions := p.ParseCSSRegions(content)
 		spans := make([]string, 0, len(regions))
 		for _, r := range regions {

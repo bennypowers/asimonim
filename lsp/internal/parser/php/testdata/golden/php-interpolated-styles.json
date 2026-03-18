@@ -1,0 +1,156 @@
+{
+  "Variables": [
+    {
+      "Name": "--brand-color",
+      "Value": "",
+      "Type": 0,
+      "Range": {
+        "Start": {
+          "Line": 6,
+          "Character": 2
+        },
+        "End": {
+          "Line": 6,
+          "Character": 15
+        }
+      }
+    },
+    {
+      "Name": "--font-stack",
+      "Value": "",
+      "Type": 0,
+      "Range": {
+        "Start": {
+          "Line": 7,
+          "Character": 2
+        },
+        "End": {
+          "Line": 7,
+          "Character": 14
+        }
+      }
+    }
+  ],
+  "VarCalls": [
+    {
+      "Fallback": null,
+      "TokenName": "--brand-color",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 10,
+          "Character": 14
+        },
+        "End": {
+          "Line": 10,
+          "Character": 32
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--font-stack",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 11,
+          "Character": 15
+        },
+        "End": {
+          "Line": 11,
+          "Character": 32
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--color-text",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 12,
+          "Character": 9
+        },
+        "End": {
+          "Line": 12,
+          "Character": 26
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--gradient-start",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 16,
+          "Character": 30
+        },
+        "End": {
+          "Line": 16,
+          "Character": 51
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--gradient-end",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 16,
+          "Character": 53
+        },
+        "End": {
+          "Line": 16,
+          "Character": 72
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--spacing-section",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 26,
+          "Character": 10
+        },
+        "End": {
+          "Line": 26,
+          "Character": 32
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--color-primary",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 20,
+          "Character": 19
+        },
+        "End": {
+          "Line": 20,
+          "Character": 39
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--sidebar-width",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 30,
+          "Character": 21
+        },
+        "End": {
+          "Line": 30,
+          "Character": 41
+        }
+      }
+    }
+  ]
+}

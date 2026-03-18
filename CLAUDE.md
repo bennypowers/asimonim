@@ -56,6 +56,12 @@ asimonim/
 3. Register in `convert/format.go` (ParseFormat, ValidFormats)
 4. Add tests
 
+### Parsing
+
+Never regexp HTML when there's a grammar available. e.g. when the question is raised, 
+always add a new tree-sitter-php dependency rather than accept a solution involving
+regexp'ing php blocks out of the surrounding HTML.
+
 ## asimonim CLI usage
 
 When running asimonim commands against test fixtures:

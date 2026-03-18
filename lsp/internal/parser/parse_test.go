@@ -1,6 +1,8 @@
 package parser_test
 
 import (
+	"os"
+	"strings"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/parser"
@@ -12,6 +14,7 @@ func TestIsCSSSupportedLanguage(t *testing.T) {
 	supported := []string{
 		"css",
 		"html",
+		"php",
 		"javascript",
 		"javascriptreact",
 		"typescript",
@@ -98,6 +101,37 @@ func TestParseCSSFromDocumentTSX(t *testing.T) {
 	assert.Equal(t, "--host-color", result.VarCalls[0].TokenName)
 }
 
+func TestParseCSSFromDocumentPHP(t *testing.T) {
+	content, err := os.ReadFile("php/testdata/wordpress-theme.php")
+	require.NoError(t, err)
+
+	result, err := parser.ParseCSSFromDocument(string(content), "php")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// wordpress-theme.php has 1 variable declaration and 7 var() calls
+	assert.Len(t, result.Variables, 1)
+	assert.Equal(t, "--color-primary", result.Variables[0].Name)
+
+	assert.Len(t, result.VarCalls, 7)
+
+	// Verify key var() calls from style tags and attributes
+	varNames := make([]string, len(result.VarCalls))
+	for i, vc := range result.VarCalls {
+		varNames[i] = vc.TokenName
+	}
+	// Style tag calls
+	assert.Contains(t, varNames, "--color-primary")
+	assert.Contains(t, varNames, "--spacing-lg")
+	// Style attribute calls
+	assert.Contains(t, varNames, "--color-text")
+	assert.Contains(t, varNames, "--font-size-xl")
+	assert.Contains(t, varNames, "--spacing-md")
+	// Second style tag calls
+	assert.Contains(t, varNames, "--color-border")
+	assert.Contains(t, varNames, "--spacing-sm")
+}
+
 func TestParseCSSFromDocumentUnsupported(t *testing.T) {
 	result, err := parser.ParseCSSFromDocument("{}", "json")
 	assert.NoError(t, err)
@@ -138,6 +172,29 @@ func TestCSSContentSpansJSHTMLTemplate(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "should have extracted CSS span '.b { color: blue; }' from html template")
+}
+
+func TestCSSContentSpansPHP(t *testing.T) {
+	content, err := os.ReadFile("php/testdata/wordpress-theme.php")
+	require.NoError(t, err)
+
+	spans := parser.CSSContentSpans(string(content), "php")
+	// wordpress-theme.php: 2 style tags + 2 style attributes = 4 spans
+	require.Len(t, spans, 4)
+
+	// Style tag spans contain raw CSS
+	assert.Contains(t, spans[0], "--color-primary")
+	assert.Contains(t, spans[0], "var(--color-primary)")
+
+	// Style attribute spans are wrapped in "x{...}"
+	found := false
+	for _, s := range spans {
+		if strings.Contains(s, "x{") && strings.Contains(s, "var(--color-text)") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "should find style attribute span with var(--color-text)")
 }
 
 func TestCSSContentSpansUnsupported(t *testing.T) {

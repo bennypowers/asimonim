@@ -88,7 +88,7 @@ Create a file like `~/.config/nvim/lsp/asimonim.lua`:
 return {
   cmd = { 'asimonim', 'lsp' },
   root_markers = { '.git', 'package.json' },
-  filetypes = { 'css', 'html', 'javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'json', 'yaml' },
+  filetypes = { 'css', 'html', 'php', 'javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'json', 'yaml' },
   settings = {
     dtls = {
       tokensFiles = {
@@ -134,10 +134,15 @@ return {
 ### Other Editors
 
 Any editor with LSP support can use Asimonim. Run `asimonim lsp` as the
-language server command, with document selectors for CSS, HTML, JavaScript,
+language server command, with document selectors for CSS, HTML, PHP, JavaScript,
 TypeScript, JSON, and YAML.
 
 ## Language Server Features
+
+The language server extracts CSS from `<style>` blocks and `style=""`
+attributes in HTML, as well as HTML embedded in languages like PHP or in
+tagged template literals in JavaScript and TypeScript. All LSP features
+below work across these contexts.
 
 ### Hover Docs
 
