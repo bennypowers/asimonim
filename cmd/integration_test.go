@@ -410,7 +410,10 @@ func TestExecute(t *testing.T) {
 	cmd.RootCmd.SetArgs([]string{"version"})
 
 	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
+	r, w, pipeErr := os.Pipe()
+	if pipeErr != nil {
+		t.Fatalf("failed to create pipe: %v", pipeErr)
+	}
 	os.Stdout = w
 
 	err := cmd.Execute()
