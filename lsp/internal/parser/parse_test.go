@@ -2,7 +2,6 @@ package parser_test
 
 import (
 	"os"
-	"strings"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/parser"
@@ -180,18 +179,20 @@ func TestCSSContentSpansPHP(t *testing.T) {
 	require.Len(t, spans, 4)
 
 	// Style tag spans contain raw CSS
-	assert.Contains(t, spans[0], "--color-primary")
-	assert.Contains(t, spans[0], "var(--color-primary)")
+	assert.Equal(t,
+		"\n:root {\n  --color-primary: #0073aa;\n}\n.site-header {\n  background-color: var(--color-primary);\n  padding: var(--spacing-lg);\n}\n",
+		spans[0], "first style tag span")
+	assert.Equal(t,
+		"\n    .site-footer {\n      border-top: 1px solid var(--color-border);\n      padding: var(--spacing-sm);\n    }\n  ",
+		spans[1], "second style tag span")
 
 	// Style attribute spans are wrapped in "x{...}"
-	found := false
-	for _, s := range spans {
-		if strings.Contains(s, "x{") && strings.Contains(s, "var(--color-text)") {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "should find style attribute span with var(--color-text)")
+	assert.Equal(t,
+		"x{color: var(--color-text); font-size: var(--font-size-xl)}",
+		spans[2], "first style attribute span")
+	assert.Equal(t,
+		"x{margin: var(--spacing-md)}",
+		spans[3], "second style attribute span")
 }
 
 func TestCSSContentSpansUnsupported(t *testing.T) {
