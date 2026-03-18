@@ -123,6 +123,11 @@ func TestCustomHandler_DiagnosticMethod(t *testing.T) {
 		assert.True(t, validMethod)
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
+
+		// Verify the capability was actually detected and stored
+		cap := server.ClientDiagnosticCapability()
+		require.NotNil(t, cap, "pull diagnostics capability should be detected")
+		assert.True(t, *cap, "pull diagnostics should be true")
 	})
 
 	t.Run("semanticTokens/full/delta with valid params", func(t *testing.T) {
