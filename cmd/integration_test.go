@@ -36,14 +36,20 @@ func captureAndExecute(t *testing.T, args ...string) (string, error) {
 	os.Stdout = w
 	defer func() { os.Stdout = oldStdout }()
 
-	rootCmd := cmd.RootCmd
+	// Create a fresh command tree for each test to avoid flag state pollution
+	rootCmd := cmd.NewRootCmd()
 	rootCmd.SetArgs(args)
 	err := rootCmd.Execute()
 
-	w.Close()
+	if closeErr := w.Close(); closeErr != nil {
+		t.Fatalf("failed to close pipe: %v", closeErr)
+	}
 	var buf bytes.Buffer
 	if _, readErr := buf.ReadFrom(r); readErr != nil {
 		t.Fatalf("failed to read captured output: %v", readErr)
+	}
+	if closeErr := r.Close(); closeErr != nil {
+		t.Fatalf("failed to close read pipe: %v", closeErr)
 	}
 
 	return buf.String(), err
@@ -248,8 +254,8 @@ func TestConvertCommand_Stdout(t *testing.T) {
 	td := testdataDir(t)
 	fixture := filepath.Join(td, "fixtures/draft/simple/tokens.json")
 
-	// Explicitly pass --output="" to override any persisted state from previous tests
-	output, err := captureAndExecute(t, "convert", "--format", "json", "--output", "", fixture)
+	// No need for --output="" workaround: each test gets a fresh command tree
+	output, err := captureAndExecute(t, "convert", "--format", "json", fixture)
 	if err != nil {
 		t.Errorf("convert to stdout failed: %v", err)
 	}
@@ -355,5 +361,80 @@ func TestConvertCommand_Flatten(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "color-primary") {
 		t.Errorf("expected flattened keys, got:\n%s", data)
+	}
+}
+
+func TestNewRootCmd_HasAllSubcommands(t *testing.T) {
+	rootCmd := cmd.NewRootCmd()
+	expectedCmds := []string{"convert", "list", "search", "validate", "version"}
+	for _, name := range expectedCmds {
+		found := false
+		for _, sub := range rootCmd.Commands() {
+			if sub.Name() == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("NewRootCmd() missing subcommand %q", name)
+		}
+	}
+}
+
+func TestNewRootCmd_FlagIsolation(t *testing.T) {
+	// Verify that two independently created commands don't share flag state
+	cmd1 := cmd.NewRootCmd()
+	cmd2 := cmd.NewRootCmd()
+
+	cmd1.SetArgs([]string{"version"})
+	cmd2.SetArgs([]string{"version"})
+
+	// Set a flag on cmd1
+	if err := cmd1.PersistentFlags().Set("schema", "draft"); err != nil {
+		t.Fatalf("failed to set schema flag: %v", err)
+	}
+
+	// cmd2 should still have the default value
+	val, err := cmd2.PersistentFlags().GetString("schema")
+	if err != nil {
+		t.Fatalf("failed to get schema flag: %v", err)
+	}
+	if val != "" {
+		t.Errorf("expected empty schema on fresh command, got %q", val)
+	}
+}
+
+func TestExecute(t *testing.T) {
+	// Exercise the Execute() function that main.go calls
+	old := cmd.RootCmd
+	defer func() { cmd.RootCmd = old }()
+
+	cmd.RootCmd = cmd.NewRootCmd()
+	cmd.RootCmd.SetArgs([]string{"version"})
+
+	oldStdout := os.Stdout
+	r, w, pipeErr := os.Pipe()
+	if pipeErr != nil {
+		t.Fatalf("failed to create pipe: %v", pipeErr)
+	}
+	os.Stdout = w
+	defer func() { os.Stdout = oldStdout }()
+	defer r.Close()
+
+	err := cmd.Execute()
+
+	if closeErr := w.Close(); closeErr != nil {
+		t.Fatalf("failed to close pipe: %v", closeErr)
+	}
+	var buf bytes.Buffer
+	if _, readErr := buf.ReadFrom(r); readErr != nil {
+		t.Fatalf("failed to read captured output: %v", readErr)
+	}
+
+	if err != nil {
+		t.Errorf("Execute() returned error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "asimonim") {
+		t.Errorf("expected 'asimonim' in output, got: %s", buf.String())
 	}
 }

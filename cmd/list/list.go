@@ -27,25 +27,28 @@ import (
 )
 
 // Cmd is the list cobra command.
-var Cmd = &cobra.Command{
-	Use:   "list [files...]",
-	Short: "List tokens from design token files",
-	Long:  `List all tokens from design token files with optional filtering and formatting.`,
-	Args:  cobra.ArbitraryArgs,
-	RunE:  run,
-}
+var Cmd = NewCmd()
 
-func init() {
-	Cmd.Flags().String("type", "", "Filter by token type")
-	Cmd.Flags().Bool("resolved", false, "Show resolved values")
-	Cmd.Flags().Bool("css", false, "Output as CSS custom properties")
-	Cmd.Flags().String("format", "table", "Output format: table, css, markdown")
-	Cmd.Flags().String("group", "", "Filter by group/path prefix (e.g., color.brand)")
-	Cmd.Flags().Bool("deprecated", false, "Show only deprecated tokens")
-	Cmd.Flags().Bool("no-deprecated", false, "Hide deprecated tokens")
-	Cmd.Flags().Bool("toc", false, "Include table of contents (markdown only)")
-	Cmd.Flags().Int("toc-depth", 3, "Maximum TOC depth (1-6)")
-	Cmd.Flags().Bool("links", false, "Add anchor links to tokens (markdown only)")
+// NewCmd creates a fresh list command with its own flags.
+func NewCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list [files...]",
+		Short: "List tokens from design token files",
+		Long:  `List all tokens from design token files with optional filtering and formatting.`,
+		Args:  cobra.ArbitraryArgs,
+		RunE:  run,
+	}
+	cmd.Flags().String("type", "", "Filter by token type")
+	cmd.Flags().Bool("resolved", false, "Show resolved values")
+	cmd.Flags().Bool("css", false, "Output as CSS custom properties")
+	cmd.Flags().String("format", "table", "Output format: table, css, markdown")
+	cmd.Flags().String("group", "", "Filter by group/path prefix (e.g., color.brand)")
+	cmd.Flags().Bool("deprecated", false, "Show only deprecated tokens")
+	cmd.Flags().Bool("no-deprecated", false, "Hide deprecated tokens")
+	cmd.Flags().Bool("toc", false, "Include table of contents (markdown only)")
+	cmd.Flags().Int("toc-depth", 3, "Maximum TOC depth (1-6)")
+	cmd.Flags().Bool("links", false, "Add anchor links to tokens (markdown only)")
+	return cmd
 }
 
 func run(cmd *cobra.Command, args []string) error {

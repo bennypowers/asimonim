@@ -17,7 +17,8 @@ import (
 	"bennypowers.dev/asimonim/lsp"
 )
 
-func init() {
+// NewCmd creates a fresh lsp command.
+func NewCmd() *cobra.Command {
 	lspCmd := &cobra.Command{
 		Use:   "lsp",
 		Short: "Start the Design Tokens Language Server",
@@ -39,5 +40,9 @@ func init() {
 	// The flag is accepted but ignored since stdio is the only transport.
 	lspCmd.Flags().Bool("stdio", false, "Use stdio transport (default, accepted for compatibility)")
 
-	cmd.RootCmd.AddCommand(lspCmd)
+	return lspCmd
+}
+
+func init() {
+	cmd.RootCmd.AddCommand(NewCmd())
 }

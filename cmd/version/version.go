@@ -17,15 +17,18 @@ import (
 )
 
 // Cmd is the version cobra command that prints version and build information.
-var Cmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print version information",
-	Long:  `Print version information for asimonim.`,
-	RunE:  run,
-}
+var Cmd = NewCmd()
 
-func init() {
-	Cmd.Flags().StringP("format", "f", "text", "Output format (text, json)")
+// NewCmd creates a fresh version command with its own flags.
+func NewCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "version",
+		Short: "Print version information",
+		Long:  `Print version information for asimonim.`,
+		RunE:  run,
+	}
+	cmd.Flags().StringP("format", "f", "text", "Output format (text, json)")
+	return cmd
 }
 
 func run(cmd *cobra.Command, args []string) error {
