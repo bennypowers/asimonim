@@ -323,8 +323,9 @@ func TestFormat_StringValues(t *testing.T) {
 
 	output := string(result)
 
-	if !strings.Contains(output, "public enum String") {
-		t.Errorf("expected String enum section, got:\n%s", output)
+	// "string" type maps to "StringTokens" to avoid shadowing Swift's built-in String
+	if !strings.Contains(output, "public enum StringTokens") {
+		t.Errorf("expected StringTokens enum section, got:\n%s", output)
 	}
 	if !strings.Contains(output, `"Hello World"`) {
 		t.Errorf("expected quoted string value, got:\n%s", output)
