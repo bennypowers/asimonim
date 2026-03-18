@@ -54,15 +54,17 @@ func parseConfiguration(settings any) (types.ServerConfig, error) {
 		return config, nil
 	}
 
-	// Settings come as a nested object: { "designTokensLanguageServer": { ... } }
+	// Settings come as a nested object: { "asimonim": { ... } } or legacy { "designTokensLanguageServer": { ... } }
 	settingsMap, ok := settings.(map[string]any)
 	if !ok {
 		return config, fmt.Errorf("settings is not a map")
 	}
 
-	// Look for our configuration under "designTokensLanguageServer" key
+	// Look for our configuration: prefer "asimonim", fall back to legacy keys
 	var ourSettings any
-	if val, exists := settingsMap["designTokensLanguageServer"]; exists {
+	if val, exists := settingsMap["asimonim"]; exists {
+		ourSettings = val
+	} else if val, exists := settingsMap["designTokensLanguageServer"]; exists {
 		ourSettings = val
 	} else if val, exists := settingsMap["design-tokens-language-server"]; exists {
 		ourSettings = val

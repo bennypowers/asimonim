@@ -240,6 +240,23 @@ func TestReadPackageJsonConfig(t *testing.T) {
 	})
 }
 
+func TestExtractConfigMap_AsimonimNamespace(t *testing.T) {
+	t.Run("reads asimonim config from package.json", func(t *testing.T) {
+		config, err := ReadPackageJsonConfig("testdata/asimonim-integration/asimonim-package-json")
+		require.NoError(t, err)
+		require.NotNil(t, config)
+		assert.Equal(t, "--pkg", config.Prefix)
+		assert.Len(t, config.TokensFiles, 1)
+	})
+
+	t.Run("asimonim takes precedence over legacy key", func(t *testing.T) {
+		config, err := ReadPackageJsonConfig("testdata/asimonim-integration/both-package-json")
+		require.NoError(t, err)
+		require.NotNil(t, config)
+		assert.Equal(t, "--new-pkg", config.Prefix)
+	})
+}
+
 func TestContainsGlobChars(t *testing.T) {
 	tests := []struct {
 		pattern  string
