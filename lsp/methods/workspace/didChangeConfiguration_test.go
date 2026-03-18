@@ -382,3 +382,11 @@ func TestDidChangeConfiguration_WithAsimonimNamespace(t *testing.T) {
 	config := ctx.GetConfig()
 	assert.Equal(t, "--asimonim", config.Prefix)
 }
+
+func TestParseConfiguration_AsimonimInvalidType(t *testing.T) {
+	// asimonim-invalid-type.json: {"asimonim": "not an object"}
+	settings := loadConfigFixture(t, "asimonim-invalid-type.json")
+	_, err := parseConfiguration(settings)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must be an object")
+}
