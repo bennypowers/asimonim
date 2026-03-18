@@ -13,6 +13,7 @@ func TestIsCSSSupportedLanguage(t *testing.T) {
 	supported := []string{
 		"css",
 		"html",
+		"twig",
 		"php",
 		"javascript",
 		"javascriptreact",
@@ -128,6 +129,33 @@ func TestParseCSSFromDocumentPHP(t *testing.T) {
 	}, varNames)
 }
 
+func TestParseCSSFromDocumentTwig(t *testing.T) {
+	content, err := os.ReadFile("html/testdata/drupal-theme.html.twig")
+	require.NoError(t, err)
+
+	result, err := parser.ParseCSSFromDocument(string(content), "twig")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// drupal-theme.html.twig has 1 variable declaration and 7 var() calls
+	assert.Len(t, result.Variables, 1)
+	assert.Equal(t, "--color-primary", result.Variables[0].Name)
+
+	varNames := make([]string, len(result.VarCalls))
+	for i, vc := range result.VarCalls {
+		varNames[i] = vc.TokenName
+	}
+	assert.ElementsMatch(t, []string{
+		"--color-primary", // style tag: var(--color-primary)
+		"--spacing-lg",    // style tag: var(--spacing-lg)
+		"--color-text",    // style attribute: var(--color-text)
+		"--font-size-xl",  // style attribute: var(--font-size-xl)
+		"--spacing-md",    // style attribute: var(--spacing-md)
+		"--color-border",  // second style tag: var(--color-border)
+		"--spacing-sm",    // second style tag: var(--spacing-sm)
+	}, varNames)
+}
+
 func TestParseCSSFromDocumentUnsupported(t *testing.T) {
 	result, err := parser.ParseCSSFromDocument("{}", "json")
 	assert.NoError(t, err)
@@ -185,6 +213,27 @@ func TestCSSContentSpansPHP(t *testing.T) {
 	assert.Equal(t,
 		"\n    .site-footer {\n      border-top: 1px solid var(--color-border);\n      padding: var(--spacing-sm);\n    }\n  ",
 		spans[1], "second style tag span")
+
+	// Style attribute spans are wrapped in "x{...}"
+	assert.Equal(t,
+		"x{color: var(--color-text); font-size: var(--font-size-xl)}",
+		spans[2], "first style attribute span")
+	assert.Equal(t,
+		"x{margin: var(--spacing-md)}",
+		spans[3], "second style attribute span")
+}
+
+func TestCSSContentSpansTwig(t *testing.T) {
+	content, err := os.ReadFile("html/testdata/drupal-theme.html.twig")
+	require.NoError(t, err)
+
+	spans := parser.CSSContentSpans(string(content), "twig")
+	// drupal-theme.html.twig: 2 style tags + 2 style attributes = 4 spans
+	require.Len(t, spans, 4)
+
+	// First style tag: :root with --color-primary and .site-header rules
+	assert.Contains(t, spans[0], "--color-primary: #0073aa")
+	assert.Contains(t, spans[0], "var(--color-primary)")
 
 	// Style attribute spans are wrapped in "x{...}"
 	assert.Equal(t,

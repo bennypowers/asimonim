@@ -1,0 +1,33 @@
+{# Twig interpolation inside style tags and attributes. #}
+{% set brand_color = theme.brand_color|default('#0073aa') %}
+{% set font_stack = theme.font_family|default('system-ui') %}
+<style>
+:root {
+  --brand-color: {{ brand_color }};
+  --font-stack: {{ font_stack }};
+}
+.site-header {
+  background: var(--brand-color);
+  font-family: var(--font-stack);
+  color: var(--color-text);
+}
+{% if show_gradient %}
+.hero {
+  background: linear-gradient(var(--gradient-start), var(--gradient-end));
+}
+{% endif %}
+</style>
+<div style="color: var(--color-primary); padding: {{ spacing }}px">
+  {{ content|raw }}
+</div>
+<style>
+.dynamic-section {
+  opacity: {{ opacity|default('1') }};
+  margin: var(--spacing-section);
+}
+</style>
+{% if show_sidebar %}
+<aside style="width: var(--sidebar-width)">
+  {% include 'sidebar.html.twig' %}
+</aside>
+{% endif %}

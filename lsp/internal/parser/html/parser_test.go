@@ -315,6 +315,313 @@ func TestClosePool(t *testing.T) {
 	assert.Len(t, regions, 1)
 }
 
+// Twig Template Tests
+// ============================================================================
+// Twig syntax ({% %}, {{ }}) is valid text content in HTML, so tree-sitter-html
+// parses Twig templates correctly without a dedicated grammar. These tests verify
+// that all edge cases work: blocks, control flow, interpolation inside CSS, etc.
+
+func TestTwigParseCSSRegions(t *testing.T) {
+	tests := []struct {
+		name     string
+		fixture  string
+		wantTags int
+		wantAttr int
+	}{
+		{
+			// Drupal theme: Twig blocks, loops, filters, multiple style blocks,
+			// style attributes interleaved with Twig variables
+			name:     "drupal theme",
+			fixture:  "testdata/drupal-theme.html.twig",
+			wantTags: 2,
+			wantAttr: 2,
+		},
+		{
+			// Twig interpolation inside style tags and attributes,
+			// Twig conditionals wrapping CSS rules, Twig filters
+			name:     "interpolated styles",
+			fixture:  "testdata/twig-interpolated-styles.html.twig",
+			wantTags: 2,
+			wantAttr: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source, err := os.ReadFile(tt.fixture)
+			require.NoError(t, err)
+
+			p := html.AcquireParser()
+			defer html.ReleaseParser(p)
+
+			regions := p.ParseCSSRegions(string(source))
+
+			tags := 0
+			attrs := 0
+			for _, r := range regions {
+				switch r.Type {
+				case html.StyleTag:
+					tags++
+				case html.StyleAttribute:
+					attrs++
+				}
+			}
+
+			assert.Equal(t, tt.wantTags, tags, "style tag count")
+			assert.Equal(t, tt.wantAttr, attrs, "style attribute count")
+		})
+	}
+}
+
+func TestTwigParseCSS_Golden(t *testing.T) {
+	tests := []struct {
+		name    string
+		fixture string
+		golden  string
+	}{
+		{
+			name:    "drupal theme",
+			fixture: "testdata/drupal-theme.html.twig",
+			golden:  "testdata/golden/drupal-theme.json",
+		},
+		{
+			name:    "interpolated styles",
+			fixture: "testdata/twig-interpolated-styles.html.twig",
+			golden:  "testdata/golden/twig-interpolated-styles.json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source, err := os.ReadFile(tt.fixture)
+			require.NoError(t, err)
+
+			p := html.AcquireParser()
+			defer html.ReleaseParser(p)
+
+			result, err := p.ParseCSS(string(source))
+			require.NoError(t, err)
+			require.NotNil(t, result)
+
+			if *update {
+				data, marshalErr := json.MarshalIndent(result, "", "  ")
+				require.NoError(t, marshalErr)
+				writeErr := os.WriteFile(tt.golden, append(data, '\n'), 0o644)
+				require.NoError(t, writeErr)
+				return
+			}
+
+			golden, readErr := os.ReadFile(tt.golden)
+			require.NoError(t, readErr)
+
+			var expected css.ParseResult
+			err = json.Unmarshal(golden, &expected)
+			require.NoError(t, err)
+
+			assert.Equal(t, expected.Variables, result.Variables, "variables")
+			assert.Equal(t, expected.VarCalls, result.VarCalls, "var calls")
+		})
+	}
+}
+
+func TestTwigStyleTagPositionMapping(t *testing.T) {
+	// Twig block before style tag - positions should be correct
+	source := `{% extends "base.html.twig" %}
+<style>
+.card {
+  color: var(--color-primary);
+}
+</style>`
+
+	p := html.AcquireParser()
+	defer html.ReleaseParser(p)
+
+	result, err := p.ParseCSS(source)
+	require.NoError(t, err)
+	require.Len(t, result.VarCalls, 1)
+
+	vc := result.VarCalls[0]
+	assert.Equal(t, "--color-primary", vc.TokenName)
+	// "  color: var(--color-primary);" on line 3 (0-indexed), var at col 9
+	assert.Equal(t, uint32(3), vc.Range.Start.Line)
+	assert.Equal(t, uint32(9), vc.Range.Start.Character)
+}
+
+func TestTwigStyleAttributePositionMapping(t *testing.T) {
+	// Twig variable in HTML, style attribute on same element
+	source := `<h1>{{ title }}</h1>
+<div style="color: var(--text-color)">{{ body }}</div>`
+
+	p := html.AcquireParser()
+	defer html.ReleaseParser(p)
+
+	result, err := p.ParseCSS(source)
+	require.NoError(t, err)
+	require.Len(t, result.VarCalls, 1)
+
+	vc := result.VarCalls[0]
+	assert.Equal(t, "--text-color", vc.TokenName)
+	// style="color: var(--text-color)" on line 1, attr value at col 12, var at +7 = 19
+	assert.Equal(t, uint32(1), vc.Range.Start.Line)
+	assert.Equal(t, uint32(19), vc.Range.Start.Character)
+}
+
+func TestTwigInterleavedBlocks(t *testing.T) {
+	// Twig blocks interleaved with style tags
+	source := `{% block header %}
+<style>
+.header { background: var(--bg-header); }
+</style>
+{% endblock %}
+{% block footer %}
+<style>
+.footer { color: var(--color-footer); }
+</style>
+{% endblock %}`
+
+	p := html.AcquireParser()
+	defer html.ReleaseParser(p)
+
+	result, err := p.ParseCSS(source)
+	require.NoError(t, err)
+	require.Len(t, result.VarCalls, 2)
+
+	assert.Equal(t, "--bg-header", result.VarCalls[0].TokenName)
+	assert.Equal(t, uint32(2), result.VarCalls[0].Range.Start.Line)
+
+	assert.Equal(t, "--color-footer", result.VarCalls[1].TokenName)
+	assert.Equal(t, uint32(7), result.VarCalls[1].Range.Start.Line)
+}
+
+func TestTwigInterpolationInsideStyle(t *testing.T) {
+	// Twig {{ }} inside a style tag - HTML parser treats it as text,
+	// var() calls around the interpolation should still be extracted
+	source := `<style>
+:root {
+  --brand: {{ brand_color }};
+}
+.card {
+  color: var(--brand);
+  background: var(--bg-card);
+}
+</style>`
+
+	p := html.AcquireParser()
+	defer html.ReleaseParser(p)
+
+	result, err := p.ParseCSS(source)
+	require.NoError(t, err)
+
+	varNames := make([]string, len(result.VarCalls))
+	for i, vc := range result.VarCalls {
+		varNames[i] = vc.TokenName
+	}
+	assert.ElementsMatch(t, []string{"--brand", "--bg-card"}, varNames)
+}
+
+func TestTwigConditionalInsideStyle(t *testing.T) {
+	// Twig {% if %} wrapping CSS rules inside a style tag
+	source := `<style>
+.base { color: var(--base-color); }
+{% if has_dark_mode %}
+.dark { background: var(--dark-bg); }
+{% endif %}
+</style>`
+
+	p := html.AcquireParser()
+	defer html.ReleaseParser(p)
+
+	result, err := p.ParseCSS(source)
+	require.NoError(t, err)
+
+	varNames := make([]string, len(result.VarCalls))
+	for i, vc := range result.VarCalls {
+		varNames[i] = vc.TokenName
+	}
+	assert.ElementsMatch(t, []string{"--base-color", "--dark-bg"}, varNames)
+}
+
+func TestTwigForLoopInsideStyle(t *testing.T) {
+	// Twig {% for %} generating CSS rules
+	source := `<style>
+{% for color in colors %}
+.text-{{ color.name }} {
+  color: var(--color-{{ color.name }});
+}
+{% endfor %}
+.fallback { color: var(--color-default); }
+</style>`
+
+	p := html.AcquireParser()
+	defer html.ReleaseParser(p)
+
+	result, err := p.ParseCSS(source)
+	require.NoError(t, err)
+
+	// Only --color-default is a complete var() call; the Twig-interpolated
+	// var(--color-{{ color.name }}) is not valid CSS, so CSS parser may or
+	// may not extract it. The important thing is --color-default is found.
+	varNames := make([]string, len(result.VarCalls))
+	for i, vc := range result.VarCalls {
+		varNames[i] = vc.TokenName
+	}
+	assert.Contains(t, varNames, "--color-default")
+}
+
+func TestTwigMacroWithStyles(t *testing.T) {
+	// Twig macros alongside style blocks
+	source := `{% macro card(title, body) %}
+<div class="card" style="padding: var(--card-padding)">
+  <h3>{{ title }}</h3>
+  <p>{{ body }}</p>
+</div>
+{% endmacro %}
+<style>
+.card { border: 1px solid var(--card-border); }
+</style>`
+
+	p := html.AcquireParser()
+	defer html.ReleaseParser(p)
+
+	result, err := p.ParseCSS(source)
+	require.NoError(t, err)
+
+	varNames := make([]string, len(result.VarCalls))
+	for i, vc := range result.VarCalls {
+		varNames[i] = vc.TokenName
+	}
+	assert.ElementsMatch(t, []string{"--card-padding", "--card-border"}, varNames)
+}
+
+func TestTwigNoStyles(t *testing.T) {
+	// Twig template with no CSS at all
+	source := `{% extends "base.html.twig" %}
+{% block content %}
+  <h1>{{ title }}</h1>
+  <p>{{ body|raw }}</p>
+{% endblock %}`
+
+	p := html.AcquireParser()
+	defer html.ReleaseParser(p)
+
+	result, err := p.ParseCSS(source)
+	require.NoError(t, err)
+	assert.Empty(t, result.Variables)
+	assert.Empty(t, result.VarCalls)
+}
+
+func TestTwigEmptyStyleTag(t *testing.T) {
+	source := `{% block styles %}<style></style>{% endblock %}`
+
+	p := html.AcquireParser()
+	defer html.ReleaseParser(p)
+
+	result, err := p.ParseCSS(source)
+	require.NoError(t, err)
+	assert.Empty(t, result.Variables)
+	assert.Empty(t, result.VarCalls)
+}
+
 func TestStyleTagWithVariableDeclaration(t *testing.T) {
 	source := `<style>
 :root {
