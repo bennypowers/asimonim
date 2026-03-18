@@ -15,6 +15,7 @@ require (
 	github.com/tree-sitter/tree-sitter-css v0.23.2
 	github.com/tree-sitter/tree-sitter-html v0.23.2
 	github.com/tree-sitter/tree-sitter-javascript v0.25.0
+	github.com/tree-sitter/tree-sitter-php v0.24.2
 	golang.org/x/text v0.28.0
 	gopkg.in/yaml.v3 v3.0.1
 )

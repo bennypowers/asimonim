@@ -786,6 +786,84 @@ func TestHover_HTMLStyleTag(t *testing.T) {
 	assert.Equal(t, uint32(0), hover.Range.Start.Line)
 }
 
+func TestHover_PHPStyleTag(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
+		Name:  "spacing.md",
+		Value: "16px",
+		Type:  "dimension",
+	}))
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
+		Name:  "color.border",
+		Value: "#cccccc",
+		Type:  "color",
+	}))
+
+	// Load PHP fixture with embedded <style> block
+	content, err := os.ReadFile("testdata/php/sidebar-widget.php")
+	require.NoError(t, err)
+
+	uri := "file:///theme/sidebar.php"
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "php", 1, string(content)))
+
+	// Hover over var(--spacing-md) on line 8 (0-indexed)
+	// "      padding: var(--spacing-md);"
+	//                    ^ char 19 is inside --spacing-md
+	hover, err := Hover(req, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 8, Character: 19},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, hover, "hover should not be nil for var() call in PHP style tag")
+	mc, ok := hover.Contents.(protocol.MarkupContent)
+	require.True(t, ok)
+	assert.Contains(t, mc.Value, "--spacing-md")
+
+	require.NotNil(t, hover.Range, "Range should be present for var() call in PHP")
+	assert.Equal(t, uint32(8), hover.Range.Start.Line)
+}
+
+func TestHover_PHPStyleAttribute(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
+		Name:  "spacing.sm",
+		Value: "8px",
+		Type:  "dimension",
+	}))
+
+	// Load PHP fixture
+	content, err := os.ReadFile("testdata/php/sidebar-widget.php")
+	require.NoError(t, err)
+
+	uri := "file:///theme/sidebar.php"
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "php", 1, string(content)))
+
+	// Hover over var(--spacing-sm) in style attribute on line 17 (0-indexed)
+	// '  <div style="margin-top: var(--spacing-sm)">'
+	//                                  ^ char 30 is inside --spacing-sm
+	hover, err := Hover(req, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 17, Character: 30},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, hover, "hover should not be nil for var() call in PHP style attribute")
+	mc, ok := hover.Contents.(protocol.MarkupContent)
+	require.True(t, ok)
+	assert.Contains(t, mc.Value, "--spacing-sm")
+}
+
 func TestHover_JSCSSTemplate(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	glspCtx := &glsp.Context{}
@@ -1162,6 +1240,7 @@ func TestHover_IsTokenFile(t *testing.T) {
 		{"yaml", "yaml", true},
 		{"css", "css", false},
 		{"html", "html", false},
+		{"php", "php", false},
 		{"javascript", "javascript", false},
 	}
 	for _, tt := range tests {

@@ -1,6 +1,7 @@
 package completion
 
 import (
+	"os"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
@@ -493,6 +494,62 @@ func TestCompletion_HTMLDocument(t *testing.T) {
 	list, ok := result.(*protocol.CompletionList)
 	require.True(t, ok)
 	assert.GreaterOrEqual(t, len(list.Items), 1)
+}
+
+func TestCompletion_PHPDocument(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	ctx.SetSupportsSnippets(false)
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:  "bg.surface",
+		Value: "#ffffff",
+		Type:  "color",
+	})
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:  "color.text",
+		Value: "#111111",
+		Type:  "color",
+	})
+
+	// Load PHP fixture with embedded <style> block
+	content, err := os.ReadFile("testdata/wordpress-template.php")
+	require.NoError(t, err)
+
+	uri := "file:///theme/header.php"
+	_ = ctx.DocumentManager().DidOpen(uri, "php", 1, string(content))
+
+	// Cursor on line 12 (0-indexed): "  background: --bg;"
+	// Position at "--bg" (col 14 to 18), cursor at col 16
+	result, err := Completion(req, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 12, Character: 16},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	list, ok := result.(*protocol.CompletionList)
+	require.True(t, ok)
+	require.Len(t, list.Items, 1, "should complete design tokens in PHP embedded styles")
+	// --bg matches bg.surface -> --bg-surface
+	assert.Equal(t, "--bg-surface", list.Items[0].Label)
+}
+
+func TestIsInCompletionContext_PHP(t *testing.T) {
+	// PHP with a style tag containing CSS - should be in completion context
+	content, err := os.ReadFile("testdata/wordpress-template.php")
+	require.NoError(t, err)
+
+	result := isInCompletionContext(string(content), "php", protocol.Position{Line: 12, Character: 16})
+	assert.True(t, result, "should be in completion context inside PHP style tag block")
+
+	// PHP with no style tags - should not be in context
+	noCSS := "<?php echo 'hello'; ?>\n<p>No styles here</p>"
+	result = isInCompletionContext(noCSS, "php", protocol.Position{Line: 1, Character: 5})
+	assert.False(t, result, "should not be in completion context with no CSS in PHP")
 }
 
 func TestCompletion_UnsupportedLanguage(t *testing.T) {
