@@ -1,6 +1,9 @@
 # Asimonim
 
 ![A vintage Israeli phone token (asimon), captured mid-drop as it falls into a payphone coin slot](./logo.png)
+
+[![codecov](https://codecov.io/gh/bennypowers/asimonim/graph/badge.svg)](https://codecov.io/gh/bennypowers/asimonim)
+
 A high-performance design tokens parser, validator, and language server, available as a CLI tool and Go library.
 
 > *Asimonim* (אֲסִימוֹנִים) (ahh-see-moh-NEEM) is Hebrew for "[tokens](https://www.wikiwand.com/en/articles/Telephone_token)".
