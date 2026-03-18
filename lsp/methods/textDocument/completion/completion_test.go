@@ -552,6 +552,56 @@ func TestIsInCompletionContext_PHP(t *testing.T) {
 	assert.False(t, result, "should not be in completion context with no CSS in PHP")
 }
 
+func TestCompletion_TwigDocument(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	ctx.SetSupportsSnippets(false)
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:  "bg.surface",
+		Value: "#ffffff",
+		Type:  "color",
+	})
+
+	// Load Twig fixture with embedded <style> block
+	content, err := os.ReadFile("testdata/drupal-template.html.twig")
+	require.NoError(t, err)
+
+	uri := "file:///theme/content.html.twig"
+	_ = ctx.DocumentManager().DidOpen(uri, "twig", 1, string(content))
+
+	// Cursor on line 10 (0-indexed): "  background: --bg;"
+	// Position at "--bg" (col 14 to 18), cursor at col 16
+	result, err := Completion(req, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 10, Character: 16},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	list, ok := result.(*protocol.CompletionList)
+	require.True(t, ok)
+	require.Len(t, list.Items, 1, "should complete design tokens in Twig embedded styles")
+	assert.Equal(t, "--bg-surface", list.Items[0].Label)
+}
+
+func TestIsInCompletionContext_Twig(t *testing.T) {
+	// Twig with a style tag containing CSS - should be in completion context
+	content, err := os.ReadFile("testdata/drupal-template.html.twig")
+	require.NoError(t, err)
+
+	result := isInCompletionContext(string(content), "twig", protocol.Position{Line: 10, Character: 16})
+	assert.True(t, result, "should be in completion context inside Twig style tag block")
+
+	// Twig with no style tags - should not be in context
+	noCSS := "{% block content %}\n<p>{{ body }}</p>\n{% endblock %}"
+	result = isInCompletionContext(noCSS, "twig", protocol.Position{Line: 1, Character: 5})
+	assert.False(t, result, "should not be in completion context with no CSS in Twig")
+}
+
 func TestCompletion_UnsupportedLanguage(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	glspCtx := &glsp.Context{}

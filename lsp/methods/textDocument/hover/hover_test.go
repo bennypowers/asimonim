@@ -864,6 +864,78 @@ func TestHover_PHPStyleAttribute(t *testing.T) {
 	assert.Contains(t, mc.Value, "--spacing-sm")
 }
 
+func TestHover_TwigStyleTag(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
+		Name:  "spacing.md",
+		Value: "16px",
+		Type:  "dimension",
+	}))
+
+	// Load Twig fixture with embedded <style> block
+	content, err := os.ReadFile("testdata/twig/sidebar-block.html.twig")
+	require.NoError(t, err)
+
+	uri := "file:///theme/sidebar.html.twig"
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "twig", 1, string(content)))
+
+	// Hover over var(--spacing-md) on line 5 (0-indexed)
+	// "      padding: var(--spacing-md);"
+	//                    ^ char 19 is inside --spacing-md
+	hover, err := Hover(req, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 5, Character: 19},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, hover, "hover should not be nil for var() call in Twig style tag")
+	mc, ok := hover.Contents.(protocol.MarkupContent)
+	require.True(t, ok)
+	assert.Contains(t, mc.Value, "--spacing-md")
+
+	require.NotNil(t, hover.Range, "Range should be present for var() call in Twig")
+	assert.Equal(t, uint32(5), hover.Range.Start.Line)
+}
+
+func TestHover_TwigStyleAttribute(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+
+	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
+		Name:  "spacing.sm",
+		Value: "8px",
+		Type:  "dimension",
+	}))
+
+	content, err := os.ReadFile("testdata/twig/sidebar-block.html.twig")
+	require.NoError(t, err)
+
+	uri := "file:///theme/sidebar.html.twig"
+	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "twig", 1, string(content)))
+
+	// Hover over var(--spacing-sm) in style attribute on line 14 (0-indexed)
+	// '  <div style="margin-top: var(--spacing-sm)">'
+	//                                  ^ char 30 is inside --spacing-sm
+	hover, err := Hover(req, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 14, Character: 30},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, hover, "hover should not be nil for var() call in Twig style attribute")
+	mc, ok := hover.Contents.(protocol.MarkupContent)
+	require.True(t, ok)
+	assert.Contains(t, mc.Value, "--spacing-sm")
+}
+
 func TestHover_JSCSSTemplate(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	glspCtx := &glsp.Context{}
@@ -1241,6 +1313,7 @@ func TestHover_IsTokenFile(t *testing.T) {
 		{"css", "css", false},
 		{"html", "html", false},
 		{"php", "php", false},
+		{"twig", "twig", false},
 		{"javascript", "javascript", false},
 	}
 	for _, tt := range tests {

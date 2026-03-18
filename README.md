@@ -1,6 +1,9 @@
 # Asimonim
 
 ![A vintage Israeli phone token (asimon), captured mid-drop as it falls into a payphone coin slot](./logo.png)
+
+[![codecov](https://codecov.io/gh/bennypowers/asimonim/graph/badge.svg)](https://codecov.io/gh/bennypowers/asimonim)
+
 A high-performance design tokens parser, validator, and language server, available as a CLI tool and Go library.
 
 > *Asimonim* (אֲסִימוֹנִים) (ahh-see-moh-NEEM) is Hebrew for "[tokens](https://www.wikiwand.com/en/articles/Telephone_token)".
@@ -88,7 +91,7 @@ Create a file like `~/.config/nvim/lsp/asimonim.lua`:
 return {
   cmd = { 'asimonim', 'lsp' },
   root_markers = { '.git', 'package.json' },
-  filetypes = { 'css', 'html', 'php', 'javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'json', 'yaml' },
+  filetypes = { 'css', 'html', 'twig', 'php', 'javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'json', 'yaml' },
   settings = {
     dtls = {
       tokensFiles = {
@@ -134,8 +137,8 @@ return {
 ### Other Editors
 
 Any editor with LSP support can use Asimonim. Run `asimonim lsp` as the
-language server command, with document selectors for CSS, HTML, PHP, JavaScript,
-TypeScript, JSON, and YAML.
+language server command, with document selectors for CSS, HTML, Twig, PHP,
+JavaScript, TypeScript, JSON, and YAML.
 
 ## Language Server Features
 

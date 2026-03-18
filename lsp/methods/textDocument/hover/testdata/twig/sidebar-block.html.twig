@@ -1,0 +1,18 @@
+{# Drupal block template for testing hover on design tokens. #}
+{% set block_title = elements['#title'] %}
+<aside class="block">
+  <style>
+    .block {
+      padding: var(--spacing-md);
+      border: 1px solid var(--color-border);
+    }
+    .block-title {
+      font-size: var(--font-size-lg);
+      color: var(--color-heading);
+    }
+  </style>
+  <h3 class="block-title">{{ block_title }}</h3>
+  <div style="margin-top: var(--spacing-sm)">
+    {{ content|raw }}
+  </div>
+</aside>

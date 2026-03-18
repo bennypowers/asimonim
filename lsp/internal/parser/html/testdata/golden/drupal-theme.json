@@ -1,0 +1,126 @@
+{
+  "Variables": [
+    {
+      "Name": "--color-primary",
+      "Value": "#0073aa",
+      "Type": 0,
+      "Range": {
+        "Start": {
+          "Line": 11,
+          "Character": 6
+        },
+        "End": {
+          "Line": 11,
+          "Character": 21
+        }
+      }
+    }
+  ],
+  "VarCalls": [
+    {
+      "Fallback": null,
+      "TokenName": "--color-primary",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 14,
+          "Character": 24
+        },
+        "End": {
+          "Line": 14,
+          "Character": 44
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--spacing-lg",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 15,
+          "Character": 15
+        },
+        "End": {
+          "Line": 15,
+          "Character": 32
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--color-border",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 38,
+          "Character": 28
+        },
+        "End": {
+          "Line": 38,
+          "Character": 47
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--spacing-sm",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 39,
+          "Character": 15
+        },
+        "End": {
+          "Line": 39,
+          "Character": 32
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--color-text",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 22,
+          "Character": 22
+        },
+        "End": {
+          "Line": 22,
+          "Character": 39
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--font-size-xl",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 22,
+          "Character": 52
+        },
+        "End": {
+          "Line": 22,
+          "Character": 71
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--spacing-md",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 29,
+          "Character": 28
+        },
+        "End": {
+          "Line": 29,
+          "Character": 45
+        }
+      }
+    }
+  ]
+}

@@ -9,9 +9,12 @@ import (
 
 // cssLanguages maps language IDs to the parser category they use.
 // "css" → direct CSS, "html" → HTML parser, "php" → PHP parser, "js" → JS parser.
+// Twig templates use the HTML parser directly because Twig syntax ({% %}, {{ }})
+// is valid text content in HTML and does not interfere with style extraction.
 var cssLanguages = map[string]string{
 	"css":             "css",
 	"html":            "html",
+	"twig":            "html",
 	"php":             "php",
 	"javascript":      "js",
 	"javascriptreact": "js",

@@ -1,0 +1,47 @@
+{#
+ # Drupal theme template demonstrating design token usage.
+ # Covers: Twig blocks, variables, filters, control flow,
+ # multiple style blocks, style attributes, and macros.
+ #}
+{% extends "layout.html.twig" %}
+
+{% block stylesheets %}
+  {{ parent() }}
+  <style>
+    :root {
+      --color-primary: #0073aa;
+    }
+    .site-header {
+      background-color: var(--color-primary);
+      padding: var(--spacing-lg);
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <header class="site-header">
+    <h1 style="color: var(--color-text); font-size: var(--font-size-xl)">
+      {{ site_name|escape }}
+    </h1>
+  </header>
+
+  <main>
+    {% for article in articles %}
+    <article style="margin: var(--spacing-md)">
+      <h2>{{ article.title }}</h2>
+      {{ article.body|raw }}
+    </article>
+    {% endfor %}
+  </main>
+
+  <style>
+    .site-footer {
+      border-top: 1px solid var(--color-border);
+      padding: var(--spacing-sm);
+    }
+  </style>
+
+  <footer class="site-footer">
+    &copy; {{ "now"|date("Y") }} {{ site_name }}
+  </footer>
+{% endblock %}

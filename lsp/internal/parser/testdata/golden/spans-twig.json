@@ -1,0 +1,6 @@
+[
+  "\n    :root {\n      --color-primary: #0073aa;\n    }\n    .site-header {\n      background-color: var(--color-primary);\n      padding: var(--spacing-lg);\n    }\n  ",
+  "\n    .site-footer {\n      border-top: 1px solid var(--color-border);\n      padding: var(--spacing-sm);\n    }\n  ",
+  "x{color: var(--color-text); font-size: var(--font-size-xl)}",
+  "x{margin: var(--spacing-md)}"
+]
