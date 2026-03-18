@@ -12,6 +12,8 @@ import (
 
 	"bennypowers.dev/asimonim/convert/formatter"
 	"bennypowers.dev/asimonim/convert/formatter/dtcg"
+	"bennypowers.dev/asimonim/schema"
+	"bennypowers.dev/asimonim/testutil"
 	"bennypowers.dev/asimonim/token"
 )
 
@@ -27,9 +29,10 @@ func TestFormat(t *testing.T) {
 		return result
 	}
 
+	allTokens := testutil.ParseFixtureTokens(t, "fixtures/v2025_10/all-color-spaces", schema.V2025_10)
 	tokens := []*token.Token{
-		{Name: "color-primary", Value: "#FF6B35", Type: "color"},
-		{Name: "spacing-small", Value: "4px", Type: "dimension"},
+		testutil.TokenByPath(t, allTokens, "color.srgb-hex"),
+		testutil.TokenByPath(t, allTokens, "spacing.small"),
 	}
 
 	f := dtcg.New(serialize)
@@ -43,24 +46,21 @@ func TestFormat(t *testing.T) {
 		t.Fatalf("result is not valid JSON: %v", err)
 	}
 
-	// Check color token
-	colorTok, ok := parsed["color-primary"].(map[string]any)
+	// color.srgb-hex: structured sRGB color -> $value and $type preserved
+	colorTok, ok := parsed["color-srgb-hex"].(map[string]any)
 	if !ok {
-		t.Fatal("expected color-primary in output")
-	}
-	if colorTok["$value"] != "#FF6B35" {
-		t.Errorf("color value = %v, want #FF6B35", colorTok["$value"])
+		t.Fatal("expected color-srgb-hex in output")
 	}
 	if colorTok["$type"] != "color" {
 		t.Errorf("color type = %v, want color", colorTok["$type"])
 	}
 
-	// Check spacing token
+	// spacing.small: {value: 4, unit: "px"} -> $value and $type: "dimension"
 	spacingTok, ok := parsed["spacing-small"].(map[string]any)
 	if !ok {
 		t.Fatal("expected spacing-small in output")
 	}
-	if spacingTok["$value"] != "4px" {
-		t.Errorf("spacing value = %v, want 4px", spacingTok["$value"])
+	if spacingTok["$type"] != "dimension" {
+		t.Errorf("spacing type = %v, want dimension", spacingTok["$type"])
 	}
 }

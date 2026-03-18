@@ -190,9 +190,18 @@ func TestNormalizeMap(t *testing.T) {
 			},
 		}
 		result := normalizeMap(input)
-		m := result.(map[string]any)
-		tokens := m["tokens"].(map[string]any)
-		color := tokens["color"].(map[string]any)
+		m, ok := result.(map[string]any)
+		if !ok {
+			t.Fatalf("expected result to be map[string]any, got %T", result)
+		}
+		tokens, ok := m["tokens"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected tokens to be map[string]any, got %T", m["tokens"])
+		}
+		color, ok := tokens["color"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected color to be map[string]any, got %T", tokens["color"])
+		}
 		if color["$value"] != "#fff" {
 			t.Errorf("expected $value=#fff, got %v", color["$value"])
 		}
