@@ -112,18 +112,8 @@ func TestParseCSS_Golden(t *testing.T) {
 			err = json.Unmarshal(golden, &expected)
 			require.NoError(t, err)
 
-			require.Equal(t, len(expected.Variables), len(result.Variables), "variable count")
-			require.Equal(t, len(expected.VarCalls), len(result.VarCalls), "var call count")
-
-			for i, v := range result.Variables {
-				assert.Equal(t, expected.Variables[i].Name, v.Name, "variable %d name", i)
-				assert.Equal(t, expected.Variables[i].Range, v.Range, "variable %d range", i)
-			}
-
-			for i, vc := range result.VarCalls {
-				assert.Equal(t, expected.VarCalls[i].TokenName, vc.TokenName, "var call %d token name", i)
-				assert.Equal(t, expected.VarCalls[i].Range, vc.Range, "var call %d range", i)
-			}
+			assert.Equal(t, expected.Variables, result.Variables, "variables")
+			assert.Equal(t, expected.VarCalls, result.VarCalls, "var calls")
 		})
 	}
 }
@@ -219,23 +209,16 @@ func TestInterpolatedStyles(t *testing.T) {
 		varNames[i] = vc.TokenName
 	}
 
-	// var() calls in the <style> tag (around PHP interpolation)
-	assert.Contains(t, varNames, "--brand-color", "var(--brand-color) in style tag")
-	assert.Contains(t, varNames, "--font-stack", "var(--font-stack) in style tag")
-	assert.Contains(t, varNames, "--color-text", "var(--color-text) in style tag")
-
-	// var() calls inside a PHP-conditional block within the style tag
-	assert.Contains(t, varNames, "--gradient-start", "var(--gradient-start) in PHP conditional")
-	assert.Contains(t, varNames, "--gradient-end", "var(--gradient-end) in PHP conditional")
-
-	// var() call in a style attribute
-	assert.Contains(t, varNames, "--color-primary", "var(--color-primary) in style attribute")
-
-	// var() call in second style tag (short echo syntax <?= ?>)
-	assert.Contains(t, varNames, "--spacing-section", "var(--spacing-section) in style tag with <?= ?>")
-
-	// var() call in style attribute within PHP conditional
-	assert.Contains(t, varNames, "--sidebar-width", "var(--sidebar-width) in conditional style attribute")
+	assert.ElementsMatch(t, []string{
+		"--brand-color",    // style tag: around PHP interpolation
+		"--font-stack",     // style tag: around PHP interpolation
+		"--color-text",     // style tag: pure CSS
+		"--gradient-start", // style tag: inside PHP-conditional block
+		"--gradient-end",   // style tag: inside PHP-conditional block
+		"--color-primary",  // style attribute
+		"--spacing-section", // second style tag: short echo syntax <?= ?>
+		"--sidebar-width",  // style attribute: within PHP conditional
+	}, varNames)
 }
 
 func TestComplexPHPBeforeStyles(t *testing.T) {
@@ -294,6 +277,25 @@ function render() {
 	require.NoError(t, err)
 	assert.Empty(t, result.Variables)
 	assert.Empty(t, result.VarCalls)
+}
+
+func TestEmptyInput(t *testing.T) {
+	p := php.AcquireParser()
+	defer php.ReleaseParser(p)
+
+	// Empty string
+	regions := p.ParseCSSRegions("")
+	assert.Empty(t, regions)
+
+	result, err := p.ParseCSS("")
+	require.NoError(t, err)
+	assert.Empty(t, result.Variables)
+	assert.Empty(t, result.VarCalls)
+}
+
+func TestReleaseNilParser(t *testing.T) {
+	// Should not panic
+	php.ReleaseParser(nil)
 }
 
 func TestClosePool(t *testing.T) {

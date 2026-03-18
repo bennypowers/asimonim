@@ -533,8 +533,9 @@ func TestCompletion_PHPDocument(t *testing.T) {
 
 	list, ok := result.(*protocol.CompletionList)
 	require.True(t, ok)
+	require.Len(t, list.Items, 1, "should complete design tokens in PHP embedded styles")
 	// --bg matches bg.surface -> --bg-surface
-	assert.GreaterOrEqual(t, len(list.Items), 1, "should complete design tokens in PHP embedded styles")
+	assert.Equal(t, "--bg-surface", list.Items[0].Label)
 }
 
 func TestIsInCompletionContext_PHP(t *testing.T) {

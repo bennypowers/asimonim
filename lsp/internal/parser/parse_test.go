@@ -113,23 +113,20 @@ func TestParseCSSFromDocumentPHP(t *testing.T) {
 	assert.Len(t, result.Variables, 1)
 	assert.Equal(t, "--color-primary", result.Variables[0].Name)
 
-	assert.Len(t, result.VarCalls, 7)
-
-	// Verify key var() calls from style tags and attributes
+	// Verify all var() calls from style tags and attributes
 	varNames := make([]string, len(result.VarCalls))
 	for i, vc := range result.VarCalls {
 		varNames[i] = vc.TokenName
 	}
-	// Style tag calls
-	assert.Contains(t, varNames, "--color-primary")
-	assert.Contains(t, varNames, "--spacing-lg")
-	// Style attribute calls
-	assert.Contains(t, varNames, "--color-text")
-	assert.Contains(t, varNames, "--font-size-xl")
-	assert.Contains(t, varNames, "--spacing-md")
-	// Second style tag calls
-	assert.Contains(t, varNames, "--color-border")
-	assert.Contains(t, varNames, "--spacing-sm")
+	assert.ElementsMatch(t, []string{
+		"--color-primary", // style tag: var(--color-primary)
+		"--spacing-lg",    // style tag: var(--spacing-lg)
+		"--color-text",    // style attribute: var(--color-text)
+		"--font-size-xl",  // style attribute: var(--font-size-xl)
+		"--spacing-md",    // style attribute: var(--spacing-md)
+		"--color-border",  // second style tag: var(--color-border)
+		"--spacing-sm",    // second style tag: var(--spacing-sm)
+	}, varNames)
 }
 
 func TestParseCSSFromDocumentUnsupported(t *testing.T) {

@@ -58,9 +58,9 @@ asimonim/
 
 ### Parsing
 
-Never regexp HTML when there's a grammar available. e.g. when the question is raised, 
-always add a new tree-sitter-php dependency rather than accept a solution involving
-regexp'ing php blocks out of the surrounding HTML.
+Never parse HTML with regular expressions when a grammar is available. When the
+question is raised, always add a tree-sitter dependency (e.g. tree-sitter-php)
+rather than using regex to strip language blocks from the surrounding HTML.
 
 ## asimonim CLI usage
 
