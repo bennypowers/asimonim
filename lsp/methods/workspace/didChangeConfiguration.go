@@ -73,8 +73,14 @@ func parseConfiguration(settings any) (types.ServerConfig, error) {
 		return config, nil
 	}
 
+	// Validate that the settings value is an object
+	settingsObj, ok := ourSettings.(map[string]any)
+	if !ok {
+		return config, fmt.Errorf("configuration value must be an object, got %T", ourSettings)
+	}
+
 	// Convert to JSON and back to parse into struct
-	jsonBytes, err := json.Marshal(ourSettings)
+	jsonBytes, err := json.Marshal(settingsObj)
 	if err != nil {
 		return config, fmt.Errorf("failed to marshal settings: %w", err)
 	}
@@ -84,10 +90,8 @@ func parseConfiguration(settings any) (types.ServerConfig, error) {
 	}
 
 	// Track whether groupMarkers was explicitly provided
-	if settingsObj, ok := ourSettings.(map[string]any); ok {
-		if _, hasGM := settingsObj["groupMarkers"]; hasGM {
-			config.GroupMarkersSet = true
-		}
+	if _, hasGM := settingsObj["groupMarkers"]; hasGM {
+		config.GroupMarkersSet = true
 	}
 
 	return config, nil

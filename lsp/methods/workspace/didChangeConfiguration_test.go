@@ -352,7 +352,8 @@ func TestParseConfiguration_AsimonimNamespace(t *testing.T) {
 	config, err := parseConfiguration(settings)
 	require.NoError(t, err)
 	assert.Equal(t, "--asimonim", config.Prefix)
-	assert.Len(t, config.TokensFiles, 1)
+	require.Len(t, config.TokensFiles, 1)
+	assert.Equal(t, "tokens.json", config.TokensFiles[0])
 }
 
 func TestParseConfiguration_AsimonimTakesPrecedenceOverLegacy(t *testing.T) {

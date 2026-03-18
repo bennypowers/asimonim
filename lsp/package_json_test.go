@@ -255,6 +255,12 @@ func TestExtractConfigMap_AsimonimNamespace(t *testing.T) {
 		require.NotNil(t, config)
 		assert.Equal(t, "--new-pkg", config.Prefix)
 	})
+
+	t.Run("returns error for invalid asimonim type", func(t *testing.T) {
+		_, err := ReadPackageJsonConfig("testdata/asimonim-integration/invalid-asimonim-type")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be an object")
+	})
 }
 
 func TestContainsGlobChars(t *testing.T) {

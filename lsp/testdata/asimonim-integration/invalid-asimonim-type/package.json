@@ -1,0 +1,5 @@
+{
+  "name": "invalid-asimonim-type-test",
+  "version": "1.0.0",
+  "asimonim": "not an object"
+}
