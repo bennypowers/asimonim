@@ -1,6 +1,8 @@
 package parser_test
 
 import (
+	"encoding/json"
+	"flag"
 	"os"
 	"testing"
 
@@ -8,6 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var update = flag.Bool("update", false, "update golden files")
 
 func TestIsCSSSupportedLanguage(t *testing.T) {
 	supported := []string{
@@ -203,24 +207,7 @@ func TestCSSContentSpansPHP(t *testing.T) {
 	require.NoError(t, err)
 
 	spans := parser.CSSContentSpans(string(content), "php")
-	// wordpress-theme.php: 2 style tags + 2 style attributes = 4 spans
-	require.Len(t, spans, 4)
-
-	// Style tag spans contain raw CSS
-	assert.Equal(t,
-		"\n:root {\n  --color-primary: #0073aa;\n}\n.site-header {\n  background-color: var(--color-primary);\n  padding: var(--spacing-lg);\n}\n",
-		spans[0], "first style tag span")
-	assert.Equal(t,
-		"\n    .site-footer {\n      border-top: 1px solid var(--color-border);\n      padding: var(--spacing-sm);\n    }\n  ",
-		spans[1], "second style tag span")
-
-	// Style attribute spans are wrapped in "x{...}"
-	assert.Equal(t,
-		"x{color: var(--color-text); font-size: var(--font-size-xl)}",
-		spans[2], "first style attribute span")
-	assert.Equal(t,
-		"x{margin: var(--spacing-md)}",
-		spans[3], "second style attribute span")
+	assertSpansGolden(t, spans, "testdata/golden/spans-php.json")
 }
 
 func TestCSSContentSpansTwig(t *testing.T) {
@@ -228,20 +215,30 @@ func TestCSSContentSpansTwig(t *testing.T) {
 	require.NoError(t, err)
 
 	spans := parser.CSSContentSpans(string(content), "twig")
-	// drupal-theme.html.twig: 2 style tags + 2 style attributes = 4 spans
-	require.Len(t, spans, 4)
+	assertSpansGolden(t, spans, "testdata/golden/spans-twig.json")
+}
 
-	// First style tag: :root with --color-primary and .site-header rules
-	assert.Contains(t, spans[0], "--color-primary: #0073aa")
-	assert.Contains(t, spans[0], "var(--color-primary)")
+// assertSpansGolden compares spans against a golden file, or updates the
+// golden file when -update is passed.
+func assertSpansGolden(t *testing.T, spans []string, goldenPath string) {
+	t.Helper()
 
-	// Style attribute spans are wrapped in "x{...}"
-	assert.Equal(t,
-		"x{color: var(--color-text); font-size: var(--font-size-xl)}",
-		spans[2], "first style attribute span")
-	assert.Equal(t,
-		"x{margin: var(--spacing-md)}",
-		spans[3], "second style attribute span")
+	if *update {
+		data, err := json.MarshalIndent(spans, "", "  ")
+		require.NoError(t, err)
+		err = os.WriteFile(goldenPath, append(data, '\n'), 0o644)
+		require.NoError(t, err)
+		return
+	}
+
+	golden, err := os.ReadFile(goldenPath)
+	require.NoError(t, err, "golden file %s not found; run with -update to create", goldenPath)
+
+	var expected []string
+	err = json.Unmarshal(golden, &expected)
+	require.NoError(t, err)
+
+	assert.Equal(t, expected, spans)
 }
 
 func TestCSSContentSpansUnsupported(t *testing.T) {
