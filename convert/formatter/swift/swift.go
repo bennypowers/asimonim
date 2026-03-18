@@ -67,7 +67,7 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 		}
 
 		sb.WriteString(fmt.Sprintf("\n    // MARK: - %s\n", formatter.ToTitleCase(tokenType)))
-		sb.WriteString(fmt.Sprintf("    public enum %s {\n", formatter.ToPascalCase(tokenType)))
+		sb.WriteString(fmt.Sprintf("    public enum %s {\n", swiftEnumName(tokenType)))
 
 		sorted := formatter.SortTokens(group)
 		for _, tok := range sorted {
@@ -99,6 +99,21 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 
 	sb.WriteString("}\n")
 	return []byte(sb.String()), nil
+}
+
+// swiftReservedTypes maps DTCG type names that collide with Swift built-in
+// types to safe alternatives.
+var swiftReservedTypes = map[string]string{
+	"string": "StringTokens",
+	"number": "NumberTokens",
+}
+
+// swiftEnumName returns a Swift-safe enum name for a DTCG token type.
+func swiftEnumName(tokenType string) string {
+	if safe, ok := swiftReservedTypes[tokenType]; ok {
+		return safe
+	}
+	return formatter.ToPascalCase(tokenType)
 }
 
 func toSwiftValue(tokenType string, value any) string {
