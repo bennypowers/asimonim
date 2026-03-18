@@ -1,0 +1,10 @@
+{
+  "name": "both-namespace-test",
+  "version": "1.0.0",
+  "asimonim": {
+    "prefix": "--new-pkg"
+  },
+  "designTokensLanguageServer": {
+    "prefix": "--old-pkg"
+  }
+}

@@ -42,17 +42,29 @@ func readPackageJsonFile(rootPath string) (map[string]any, error) {
 	return pkgJSON, nil
 }
 
-// extractConfigMap extracts the designTokensLanguageServer configuration map.
-// Returns nil if the field doesn't exist (not an error).
+// extractConfigMap extracts the design tokens configuration map from package.json.
+// Prefers "asimonim" key, falls back to legacy keys.
+// Returns nil if no config field exists (not an error).
 func extractConfigMap(pkgJSON map[string]any) (map[string]any, error) {
-	dtlsConfig, ok := pkgJSON["designTokensLanguageServer"]
-	if !ok {
+	// Prefer "asimonim", fall back to legacy keys (same order as didChangeConfiguration)
+	var raw any
+	var key string
+	if val, ok := pkgJSON["asimonim"]; ok {
+		raw = val
+		key = "asimonim"
+	} else if val, ok := pkgJSON["designTokensLanguageServer"]; ok {
+		raw = val
+		key = "designTokensLanguageServer"
+	} else if val, ok := pkgJSON["design-tokens-language-server"]; ok {
+		raw = val
+		key = "design-tokens-language-server"
+	} else {
 		return nil, nil // No config, not an error
 	}
 
-	configMap, ok := dtlsConfig.(map[string]any)
+	configMap, ok := raw.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("designTokensLanguageServer must be an object")
+		return nil, fmt.Errorf("%s must be an object", key)
 	}
 
 	return configMap, nil
@@ -244,9 +256,10 @@ func expandGlobPattern(pattern, rootPath string) ([]string, error) {
 	return matches, nil
 }
 
-// ReadPackageJsonConfig reads designTokensLanguageServer configuration from package.json.
+// ReadPackageJsonConfig reads design tokens configuration from package.json.
+// Prefers "asimonim" key, falls back to legacy "designTokensLanguageServer" key.
 // Falls back to .config/design-tokens.{yaml,json} if no package.json config is found.
-// When package.json config exists, also reads asimonim config to fill in
+// When package.json config exists, also reads asimonim config file to fill in
 // fields not present in package.json (e.g., resolvers).
 // Returns nil if no configuration exists (not an error).
 func ReadPackageJsonConfig(rootPath string) (*types.ServerConfig, error) {

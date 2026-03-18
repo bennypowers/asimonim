@@ -54,15 +54,17 @@ func parseConfiguration(settings any) (types.ServerConfig, error) {
 		return config, nil
 	}
 
-	// Settings come as a nested object: { "designTokensLanguageServer": { ... } }
+	// Settings come as a nested object: { "asimonim": { ... } } or legacy { "designTokensLanguageServer": { ... } }
 	settingsMap, ok := settings.(map[string]any)
 	if !ok {
 		return config, fmt.Errorf("settings is not a map")
 	}
 
-	// Look for our configuration under "designTokensLanguageServer" key
+	// Look for our configuration: prefer "asimonim", fall back to legacy keys
 	var ourSettings any
-	if val, exists := settingsMap["designTokensLanguageServer"]; exists {
+	if val, exists := settingsMap["asimonim"]; exists {
+		ourSettings = val
+	} else if val, exists := settingsMap["designTokensLanguageServer"]; exists {
 		ourSettings = val
 	} else if val, exists := settingsMap["design-tokens-language-server"]; exists {
 		ourSettings = val
@@ -71,8 +73,14 @@ func parseConfiguration(settings any) (types.ServerConfig, error) {
 		return config, nil
 	}
 
+	// Validate that the settings value is an object
+	settingsObj, ok := ourSettings.(map[string]any)
+	if !ok {
+		return config, fmt.Errorf("configuration value must be an object, got %T", ourSettings)
+	}
+
 	// Convert to JSON and back to parse into struct
-	jsonBytes, err := json.Marshal(ourSettings)
+	jsonBytes, err := json.Marshal(settingsObj)
 	if err != nil {
 		return config, fmt.Errorf("failed to marshal settings: %w", err)
 	}
@@ -82,10 +90,8 @@ func parseConfiguration(settings any) (types.ServerConfig, error) {
 	}
 
 	// Track whether groupMarkers was explicitly provided
-	if settingsObj, ok := ourSettings.(map[string]any); ok {
-		if _, hasGM := settingsObj["groupMarkers"]; hasGM {
-			config.GroupMarkersSet = true
-		}
+	if _, hasGM := settingsObj["groupMarkers"]; hasGM {
+		config.GroupMarkersSet = true
 	}
 
 	return config, nil

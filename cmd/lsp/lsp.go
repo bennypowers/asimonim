@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	cmd.RootCmd.AddCommand(&cobra.Command{
+	lspCmd := &cobra.Command{
 		Use:   "lsp",
 		Short: "Start the Design Tokens Language Server",
 		Long:  `Start the Design Tokens Language Server using stdio transport for communication with editors.`,
@@ -32,5 +32,12 @@ func init() {
 			}
 			return nil
 		},
-	})
+	}
+
+	// Accept --stdio for compatibility with vscode-languageclient,
+	// which appends --stdio when transport is set to stdio.
+	// The flag is accepted but ignored since stdio is the only transport.
+	lspCmd.Flags().Bool("stdio", false, "Use stdio transport (default, accepted for compatibility)")
+
+	cmd.RootCmd.AddCommand(lspCmd)
 }

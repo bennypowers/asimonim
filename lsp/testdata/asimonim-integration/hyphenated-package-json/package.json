@@ -1,0 +1,10 @@
+{
+  "name": "hyphenated-namespace-test",
+  "version": "1.0.0",
+  "design-tokens-language-server": {
+    "prefix": "--hyphenated",
+    "tokensFiles": [
+      "tokens.json"
+    ]
+  }
+}
