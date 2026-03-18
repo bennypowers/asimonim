@@ -1,12 +1,12 @@
 package completion
 
 import (
-	"os"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
+	fixtureutil "bennypowers.dev/asimonim/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tliron/glsp"
@@ -514,8 +514,7 @@ func TestCompletion_PHPDocument(t *testing.T) {
 	})
 
 	// Load PHP fixture with embedded <style> block
-	content, err := os.ReadFile("testdata/wordpress-template.php")
-	require.NoError(t, err)
+	content := fixtureutil.LoadFixtureFile(t, "fixtures/lsp/completion/wordpress-template.php")
 
 	uri := "file:///theme/header.php"
 	_ = ctx.DocumentManager().DidOpen(uri, "php", 1, string(content))
@@ -540,8 +539,7 @@ func TestCompletion_PHPDocument(t *testing.T) {
 
 func TestIsInCompletionContext_PHP(t *testing.T) {
 	// PHP with a style tag containing CSS - should be in completion context
-	content, err := os.ReadFile("testdata/wordpress-template.php")
-	require.NoError(t, err)
+	content := fixtureutil.LoadFixtureFile(t, "fixtures/lsp/completion/wordpress-template.php")
 
 	result := isInCompletionContext(string(content), "php", protocol.Position{Line: 12, Character: 16})
 	assert.True(t, result, "should be in completion context inside PHP style tag block")
@@ -565,8 +563,7 @@ func TestCompletion_TwigDocument(t *testing.T) {
 	})
 
 	// Load Twig fixture with embedded <style> block
-	content, err := os.ReadFile("testdata/drupal-template.html.twig")
-	require.NoError(t, err)
+	content := fixtureutil.LoadFixtureFile(t, "fixtures/lsp/completion/drupal-template.html.twig")
 
 	uri := "file:///theme/content.html.twig"
 	_ = ctx.DocumentManager().DidOpen(uri, "twig", 1, string(content))
@@ -590,8 +587,7 @@ func TestCompletion_TwigDocument(t *testing.T) {
 
 func TestIsInCompletionContext_Twig(t *testing.T) {
 	// Twig with a style tag containing CSS - should be in completion context
-	content, err := os.ReadFile("testdata/drupal-template.html.twig")
-	require.NoError(t, err)
+	content := fixtureutil.LoadFixtureFile(t, "fixtures/lsp/completion/drupal-template.html.twig")
 
 	result := isInCompletionContext(string(content), "twig", protocol.Position{Line: 10, Character: 16})
 	assert.True(t, result, "should be in completion context inside Twig style tag block")
