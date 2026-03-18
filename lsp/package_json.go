@@ -43,10 +43,10 @@ func readPackageJsonFile(rootPath string) (map[string]any, error) {
 }
 
 // extractConfigMap extracts the design tokens configuration map from package.json.
-// Prefers "asimonim" key, falls back to legacy "designTokensLanguageServer" key.
-// Returns nil if neither field exists (not an error).
+// Prefers "asimonim" key, falls back to legacy keys.
+// Returns nil if no config field exists (not an error).
 func extractConfigMap(pkgJSON map[string]any) (map[string]any, error) {
-	// Prefer "asimonim" key, fall back to legacy "designTokensLanguageServer"
+	// Prefer "asimonim", fall back to legacy keys (same order as didChangeConfiguration)
 	var raw any
 	var key string
 	if val, ok := pkgJSON["asimonim"]; ok {
@@ -55,6 +55,9 @@ func extractConfigMap(pkgJSON map[string]any) (map[string]any, error) {
 	} else if val, ok := pkgJSON["designTokensLanguageServer"]; ok {
 		raw = val
 		key = "designTokensLanguageServer"
+	} else if val, ok := pkgJSON["design-tokens-language-server"]; ok {
+		raw = val
+		key = "design-tokens-language-server"
 	} else {
 		return nil, nil // No config, not an error
 	}

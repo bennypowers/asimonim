@@ -261,6 +261,13 @@ func TestExtractConfigMap_AsimonimNamespace(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be an object")
 	})
+
+	t.Run("reads hyphenated legacy key from package.json", func(t *testing.T) {
+		config, err := ReadPackageJsonConfig("testdata/asimonim-integration/hyphenated-package-json")
+		require.NoError(t, err)
+		require.NotNil(t, config)
+		assert.Equal(t, "--hyphenated", config.Prefix)
+	})
 }
 
 func TestContainsGlobChars(t *testing.T) {
