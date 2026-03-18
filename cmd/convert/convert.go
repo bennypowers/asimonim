@@ -31,10 +31,14 @@ import (
 )
 
 // Cmd is the convert cobra command.
-var Cmd = &cobra.Command{
-	Use:   "convert [files...]",
-	Short: "Convert and combine token files",
-	Long: `Convert DTCG token files between formats, combine multiple files, and flatten structure.
+var Cmd = NewCmd()
+
+// NewCmd creates a fresh convert command with its own flags.
+func NewCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "convert [files...]",
+		Short: "Convert and combine token files",
+		Long: `Convert DTCG token files between formats, combine multiple files, and flatten structure.
 
 Output Formats:
   dtcg       DTCG-compliant JSON (default)
@@ -104,25 +108,24 @@ Examples:
 
   # Generate Zed editor snippets
   asimonim convert --format snippets --snippet-type zed -o css.json tokens/*.yaml`,
-	Args: cobra.ArbitraryArgs,
-	RunE: run,
-}
-
-func init() {
-	Cmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
-	Cmd.Flags().StringP("format", "f", "dtcg", "Output format: "+strings.Join(convertlib.ValidFormats(), ", "))
-	Cmd.Flags().Bool("flatten", false, "Flatten to shallow structure (dtcg/json formats only)")
-	Cmd.Flags().StringP("delimiter", "d", "-", "Delimiter for flattened keys")
-	Cmd.Flags().BoolP("in-place", "i", false, "Overwrite input files with converted output")
-	Cmd.Flags().StringArray("outputs", nil, "Multiple outputs as format:path pairs (repeatable, supports {group} template)")
-	Cmd.Flags().String("split-by", "topLevel", "Split strategy: topLevel (default), type, or path[N]")
-	Cmd.Flags().String("header", "", "Header to prepend to output (use @path to read from file)")
-	Cmd.Flags().String("css-selector", ":root", "CSS selector for custom properties: :root (default), :host")
-	Cmd.Flags().String("css-module", "", "JavaScript module wrapper for CSS: lit (Lit css tagged template), or empty for plain CSS")
-	Cmd.Flags().String("snippet-type", "vscode", "Snippet output format: vscode (default), textmate, zed")
-	Cmd.Flags().String("js-module", "esm", "JS module format: esm (default), cjs")
-	Cmd.Flags().String("js-types", "ts", "JS type system: ts (default), jsdoc")
-	Cmd.Flags().String("js-export", "values", "JS export form: values (default), map")
+		Args: cobra.ArbitraryArgs,
+		RunE: run,
+	}
+	cmd.Flags().StringP("output", "o", "", "Output file (default: stdout)")
+	cmd.Flags().StringP("format", "f", "dtcg", "Output format: "+strings.Join(convertlib.ValidFormats(), ", "))
+	cmd.Flags().Bool("flatten", false, "Flatten to shallow structure (dtcg/json formats only)")
+	cmd.Flags().StringP("delimiter", "d", "-", "Delimiter for flattened keys")
+	cmd.Flags().BoolP("in-place", "i", false, "Overwrite input files with converted output")
+	cmd.Flags().StringArray("outputs", nil, "Multiple outputs as format:path pairs (repeatable, supports {group} template)")
+	cmd.Flags().String("split-by", "topLevel", "Split strategy: topLevel (default), type, or path[N]")
+	cmd.Flags().String("header", "", "Header to prepend to output (use @path to read from file)")
+	cmd.Flags().String("css-selector", ":root", "CSS selector for custom properties: :root (default), :host")
+	cmd.Flags().String("css-module", "", "JavaScript module wrapper for CSS: lit (Lit css tagged template), or empty for plain CSS")
+	cmd.Flags().String("snippet-type", "vscode", "Snippet output format: vscode (default), textmate, zed")
+	cmd.Flags().String("js-module", "esm", "JS module format: esm (default), cjs")
+	cmd.Flags().String("js-types", "ts", "JS type system: ts (default), jsdoc")
+	cmd.Flags().String("js-export", "values", "JS export form: values (default), map")
+	return cmd
 }
 
 func run(cmd *cobra.Command, args []string) error {

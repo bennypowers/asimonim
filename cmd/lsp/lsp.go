@@ -17,8 +17,9 @@ import (
 	"bennypowers.dev/asimonim/lsp"
 )
 
-func init() {
-	cmd.RootCmd.AddCommand(&cobra.Command{
+// NewCmd creates a fresh lsp command.
+func NewCmd() *cobra.Command {
+	return &cobra.Command{
 		Use:   "lsp",
 		Short: "Start the Design Tokens Language Server",
 		Long:  `Start the Design Tokens Language Server using stdio transport for communication with editors.`,
@@ -32,5 +33,9 @@ func init() {
 			}
 			return nil
 		},
-	})
+	}
+}
+
+func init() {
+	cmd.RootCmd.AddCommand(NewCmd())
 }

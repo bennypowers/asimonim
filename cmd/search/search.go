@@ -27,26 +27,29 @@ import (
 )
 
 // Cmd is the search cobra command.
-var Cmd = &cobra.Command{
-	Use:   "search <query> [files...]",
-	Short: "Search tokens by name, value, or type",
-	Long:  `Search design tokens by name, value, or type with optional regex support.`,
-	Args:  cobra.MinimumNArgs(1),
-	RunE:  run,
-}
+var Cmd = NewCmd()
 
-func init() {
-	Cmd.Flags().Bool("name", false, "Search names only")
-	Cmd.Flags().Bool("value", false, "Search values only")
-	Cmd.Flags().String("type", "", "Filter by token type")
-	Cmd.Flags().Bool("regex", false, "Query is a regex")
-	Cmd.Flags().String("format", "table", "Output format: table, names, markdown")
-	Cmd.Flags().String("group", "", "Filter by group/path prefix (e.g., color.brand)")
-	Cmd.Flags().Bool("deprecated", false, "Show only deprecated tokens")
-	Cmd.Flags().Bool("no-deprecated", false, "Hide deprecated tokens")
-	Cmd.Flags().Bool("toc", false, "Include table of contents (markdown only)")
-	Cmd.Flags().Int("toc-depth", 3, "Maximum TOC depth (1-6)")
-	Cmd.Flags().Bool("links", false, "Add anchor links to tokens (markdown only)")
+// NewCmd creates a fresh search command with its own flags.
+func NewCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "search <query> [files...]",
+		Short: "Search tokens by name, value, or type",
+		Long:  `Search design tokens by name, value, or type with optional regex support.`,
+		Args:  cobra.MinimumNArgs(1),
+		RunE:  run,
+	}
+	cmd.Flags().Bool("name", false, "Search names only")
+	cmd.Flags().Bool("value", false, "Search values only")
+	cmd.Flags().String("type", "", "Filter by token type")
+	cmd.Flags().Bool("regex", false, "Query is a regex")
+	cmd.Flags().String("format", "table", "Output format: table, names, markdown")
+	cmd.Flags().String("group", "", "Filter by group/path prefix (e.g., color.brand)")
+	cmd.Flags().Bool("deprecated", false, "Show only deprecated tokens")
+	cmd.Flags().Bool("no-deprecated", false, "Hide deprecated tokens")
+	cmd.Flags().Bool("toc", false, "Include table of contents (markdown only)")
+	cmd.Flags().Int("toc-depth", 3, "Maximum TOC depth (1-6)")
+	cmd.Flags().Bool("links", false, "Add anchor links to tokens (markdown only)")
+	return cmd
 }
 
 func run(cmd *cobra.Command, args []string) error {

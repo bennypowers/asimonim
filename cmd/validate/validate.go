@@ -22,17 +22,20 @@ import (
 )
 
 // Cmd is the validate cobra command.
-var Cmd = &cobra.Command{
-	Use:   "validate [files...]",
-	Short: "Validate design token files",
-	Long:  `Validate design token files for correctness and schema compliance.`,
-	Args:  cobra.ArbitraryArgs,
-	RunE:  run,
-}
+var Cmd = NewCmd()
 
-func init() {
-	Cmd.Flags().Bool("strict", false, "Fail on warnings")
-	Cmd.Flags().Bool("quiet", false, "Only output errors")
+// NewCmd creates a fresh validate command with its own flags.
+func NewCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "validate [files...]",
+		Short: "Validate design token files",
+		Long:  `Validate design token files for correctness and schema compliance.`,
+		Args:  cobra.ArbitraryArgs,
+		RunE:  run,
+	}
+	cmd.Flags().Bool("strict", false, "Fail on warnings")
+	cmd.Flags().Bool("quiet", false, "Only output errors")
+	return cmd
 }
 
 func run(cmd *cobra.Command, args []string) error {

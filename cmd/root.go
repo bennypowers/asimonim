@@ -19,11 +19,7 @@ import (
 )
 
 // RootCmd is the root cobra command, exported for subcommand registration.
-var RootCmd = &cobra.Command{
-	Use:   "asimonim",
-	Short: "Parse and work with design tokens definitions",
-	Long:  `asimonim parses and validates design token files, defined by the Design Tokens Community Group specification.`,
-}
+var RootCmd *cobra.Command
 
 // Execute runs the root command.
 func Execute() error {
@@ -31,19 +27,33 @@ func Execute() error {
 }
 
 func init() {
+	RootCmd = NewRootCmd()
+}
+
+// NewRootCmd creates a fresh root command with all subcommands and flags.
+// Each call returns an isolated command tree with no shared state.
+func NewRootCmd() *cobra.Command {
+	rootCmd := &cobra.Command{
+		Use:   "asimonim",
+		Short: "Parse and work with design tokens definitions",
+		Long:  `asimonim parses and validates design token files, defined by the Design Tokens Community Group specification.`,
+	}
+
 	cobra.OnInitialize(initConfig)
 
-	RootCmd.PersistentFlags().StringP("schema", "s", "", "Force schema version (draft, v2025.10)")
-	RootCmd.PersistentFlags().StringP("prefix", "p", "", "Prefix for output variable names")
+	rootCmd.PersistentFlags().StringP("schema", "s", "", "Force schema version (draft, v2025.10)")
+	rootCmd.PersistentFlags().StringP("prefix", "p", "", "Prefix for output variable names")
 
-	_ = viper.BindPFlag("schema", RootCmd.PersistentFlags().Lookup("schema"))
-	_ = viper.BindPFlag("prefix", RootCmd.PersistentFlags().Lookup("prefix"))
+	_ = viper.BindPFlag("schema", rootCmd.PersistentFlags().Lookup("schema"))
+	_ = viper.BindPFlag("prefix", rootCmd.PersistentFlags().Lookup("prefix"))
 
-	RootCmd.AddCommand(convert.Cmd)
-	RootCmd.AddCommand(list.Cmd)
-	RootCmd.AddCommand(search.Cmd)
-	RootCmd.AddCommand(validate.Cmd)
-	RootCmd.AddCommand(version.Cmd)
+	rootCmd.AddCommand(convert.NewCmd())
+	rootCmd.AddCommand(list.NewCmd())
+	rootCmd.AddCommand(search.NewCmd())
+	rootCmd.AddCommand(validate.NewCmd())
+	rootCmd.AddCommand(version.NewCmd())
+
+	return rootCmd
 }
 
 func initConfig() {
