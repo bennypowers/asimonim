@@ -48,6 +48,9 @@ func captureAndExecute(t *testing.T, args ...string) (string, error) {
 	if _, readErr := buf.ReadFrom(r); readErr != nil {
 		t.Fatalf("failed to read captured output: %v", readErr)
 	}
+	if closeErr := r.Close(); closeErr != nil {
+		t.Fatalf("failed to close read pipe: %v", closeErr)
+	}
 
 	return buf.String(), err
 }
@@ -415,13 +418,14 @@ func TestExecute(t *testing.T) {
 		t.Fatalf("failed to create pipe: %v", pipeErr)
 	}
 	os.Stdout = w
+	defer func() { os.Stdout = oldStdout }()
+	defer r.Close()
 
 	err := cmd.Execute()
 
 	if closeErr := w.Close(); closeErr != nil {
 		t.Fatalf("failed to close pipe: %v", closeErr)
 	}
-	os.Stdout = oldStdout
 	var buf bytes.Buffer
 	if _, readErr := buf.ReadFrom(r); readErr != nil {
 		t.Fatalf("failed to read captured output: %v", readErr)
