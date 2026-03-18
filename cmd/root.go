@@ -27,6 +27,7 @@ func Execute() error {
 }
 
 func init() {
+	cobra.OnInitialize(initConfig)
 	RootCmd = NewRootCmd()
 }
 
@@ -38,8 +39,6 @@ func NewRootCmd() *cobra.Command {
 		Short: "Parse and work with design tokens definitions",
 		Long:  `asimonim parses and validates design token files, defined by the Design Tokens Community Group specification.`,
 	}
-
-	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringP("schema", "s", "", "Force schema version (draft, v2025.10)")
 	rootCmd.PersistentFlags().StringP("prefix", "p", "", "Prefix for output variable names")
