@@ -2,17 +2,14 @@ package html_test
 
 import (
 	"encoding/json"
-	"flag"
-	"os"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/parser/css"
 	"bennypowers.dev/asimonim/lsp/internal/parser/html"
+	"bennypowers.dev/asimonim/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-var update = flag.Bool("update", false, "update golden files")
 
 func TestParseCSSRegions(t *testing.T) {
 	tests := []struct {
@@ -23,25 +20,25 @@ func TestParseCSSRegions(t *testing.T) {
 	}{
 		{
 			name:     "style tag",
-			fixture:  "testdata/style-tag.html",
+			fixture:  "fixtures/lsp/html/style-tag.html",
 			wantTags: 1,
 			wantAttr: 0,
 		},
 		{
 			name:     "style attributes",
-			fixture:  "testdata/style-attribute.html",
+			fixture:  "fixtures/lsp/html/style-attribute.html",
 			wantTags: 0,
 			wantAttr: 2,
 		},
 		{
 			name:     "multiple styles",
-			fixture:  "testdata/multiple-styles.html",
+			fixture:  "fixtures/lsp/html/multiple-styles.html",
 			wantTags: 2,
 			wantAttr: 2,
 		},
 		{
 			name:     "no CSS",
-			fixture:  "testdata/no-css.html",
+			fixture:  "fixtures/lsp/html/no-css.html",
 			wantTags: 0,
 			wantAttr: 0,
 		},
@@ -49,8 +46,7 @@ func TestParseCSSRegions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source, err := os.ReadFile(tt.fixture)
-			require.NoError(t, err)
+			source := testutil.LoadFixtureFile(t, tt.fixture)
 
 			parser := html.AcquireParser()
 			defer html.ReleaseParser(parser)
@@ -82,25 +78,24 @@ func TestParseCSS(t *testing.T) {
 	}{
 		{
 			name:    "style tag",
-			fixture: "testdata/style-tag.html",
-			golden:  "testdata/golden/style-tag.json",
+			fixture: "fixtures/lsp/html/style-tag.html",
+			golden:  "fixtures/lsp/html/golden/style-tag.json",
 		},
 		{
 			name:    "style attribute",
-			fixture: "testdata/style-attribute.html",
-			golden:  "testdata/golden/style-attribute.json",
+			fixture: "fixtures/lsp/html/style-attribute.html",
+			golden:  "fixtures/lsp/html/golden/style-attribute.json",
 		},
 		{
 			name:    "multiple styles",
-			fixture: "testdata/multiple-styles.html",
-			golden:  "testdata/golden/multiple-styles.json",
+			fixture: "fixtures/lsp/html/multiple-styles.html",
+			golden:  "fixtures/lsp/html/golden/multiple-styles.json",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source, err := os.ReadFile(tt.fixture)
-			require.NoError(t, err)
+			source := testutil.LoadFixtureFile(t, tt.fixture)
 
 			parser := html.AcquireParser()
 			defer html.ReleaseParser(parser)
@@ -109,16 +104,11 @@ func TestParseCSS(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, result)
 
-			if *update {
-				data, marshalErr := json.MarshalIndent(result, "", "  ")
-				require.NoError(t, marshalErr)
-				writeErr := os.WriteFile(tt.golden, append(data, '\n'), 0o644)
-				require.NoError(t, writeErr)
-				return
-			}
+			data, marshalErr := json.MarshalIndent(result, "", "  ")
+			require.NoError(t, marshalErr)
+			testutil.UpdateGoldenFile(t, tt.golden, append(data, '\n'))
 
-			golden, err := os.ReadFile(tt.golden)
-			require.NoError(t, err)
+			golden := testutil.LoadFixtureFile(t, tt.golden)
 
 			var expected css.ParseResult
 			err = json.Unmarshal(golden, &expected)
@@ -141,8 +131,7 @@ func TestParseCSS(t *testing.T) {
 }
 
 func TestParseCSSNoCSS(t *testing.T) {
-	source, err := os.ReadFile("testdata/no-css.html")
-	require.NoError(t, err)
+	source := testutil.LoadFixtureFile(t, "fixtures/lsp/html/no-css.html")
 
 	parser := html.AcquireParser()
 	defer html.ReleaseParser(parser)
@@ -332,7 +321,7 @@ func TestTwigParseCSSRegions(t *testing.T) {
 			// Drupal theme: Twig blocks, loops, filters, multiple style blocks,
 			// style attributes interleaved with Twig variables
 			name:     "drupal theme",
-			fixture:  "testdata/drupal-theme.html.twig",
+			fixture:  "fixtures/lsp/twig/drupal-theme.html.twig",
 			wantTags: 2,
 			wantAttr: 2,
 		},
@@ -340,7 +329,7 @@ func TestTwigParseCSSRegions(t *testing.T) {
 			// Twig interpolation inside style tags and attributes,
 			// Twig conditionals wrapping CSS rules, Twig filters
 			name:     "interpolated styles",
-			fixture:  "testdata/twig-interpolated-styles.html.twig",
+			fixture:  "fixtures/lsp/twig/twig-interpolated-styles.html.twig",
 			wantTags: 2,
 			wantAttr: 2,
 		},
@@ -348,8 +337,7 @@ func TestTwigParseCSSRegions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source, err := os.ReadFile(tt.fixture)
-			require.NoError(t, err)
+			source := testutil.LoadFixtureFile(t, tt.fixture)
 
 			p := html.AcquireParser()
 			defer html.ReleaseParser(p)
@@ -381,20 +369,19 @@ func TestTwigParseCSS_Golden(t *testing.T) {
 	}{
 		{
 			name:    "drupal theme",
-			fixture: "testdata/drupal-theme.html.twig",
-			golden:  "testdata/golden/drupal-theme.json",
+			fixture: "fixtures/lsp/twig/drupal-theme.html.twig",
+			golden:  "fixtures/lsp/twig/golden/drupal-theme.json",
 		},
 		{
 			name:    "interpolated styles",
-			fixture: "testdata/twig-interpolated-styles.html.twig",
-			golden:  "testdata/golden/twig-interpolated-styles.json",
+			fixture: "fixtures/lsp/twig/twig-interpolated-styles.html.twig",
+			golden:  "fixtures/lsp/twig/golden/twig-interpolated-styles.json",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source, err := os.ReadFile(tt.fixture)
-			require.NoError(t, err)
+			source := testutil.LoadFixtureFile(t, tt.fixture)
 
 			p := html.AcquireParser()
 			defer html.ReleaseParser(p)
@@ -403,16 +390,11 @@ func TestTwigParseCSS_Golden(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, result)
 
-			if *update {
-				data, marshalErr := json.MarshalIndent(result, "", "  ")
-				require.NoError(t, marshalErr)
-				writeErr := os.WriteFile(tt.golden, append(data, '\n'), 0o644)
-				require.NoError(t, writeErr)
-				return
-			}
+			data, marshalErr := json.MarshalIndent(result, "", "  ")
+			require.NoError(t, marshalErr)
+			testutil.UpdateGoldenFile(t, tt.golden, append(data, '\n'))
 
-			golden, readErr := os.ReadFile(tt.golden)
-			require.NoError(t, readErr)
+			golden := testutil.LoadFixtureFile(t, tt.golden)
 
 			var expected css.ParseResult
 			err = json.Unmarshal(golden, &expected)

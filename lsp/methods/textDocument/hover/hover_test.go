@@ -1,8 +1,6 @@
 package hover
 
 import (
-	"flag"
-	"os"
 	"testing"
 
 	asimonim "bennypowers.dev/asimonim/parser"
@@ -10,13 +8,12 @@ import (
 	tokens "bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
+	fixtureutil "bennypowers.dev/asimonim/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
-
-var update = flag.Bool("update", false, "update golden files")
 
 // TestIsPositionInRange tests the isPositionInRange function with half-open range semantics [start, end)
 func TestIsPositionInRange(t *testing.T) {
@@ -803,8 +800,7 @@ func TestHover_PHPStyleTag(t *testing.T) {
 	}))
 
 	// Load PHP fixture with embedded <style> block
-	content, err := os.ReadFile("testdata/php/sidebar-widget.php")
-	require.NoError(t, err)
+	content := fixtureutil.LoadFixtureFile(t, "fixtures/lsp/hover/php/sidebar-widget.php")
 
 	uri := "file:///theme/sidebar.php"
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "php", 1, string(content)))
@@ -841,8 +837,7 @@ func TestHover_PHPStyleAttribute(t *testing.T) {
 	}))
 
 	// Load PHP fixture
-	content, err := os.ReadFile("testdata/php/sidebar-widget.php")
-	require.NoError(t, err)
+	content := fixtureutil.LoadFixtureFile(t, "fixtures/lsp/hover/php/sidebar-widget.php")
 
 	uri := "file:///theme/sidebar.php"
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "php", 1, string(content)))
@@ -876,8 +871,7 @@ func TestHover_TwigStyleTag(t *testing.T) {
 	}))
 
 	// Load Twig fixture with embedded <style> block
-	content, err := os.ReadFile("testdata/twig/sidebar-block.html.twig")
-	require.NoError(t, err)
+	content := fixtureutil.LoadFixtureFile(t, "fixtures/lsp/hover/twig/sidebar-block.html.twig")
 
 	uri := "file:///theme/sidebar.html.twig"
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "twig", 1, string(content)))
@@ -913,8 +907,7 @@ func TestHover_TwigStyleAttribute(t *testing.T) {
 		Type:  "dimension",
 	}))
 
-	content, err := os.ReadFile("testdata/twig/sidebar-block.html.twig")
-	require.NoError(t, err)
+	content := fixtureutil.LoadFixtureFile(t, "fixtures/lsp/hover/twig/sidebar-block.html.twig")
 
 	uri := "file:///theme/sidebar.html.twig"
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "twig", 1, string(content)))
@@ -1246,8 +1239,7 @@ func TestHover_TokenReference_DeprecatedToken(t *testing.T) {
 // parseTokensFile parses a DTCG token file and returns tokens indexed by CSS variable name.
 func parseTokensFile(t *testing.T, path string) map[string]*tokens.Token {
 	t.Helper()
-	data, err := os.ReadFile(path)
-	require.NoError(t, err)
+	data := fixtureutil.LoadFixtureFile(t, path)
 
 	p := asimonim.NewJSONParser()
 	toks, err := p.Parse(data, asimonim.Options{})
@@ -1638,8 +1630,8 @@ func TestIsPositionInRange_MultiLine(t *testing.T) {
 }
 
 func TestRenderTokenHover_StructuredColor(t *testing.T) {
-	tokens2025 := parseTokensFile(t, "testdata/tokens-2025.json")
-	tokensDraft := parseTokensFile(t, "testdata/tokens-draft.json")
+	tokens2025 := parseTokensFile(t, "fixtures/lsp/hover/tokens-2025.json")
+	tokensDraft := parseTokensFile(t, "fixtures/lsp/hover/tokens-draft.json")
 
 	tests := []struct {
 		name      string
@@ -1648,15 +1640,15 @@ func TestRenderTokenHover_StructuredColor(t *testing.T) {
 		golden    string
 		format    protocol.MarkupKind
 	}{
-		{"srgb color", "color-primary", tokens2025, "testdata/golden/color-primary.md", protocol.MarkupKindMarkdown},
-		{"display-p3 color", "color-accent", tokens2025, "testdata/golden/color-accent.md", protocol.MarkupKindMarkdown},
-		{"color with hex field", "color-brand", tokens2025, "testdata/golden/color-brand.md", protocol.MarkupKindMarkdown},
-		{"color with none component", "color-achromatic", tokens2025, "testdata/golden/color-achromatic.md", protocol.MarkupKindMarkdown},
-		{"color without alpha", "color-no-alpha", tokens2025, "testdata/golden/color-no-alpha.md", protocol.MarkupKindMarkdown},
-		{"string color (draft schema)", "color-simple", tokensDraft, "testdata/golden/color-simple.md", protocol.MarkupKindMarkdown},
-		{"non-color token", "spacing-large", tokens2025, "testdata/golden/spacing-large.md", protocol.MarkupKindMarkdown},
-		{"srgb color plaintext", "color-primary", tokens2025, "testdata/golden/color-primary.txt", protocol.MarkupKindPlainText},
-		{"resolved alias color", "color-alias", tokens2025, "testdata/golden/color-alias.md", protocol.MarkupKindMarkdown},
+		{"srgb color", "color-primary", tokens2025, "fixtures/lsp/hover/golden/color-primary.md", protocol.MarkupKindMarkdown},
+		{"display-p3 color", "color-accent", tokens2025, "fixtures/lsp/hover/golden/color-accent.md", protocol.MarkupKindMarkdown},
+		{"color with hex field", "color-brand", tokens2025, "fixtures/lsp/hover/golden/color-brand.md", protocol.MarkupKindMarkdown},
+		{"color with none component", "color-achromatic", tokens2025, "fixtures/lsp/hover/golden/color-achromatic.md", protocol.MarkupKindMarkdown},
+		{"color without alpha", "color-no-alpha", tokens2025, "fixtures/lsp/hover/golden/color-no-alpha.md", protocol.MarkupKindMarkdown},
+		{"string color (draft schema)", "color-simple", tokensDraft, "fixtures/lsp/hover/golden/color-simple.md", protocol.MarkupKindMarkdown},
+		{"non-color token", "spacing-large", tokens2025, "fixtures/lsp/hover/golden/spacing-large.md", protocol.MarkupKindMarkdown},
+		{"srgb color plaintext", "color-primary", tokens2025, "fixtures/lsp/hover/golden/color-primary.txt", protocol.MarkupKindPlainText},
+		{"resolved alias color", "color-alias", tokens2025, "fixtures/lsp/hover/golden/color-alias.md", protocol.MarkupKindMarkdown},
 	}
 
 	for _, tt := range tests {
@@ -1667,14 +1659,9 @@ func TestRenderTokenHover_StructuredColor(t *testing.T) {
 			content, err := renderTokenHover(token, tt.format)
 			require.NoError(t, err)
 
-			if *update {
-				err := os.WriteFile(tt.golden, []byte(content), 0o644)
-				require.NoError(t, err)
-				return
-			}
+			fixtureutil.UpdateGoldenFile(t, tt.golden, []byte(content))
 
-			expected, err := os.ReadFile(tt.golden)
-			require.NoError(t, err, "golden file %s not found; run with --update to create", tt.golden)
+			expected := fixtureutil.LoadFixtureFile(t, tt.golden)
 			assert.Equal(t, string(expected), content)
 		})
 	}

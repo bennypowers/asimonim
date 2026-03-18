@@ -1,6 +1,10 @@
 package workspace
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/testutil"
@@ -10,6 +14,18 @@ import (
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
+
+// loadConfigFixture loads a JSON fixture file as a settings map for parseConfiguration.
+func loadConfigFixture(t *testing.T, name string) map[string]any {
+	t.Helper()
+	_, thisFile, _, _ := runtime.Caller(0)
+	path := filepath.Join(filepath.Dir(thisFile), "testdata", "config", name)
+	data, err := os.ReadFile(path)
+	require.NoError(t, err, "failed to read fixture %s", name)
+	var settings map[string]any
+	require.NoError(t, json.Unmarshal(data, &settings), "failed to parse fixture %s", name)
+	return settings
+}
 
 func TestDidChangeConfiguration_WithValidConfig(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
@@ -328,4 +344,49 @@ func TestParseConfiguration_NetworkFallbackDefaults(t *testing.T) {
 	assert.False(t, config.NetworkFallback)
 	assert.Equal(t, 0, config.NetworkTimeout)
 	assert.Equal(t, "", config.CDN)
+}
+
+func TestParseConfiguration_AsimonimNamespace(t *testing.T) {
+	// asimonim-namespace.json: {"asimonim": {"prefix": "--asimonim", "tokensFiles": ["tokens.json"]}}
+	settings := loadConfigFixture(t, "asimonim-namespace.json")
+	config, err := parseConfiguration(settings)
+	require.NoError(t, err)
+	assert.Equal(t, "--asimonim", config.Prefix)
+	require.Len(t, config.TokensFiles, 1)
+	assert.Equal(t, "tokens.json", config.TokensFiles[0])
+}
+
+func TestParseConfiguration_AsimonimTakesPrecedenceOverLegacy(t *testing.T) {
+	// both-namespaces.json: {"asimonim": {"prefix": "--new"}, "designTokensLanguageServer": {"prefix": "--old"}}
+	settings := loadConfigFixture(t, "both-namespaces.json")
+	config, err := parseConfiguration(settings)
+	require.NoError(t, err)
+	assert.Equal(t, "--new", config.Prefix)
+}
+
+func TestDidChangeConfiguration_WithAsimonimNamespace(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	glspCtx := &glsp.Context{}
+	req := types.NewRequestContext(ctx, glspCtx)
+	ctx.SetGLSPContext(glspCtx)
+
+	settings := loadConfigFixture(t, "asimonim-namespace.json")
+
+	params := &protocol.DidChangeConfigurationParams{
+		Settings: settings,
+	}
+
+	err := DidChangeConfiguration(req, params)
+	require.NoError(t, err)
+
+	config := ctx.GetConfig()
+	assert.Equal(t, "--asimonim", config.Prefix)
+}
+
+func TestParseConfiguration_AsimonimInvalidType(t *testing.T) {
+	// asimonim-invalid-type.json: {"asimonim": "not an object"}
+	settings := loadConfigFixture(t, "asimonim-invalid-type.json")
+	_, err := parseConfiguration(settings)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must be an object")
 }

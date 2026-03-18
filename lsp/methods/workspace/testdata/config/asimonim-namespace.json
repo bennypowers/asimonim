@@ -1,0 +1,8 @@
+{
+  "asimonim": {
+    "prefix": "--asimonim",
+    "tokensFiles": [
+      "tokens.json"
+    ]
+  }
+}

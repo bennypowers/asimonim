@@ -2,16 +2,13 @@ package parser_test
 
 import (
 	"encoding/json"
-	"flag"
-	"os"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/parser"
+	"bennypowers.dev/asimonim/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-var update = flag.Bool("update", false, "update golden files")
 
 func TestIsCSSSupportedLanguage(t *testing.T) {
 	supported := []string{
@@ -106,8 +103,7 @@ func TestParseCSSFromDocumentTSX(t *testing.T) {
 }
 
 func TestParseCSSFromDocumentPHP(t *testing.T) {
-	content, err := os.ReadFile("php/testdata/wordpress-theme.php")
-	require.NoError(t, err)
+	content := testutil.LoadFixtureFile(t, "fixtures/lsp/php/wordpress-theme.php")
 
 	result, err := parser.ParseCSSFromDocument(string(content), "php")
 	require.NoError(t, err)
@@ -134,8 +130,7 @@ func TestParseCSSFromDocumentPHP(t *testing.T) {
 }
 
 func TestParseCSSFromDocumentTwig(t *testing.T) {
-	content, err := os.ReadFile("html/testdata/drupal-theme.html.twig")
-	require.NoError(t, err)
+	content := testutil.LoadFixtureFile(t, "fixtures/lsp/twig/drupal-theme.html.twig")
 
 	result, err := parser.ParseCSSFromDocument(string(content), "twig")
 	require.NoError(t, err)
@@ -203,19 +198,17 @@ func TestCSSContentSpansJSHTMLTemplate(t *testing.T) {
 }
 
 func TestCSSContentSpansPHP(t *testing.T) {
-	content, err := os.ReadFile("php/testdata/wordpress-theme.php")
-	require.NoError(t, err)
+	content := testutil.LoadFixtureFile(t, "fixtures/lsp/php/wordpress-theme.php")
 
 	spans := parser.CSSContentSpans(string(content), "php")
-	assertSpansGolden(t, spans, "testdata/golden/spans-php.json")
+	assertSpansGolden(t, spans, "fixtures/lsp/parser/golden/spans-php.json")
 }
 
 func TestCSSContentSpansTwig(t *testing.T) {
-	content, err := os.ReadFile("html/testdata/drupal-theme.html.twig")
-	require.NoError(t, err)
+	content := testutil.LoadFixtureFile(t, "fixtures/lsp/twig/drupal-theme.html.twig")
 
 	spans := parser.CSSContentSpans(string(content), "twig")
-	assertSpansGolden(t, spans, "testdata/golden/spans-twig.json")
+	assertSpansGolden(t, spans, "fixtures/lsp/parser/golden/spans-twig.json")
 }
 
 // assertSpansGolden compares spans against a golden file, or updates the
@@ -223,16 +216,11 @@ func TestCSSContentSpansTwig(t *testing.T) {
 func assertSpansGolden(t *testing.T, spans []string, goldenPath string) {
 	t.Helper()
 
-	if *update {
-		data, err := json.MarshalIndent(spans, "", "  ")
-		require.NoError(t, err)
-		err = os.WriteFile(goldenPath, append(data, '\n'), 0o644)
-		require.NoError(t, err)
-		return
-	}
+	data, err := json.MarshalIndent(spans, "", "  ")
+	require.NoError(t, err)
+	testutil.UpdateGoldenFile(t, goldenPath, append(data, '\n'))
 
-	golden, err := os.ReadFile(goldenPath)
-	require.NoError(t, err, "golden file %s not found; run with -update to create", goldenPath)
+	golden := testutil.LoadFixtureFile(t, goldenPath)
 
 	var expected []string
 	err = json.Unmarshal(golden, &expected)

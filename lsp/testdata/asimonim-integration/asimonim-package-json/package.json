@@ -1,0 +1,10 @@
+{
+  "name": "asimonim-namespace-test",
+  "version": "1.0.0",
+  "asimonim": {
+    "prefix": "--pkg",
+    "tokensFiles": [
+      "tokens.json"
+    ]
+  }
+}

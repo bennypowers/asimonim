@@ -1,0 +1,8 @@
+{
+  "asimonim": {
+    "prefix": "--new"
+  },
+  "designTokensLanguageServer": {
+    "prefix": "--old"
+  }
+}

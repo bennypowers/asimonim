@@ -2,18 +2,15 @@ package php_test
 
 import (
 	"encoding/json"
-	"flag"
-	"os"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/parser/css"
 	"bennypowers.dev/asimonim/lsp/internal/parser/html"
 	"bennypowers.dev/asimonim/lsp/internal/parser/php"
+	"bennypowers.dev/asimonim/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-var update = flag.Bool("update", false, "update golden files")
 
 func TestParseCSSRegions(t *testing.T) {
 	tests := []struct {
@@ -26,7 +23,7 @@ func TestParseCSSRegions(t *testing.T) {
 			// WordPress theme with multiple style blocks and style attributes,
 			// PHP blocks between HTML elements
 			name:     "wordpress theme",
-			fixture:  "testdata/wordpress-theme.php",
+			fixture:  "fixtures/lsp/php/wordpress-theme.php",
 			wantTags: 2,
 			wantAttr: 2,
 		},
@@ -34,7 +31,7 @@ func TestParseCSSRegions(t *testing.T) {
 			// PHP interpolation inside <style> tags and style attributes,
 			// PHP conditionals wrapping CSS rules, short echo syntax <?= ?>
 			name:     "interpolated styles",
-			fixture:  "testdata/php-interpolated-styles.php",
+			fixture:  "fixtures/lsp/php/php-interpolated-styles.php",
 			wantTags: 2,
 			wantAttr: 2,
 		},
@@ -42,8 +39,7 @@ func TestParseCSSRegions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source, err := os.ReadFile(tt.fixture)
-			require.NoError(t, err)
+			source := testutil.LoadFixtureFile(t, tt.fixture)
 
 			p := php.AcquireParser()
 			defer php.ReleaseParser(p)
@@ -75,20 +71,19 @@ func TestParseCSS_Golden(t *testing.T) {
 	}{
 		{
 			name:    "wordpress theme",
-			fixture: "testdata/wordpress-theme.php",
-			golden:  "testdata/golden/wordpress-theme.json",
+			fixture: "fixtures/lsp/php/wordpress-theme.php",
+			golden:  "fixtures/lsp/php/golden/wordpress-theme.json",
 		},
 		{
 			name:    "interpolated styles",
-			fixture: "testdata/php-interpolated-styles.php",
-			golden:  "testdata/golden/php-interpolated-styles.json",
+			fixture: "fixtures/lsp/php/php-interpolated-styles.php",
+			golden:  "fixtures/lsp/php/golden/php-interpolated-styles.json",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source, err := os.ReadFile(tt.fixture)
-			require.NoError(t, err)
+			source := testutil.LoadFixtureFile(t, tt.fixture)
 
 			p := php.AcquireParser()
 			defer php.ReleaseParser(p)
@@ -97,16 +92,11 @@ func TestParseCSS_Golden(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, result)
 
-			if *update {
-				data, marshalErr := json.MarshalIndent(result, "", "  ")
-				require.NoError(t, marshalErr)
-				writeErr := os.WriteFile(tt.golden, append(data, '\n'), 0o644)
-				require.NoError(t, writeErr)
-				return
-			}
+			data, marshalErr := json.MarshalIndent(result, "", "  ")
+			require.NoError(t, marshalErr)
+			testutil.UpdateGoldenFile(t, tt.golden, append(data, '\n'))
 
-			golden, readErr := os.ReadFile(tt.golden)
-			require.NoError(t, readErr)
+			golden := testutil.LoadFixtureFile(t, tt.golden)
 
 			var expected css.ParseResult
 			err = json.Unmarshal(golden, &expected)
@@ -194,8 +184,7 @@ func TestInterpolatedStyles(t *testing.T) {
 	// PHP interpolation inside <style> tags is common in WordPress themes.
 	// tree-sitter-php correctly identifies HTML text nodes, allowing the
 	// HTML parser to extract CSS regions with var() calls intact.
-	source, err := os.ReadFile("testdata/php-interpolated-styles.php")
-	require.NoError(t, err)
+	source := testutil.LoadFixtureFile(t, "fixtures/lsp/php/php-interpolated-styles.php")
 
 	p := php.AcquireParser()
 	defer php.ReleaseParser(p)

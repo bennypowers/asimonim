@@ -7,11 +7,15 @@ license that can be found in the LICENSE file.
 package swift_test
 
 import (
+	"flag"
+	"os"
 	"strings"
 	"testing"
 
 	"bennypowers.dev/asimonim/convert/formatter"
 	"bennypowers.dev/asimonim/convert/formatter/swift"
+	"github.com/stretchr/testify/require"
+
 	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/testutil"
 	"bennypowers.dev/asimonim/token"
@@ -258,24 +262,10 @@ func TestFormat_NumberAndFontWeightValues(t *testing.T) {
 
 	f := swift.New()
 	result, err := f.Format(tokens, formatter.Options{})
-	if err != nil {
-		t.Fatalf("Format() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	output := string(result)
-
-	// number 1.5 → "1.5" (not "1.5e+00")
-	if !strings.Contains(output, "sizeScale = 1.5") {
-		t.Errorf("expected sizeScale = 1.5, got:\n%s", output)
-	}
-	// integer 42 → "42" (not "42.0")
-	if !strings.Contains(output, "sizeInteger = 42") {
-		t.Errorf("expected sizeInteger = 42, got:\n%s", output)
-	}
-	// fontWeight 700 → "700"
-	if !strings.Contains(output, "fontWeightBold = 700") {
-		t.Errorf("expected fontWeightBold = 700, got:\n%s", output)
-	}
+	// "number" maps to "NumberTokens" to avoid shadowing Swift's built-in Number
+	assertGolden(t, result, "testdata/golden/number-fontweight-values.swift")
 }
 
 func TestFormat_FontFamilyValues(t *testing.T) {
@@ -317,18 +307,10 @@ func TestFormat_StringValues(t *testing.T) {
 
 	f := swift.New()
 	result, err := f.Format(tokens, formatter.Options{})
-	if err != nil {
-		t.Fatalf("Format() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	output := string(result)
-
-	if !strings.Contains(output, "public enum String") {
-		t.Errorf("expected String enum section, got:\n%s", output)
-	}
-	if !strings.Contains(output, `"Hello World"`) {
-		t.Errorf("expected quoted string value, got:\n%s", output)
-	}
+	// "string" type maps to "StringTokens" to avoid shadowing Swift's built-in String
+	assertGolden(t, result, "testdata/golden/string-values.swift")
 }
 
 func TestFormat_MoreColorSpaces(t *testing.T) {
@@ -582,8 +564,28 @@ func TestFormat_DimensionWithUnitComment(t *testing.T) {
 
 	output := string(result)
 
-	// spacing.small: {value: 4, unit: "px"} → CGFloat(4) /* px */
+	// spacing.small: {value: 4, unit: "px"} -> CGFloat(4) /* px */
 	if !strings.Contains(output, "CGFloat(4) /* px */") {
 		t.Errorf("expected CGFloat(4) /* px */ with unit comment, got:\n%s", output)
 	}
+}
+
+// assertGolden compares result against a golden file, or updates the
+// golden file when -update is passed.
+func assertGolden(t *testing.T, result []byte, goldenPath string) {
+	t.Helper()
+
+	updateFlag := flag.Lookup("update")
+	if updateFlag != nil && updateFlag.Value.String() == "true" {
+		if err := os.MkdirAll("testdata/golden", 0o755); err != nil {
+			t.Fatalf("failed to create golden dir: %v", err)
+		}
+		err := os.WriteFile(goldenPath, result, 0o644)
+		require.NoError(t, err)
+		return
+	}
+
+	expected, err := os.ReadFile(goldenPath)
+	require.NoError(t, err, "golden file %s not found; run with -update to create", goldenPath)
+	require.Equal(t, string(expected), string(result))
 }
