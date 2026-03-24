@@ -24,5 +24,10 @@
     "bin/asimonim.js",
     "install-platform-binary.js",
     "README.md"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bennypowers/asimonim.git",
+    "directory": "npm"
+  }
 }
