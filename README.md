@@ -20,6 +20,7 @@ Design systems use [design tokens][dtcg] to store visual primitives like colors,
 - **Search**: Find tokens by name, value, or type with regex support
 - **Validation**: Check files for schema compliance and circular references
 - **Language Server**: Full LSP support for design tokens in your editor
+- **MCP Server**: Model Context Protocol server for AI-assisted development
 
 ## Installation
 
@@ -428,6 +429,51 @@ asimonim convert --format snippets --snippet-type textmate -o tokens.tmSnippet t
 
 # Generate Zed editor snippets
 asimonim convert --format snippets --snippet-type zed -o css.json tokens/*.yaml
+```
+
+### `asimonim mcp`
+
+Launch a Model Context Protocol (MCP) server for AI-assisted development with
+design tokens. The server communicates over stdin/stdout using JSON-RPC.
+
+```
+Usage:
+  asimonim mcp
+```
+
+The MCP server discovers tokens from:
+- Local token files specified in `.config/design-tokens.yaml`
+- npm/jsr dependencies with `designTokens` field or export condition
+- Resolver documents referenced in config
+
+**Tools:**
+
+| Tool | Description |
+| ---- | ----------- |
+| `validate_tokens` | Validate token files for correctness, detect circular references, report deprecated tokens |
+| `search_tokens` | Search tokens by name, value, description, or type with regex support |
+| `convert_tokens` | Convert tokens to CSS, SCSS, JavaScript, Swift, Android XML, or other formats |
+
+**Resources:**
+
+| URI | Description |
+| --- | ----------- |
+| `asimonim://tokens` | List available token sources with counts |
+| `asimonim://tokens/{source}` | All tokens from a specific source |
+| `asimonim://token/{source}/{path}` | Individual token detail |
+| `asimonim://config` | Workspace configuration |
+
+**Example (Claude Code `settings.json`):**
+
+```json
+{
+  "mcpServers": {
+    "asimonim": {
+      "command": "asimonim",
+      "args": ["mcp"]
+    }
+  }
+}
 ```
 
 ### `asimonim lsp`

@@ -13,6 +13,7 @@ import (
 
 	"bennypowers.dev/asimonim/cmd/convert"
 	"bennypowers.dev/asimonim/cmd/list"
+	mcpcmd "bennypowers.dev/asimonim/cmd/mcp"
 	"bennypowers.dev/asimonim/cmd/search"
 	"bennypowers.dev/asimonim/cmd/validate"
 	"bennypowers.dev/asimonim/cmd/version"
@@ -48,6 +49,7 @@ func NewRootCmd() *cobra.Command {
 
 	rootCmd.AddCommand(convert.NewCmd())
 	rootCmd.AddCommand(list.NewCmd())
+	rootCmd.AddCommand(mcpcmd.NewCmd())
 	rootCmd.AddCommand(search.NewCmd())
 	rootCmd.AddCommand(validate.NewCmd())
 	rootCmd.AddCommand(version.NewCmd())
