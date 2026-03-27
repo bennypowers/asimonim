@@ -1,0 +1,7 @@
+{
+  "asimonim": {
+    "command": "asimonim",
+    "args": ["mcp"],
+    "description": "Design tokens server for AI-native token discovery, validation, search, and format conversion"
+  }
+}

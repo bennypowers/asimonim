@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "asimonim",
-      "description": "LSP support for DTCG design tokens - intelligent autocomplete, hover docs, diagnostics, and code actions for CSS, HTML, JavaScript, TypeScript, JSON, and YAML",
+      "description": "LSP and MCP support for DTCG design tokens - intelligent autocomplete, hover docs, diagnostics, code actions, and AI-native token discovery, validation, search, and conversion",
       "version": "0.2.1",
       "author": {
         "name": "Benny Powers",
@@ -24,7 +24,8 @@
         "html",
         "javascript",
         "typescript",
-        "lsp"
+        "lsp",
+        "mcp"
       ]
     }
   ]
