@@ -92,7 +92,7 @@ func (s *Server) setupTools() {
 
 	mcp.AddTool(s.server, &mcp.Tool{
 		Name:        "search_tokens",
-		Description: "Search design tokens by name, value, description, or type with optional regex support.",
+		Description: "Search design tokens by name, value, description, or type. Substring search is case-insensitive. Regex search is case-sensitive by default; use (?i) flag for case-insensitive regex.",
 	}, s.handleSearch)
 
 	mcp.AddTool(s.server, &mcp.Tool{
