@@ -144,7 +144,11 @@ func (s *Server) handleValidate(
 			}
 		}
 
-		sb.WriteString(fmt.Sprintf("  %d tokens, schema: %s\n", len(src.Tokens), parsed.Version))
+		srcVersion := parsed.Version
+		if len(src.Tokens) > 0 && src.Tokens[0].SchemaVersion != schema.Unknown {
+			srcVersion = src.Tokens[0].SchemaVersion
+		}
+		sb.WriteString(fmt.Sprintf("  %d tokens, schema: %s\n", len(src.Tokens), srcVersion))
 		if deprecatedCount > 0 {
 			hasWarnings = true
 			sb.WriteString(fmt.Sprintf("  WARNING: %d deprecated token(s)\n", deprecatedCount))
