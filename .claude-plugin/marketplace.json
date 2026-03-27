@@ -10,7 +10,7 @@
     {
       "name": "asimonim",
       "description": "LSP and MCP support for DTCG design tokens - intelligent autocomplete, hover docs, diagnostics, code actions, and AI-native token discovery, validation, search, and conversion",
-      "version": "0.2.1",
+      "version": "0.3.0",
       "author": {
         "name": "Benny Powers",
         "email": "web@bennypowers.com"

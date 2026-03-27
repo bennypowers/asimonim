@@ -1,6 +1,6 @@
 {
   "name": "@pwrs/asimonim",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "CLI tool for parsing and working with DTCG design tokens",
   "type": "module",
   "engines": {
