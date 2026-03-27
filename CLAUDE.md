@@ -9,6 +9,7 @@ asimonim/
 │   ├── search/            # Token search with regex
 │   ├── convert/           # Format conversion
 │   ├── version/           # Version info
+│   ├── mcp/              # MCP server command
 │   └── render/            # Output formatting (table, CSS, markdown)
 ├── parser/                # Token parsing
 │   ├── json.go            # JSON/YAML parser
@@ -23,6 +24,7 @@ asimonim/
 ├── convert/               # Output format conversion
 │   ├── convert.go         # Serialization logic
 │   └── formatter/         # Format implementations (dtcg, scss, swift, etc.)
+├── mcp/                   # MCP server (tools, resources, token parsing)
 ├── config/                # Configuration loading, resolver discovery
 ├── specifier/             # npm: and jsr: package specifier resolution
 ├── fs/                    # FileSystem interface (enables testability)
