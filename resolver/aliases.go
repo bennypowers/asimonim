@@ -50,6 +50,14 @@ func resolveToken(tok *token.Token, tokenByName map[string]*token.Token, version
 		return
 	}
 
+	// Use the token's own schema version when available (supports mixed-schema
+	// workspaces where different files use different schema versions).
+	// Fall back to the caller-provided version.
+	effectiveVersion := tok.SchemaVersion
+	if effectiveVersion == schema.Unknown {
+		effectiveVersion = version
+	}
+
 	isAlias := false
 
 	if strings.Contains(tok.Value, "{") {
@@ -64,7 +72,7 @@ func resolveToken(tok *token.Token, tokenByName map[string]*token.Token, version
 		}
 		tok.ResolvedValue = result.value
 		tok.ResolutionChain = result.chain
-	} else if version != schema.Draft && strings.HasPrefix(tok.Value, "#/") {
+	} else if effectiveVersion != schema.Draft && strings.HasPrefix(tok.Value, "#/") {
 		isAlias = true
 		result := resolveJSONPointerRef(tok.Value, tokenByName)
 		if !result.ok {

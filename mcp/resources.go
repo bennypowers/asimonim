@@ -70,9 +70,9 @@ func (s *Server) setupResources() {
 		MIMEType:    "application/json",
 	}, s.handleConfig)
 
-	// asimonim://tokens/{source} - all tokens for a source
+	// asimonim://tokens/{+source} - all tokens for a source
 	s.server.AddResourceTemplate(&mcp.ResourceTemplate{
-		URITemplate: "asimonim://tokens/{source}",
+		URITemplate: "asimonim://tokens/{+source}",
 		Name:        "tokens-by-source",
 		Description: "All design tokens from a specific source (file or package).",
 		MIMEType:    "application/json",
@@ -91,6 +91,10 @@ func (s *Server) handleTokenSources(
 	_ context.Context,
 	req *mcp.ReadResourceRequest,
 ) (*mcp.ReadResourceResult, error) {
+	if err := validateResourceRequest(req); err != nil {
+		return nil, err
+	}
+
 	parsed, err := parseWorkspaceTokens(s.fs, s.cfg, nil, s.cwd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse tokens: %w", err)
@@ -122,6 +126,10 @@ func (s *Server) handleConfig(
 	_ context.Context,
 	req *mcp.ReadResourceRequest,
 ) (*mcp.ReadResourceResult, error) {
+	if err := validateResourceRequest(req); err != nil {
+		return nil, err
+	}
+
 	cfgData := map[string]any{
 		"prefix":    s.cfg.Prefix,
 		"schema":    s.cfg.Schema,
@@ -147,7 +155,11 @@ func (s *Server) handleTokensBySource(
 	_ context.Context,
 	req *mcp.ReadResourceRequest,
 ) (*mcp.ReadResourceResult, error) {
-	// Extract source from URI: asimonim://tokens/{source}
+	if err := validateResourceRequest(req); err != nil {
+		return nil, err
+	}
+
+	// Extract source from URI: asimonim://tokens/{+source}
 	source, ok := extractURISuffix(req.Params.URI, "asimonim://tokens/")
 	if !ok {
 		return nil, mcp.ResourceNotFoundError(req.Params.URI)
@@ -187,7 +199,11 @@ func (s *Server) handleTokenDetail(
 	_ context.Context,
 	req *mcp.ReadResourceRequest,
 ) (*mcp.ReadResourceResult, error) {
-	// Extract rest from URI: asimonim://token/{source}/{path...}
+	if err := validateResourceRequest(req); err != nil {
+		return nil, err
+	}
+
+	// Extract rest from URI: asimonim://token/{+rest}
 	rest, ok := extractURISuffix(req.Params.URI, "asimonim://token/")
 	if !ok {
 		return nil, mcp.ResourceNotFoundError(req.Params.URI)
@@ -228,6 +244,14 @@ func (s *Server) handleTokenDetail(
 	}
 
 	return nil, mcp.ResourceNotFoundError(req.Params.URI)
+}
+
+// validateResourceRequest checks that the request has valid params.
+func validateResourceRequest(req *mcp.ReadResourceRequest) error {
+	if req == nil || req.Params == nil || req.Params.URI == "" {
+		return fmt.Errorf("invalid resource request: missing URI")
+	}
+	return nil
 }
 
 // extractURISuffix extracts the suffix after a URI prefix.

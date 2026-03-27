@@ -174,6 +174,10 @@ func (s *Server) handleSearch(
 		return errorResult("Error: query is required"), nil, nil
 	}
 
+	if input.NameOnly && input.ValueOnly {
+		return errorResult("Error: name_only and value_only are mutually exclusive"), nil, nil
+	}
+
 	parsed, err := parseWorkspaceTokens(s.fs, s.cfg, nil, s.cwd)
 	if err != nil {
 		return errorResult(fmt.Sprintf("Error: %v", err)), nil, nil

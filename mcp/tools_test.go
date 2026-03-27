@@ -135,8 +135,22 @@ func TestHandleSearch(t *testing.T) {
 		var tokens []tokenSummary
 		text := resultText(t, result)
 		require.NoError(t, json.Unmarshal([]byte(text), &tokens))
-		// color.primary has this value, color.secondary resolves to it
-		assert.GreaterOrEqual(t, len(tokens), 1)
+		// color.primary: Value="#FF6B35", color.secondary: DisplayValue()="#FF6B35"
+		assert.Len(t, tokens, 2)
+		assert.Equal(t, "color-primary", tokens[0].Name)
+		assert.Equal(t, "color-secondary", tokens[1].Name)
+	})
+
+	t.Run("name_only and value_only conflict", func(t *testing.T) {
+		result, _, err := s.handleSearch(context.Background(), nil, searchInput{
+			Query:     "test",
+			NameOnly:  true,
+			ValueOnly: true,
+		})
+		require.NoError(t, err)
+		assert.True(t, result.IsError)
+		text := resultText(t, result)
+		assert.Contains(t, text, "mutually exclusive")
 	})
 }
 

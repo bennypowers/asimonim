@@ -55,7 +55,7 @@ func parseWorkspaceTokens(
 
 	var resolvedFiles []*specifier.ResolvedFile
 	if len(files) == 0 {
-		resolvedFiles, err = cfg.ResolveFiles(specResolver, filesystem, ".")
+		resolvedFiles, err = cfg.ResolveFiles(specResolver, filesystem, cwd)
 		if err != nil {
 			return nil, fmt.Errorf("error resolving config files: %w", err)
 		}

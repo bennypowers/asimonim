@@ -436,7 +436,7 @@ asimonim convert --format snippets --snippet-type zed -o css.json tokens/*.yaml
 Launch a Model Context Protocol (MCP) server for AI-assisted development with
 design tokens. The server communicates over stdin/stdout using JSON-RPC.
 
-```
+```text
 Usage:
   asimonim mcp
 ```
