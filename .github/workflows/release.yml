@@ -135,13 +135,14 @@ jobs:
         id: update-zed
         working-directory: zed-extensions
         run: |
-          # Point submodule to asimonim (upstream may still reference old dtls repo)
+          # Point submodule to asimonim. The upstream submodule index may have a
+          # commit SHA from the old dtls repo, which can't be fetched from
+          # asimonim. Work around by removing the submodule dir and cloning fresh.
           git config --file .gitmodules submodule.extensions/design-tokens.url https://github.com/${{ github.repository }}.git
           git submodule sync extensions/design-tokens
-          git submodule update --init extensions/design-tokens
-          # Update submodule to latest release tag
+          rm -rf extensions/design-tokens
+          git clone https://github.com/${{ github.repository }}.git extensions/design-tokens
           cd extensions/design-tokens
-          git fetch origin --tags
           git checkout ${{ github.event.release.tag_name }}
           cd ../..
           # Update version in extensions.toml for design-tokens section only
