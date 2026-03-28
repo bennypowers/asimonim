@@ -43,33 +43,20 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 		t.Errorf("Android output contains CSS color functions:\n%s", output)
 	}
 
-	// sRGB with hex field should use it: srgb [1, 0.42, 0.21] hex "#FF6B36"
-	if !strings.Contains(output, "#FF6B36") {
-		t.Errorf("expected #FF6B36 for srgb-hex, got:\n%s", output)
-	}
-
-	// sRGB without hex should convert to hex: srgb [1, 0.5, 0.25] → #FF8040
-	if !strings.Contains(output, "#FF8040") {
-		t.Errorf("expected #FF8040 for srgb-no-hex, got:\n%s", output)
-	}
-
-	// All values must be hex format
-	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "<color") && strings.Contains(line, ">") {
-			start := strings.Index(line, ">") + 1
-			end := strings.LastIndex(line, "<")
-			if start > 0 && end > start {
-				val := line[start:end]
-				if !strings.HasPrefix(val, "#") {
-					t.Errorf("non-hex color value in Android XML: %q", val)
-				}
-			}
+	// Assert exact hex values for each color space conversion
+	for _, tc := range []struct {
+		name string
+		hex  string
+	}{
+		{"srgb-hex", "#FF6B36"},        // srgb [1, 0.42, 0.21] hex "#FF6B36"
+		{"srgb-no-hex", "#FF8040"},     // srgb [1, 0.5, 0.25] → #FF8040
+		{"srgb-alpha", "#80FF8040"},    // srgb [1, 0.5, 0.25] alpha 0.5 → #AARRGGBB
+		{"display-p3", "#FF7626"},      // display-p3 [1, 0.5, 0.25] → sRGB
+		{"a98-rgb", "#E7662B"},         // a98-rgb [0.8, 0.4, 0.2] → sRGB
+	} {
+		if !strings.Contains(output, tc.hex) {
+			t.Errorf("expected %s for %s, got:\n%s", tc.hex, tc.name, output)
 		}
-	}
-
-	// Alpha should produce #AARRGGBB: srgb [1, 0.5, 0.25] alpha 0.5
-	if !strings.Contains(output, "#80FF8040") {
-		t.Errorf("expected #80FF8040 for srgb-alpha, got:\n%s", output)
 	}
 
 	if strings.Contains(output, "map[") {
@@ -195,17 +182,19 @@ func TestFormat_WideGamutColorSpaces(t *testing.T) {
 
 	output := string(result)
 
-	// All must be hex format
-	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "<color") && strings.Contains(line, ">") {
-			start := strings.Index(line, ">") + 1
-			end := strings.LastIndex(line, "<")
-			if start > 0 && end > start {
-				val := line[start:end]
-				if !strings.HasPrefix(val, "#") {
-					t.Errorf("non-hex color value in Android XML: %q in line: %s", val, line)
-				}
-			}
+	// Assert exact hex values for each wide-gamut color space
+	for _, tc := range []struct {
+		name string
+		hex  string
+	}{
+		{"xyz-d50", "#D67987"},         // xyz-d50 [0.4, 0.3, 0.2] → sRGB
+		{"prophoto-rgb", "#FF7151"},    // prophoto-rgb [0.9, 0.5, 0.3] → sRGB
+		{"rec2020", "#DC6735"},         // rec2020 [0.7, 0.4, 0.2] → sRGB
+		{"xyz-d65", "#DF7773"},         // xyz-d65 [0.4, 0.3, 0.2] → sRGB
+		{"srgb-linear", "#BC9559"},     // srgb-linear [0.5, 0.3, 0.1] → sRGB
+	} {
+		if !strings.Contains(output, tc.hex) {
+			t.Errorf("expected %s for %s, got:\n%s", tc.hex, tc.name, output)
 		}
 	}
 
@@ -329,9 +318,8 @@ func TestFormat_WithHeader(t *testing.T) {
 }
 
 func TestFormat_LowValueColorSpaces(t *testing.T) {
-	// Colors with very low component values exercise the linear transfer
-	// function branches (srgbToLinear c <= 0.04045, prophotoToLinear c <= 16/512,
-	// a98ToLinear c < 0, rec2020ToLinear c < beta*4.5)
+	// Colors with very low or negative component values exercise edge cases
+	// in go-colorful's transfer functions and clamping
 	allTokens := testutil.ParseFixtureTokens(t, "fixtures/low-value-colors", schema.V2025_10)
 
 	tokens := []*token.Token{
@@ -349,18 +337,18 @@ func TestFormat_LowValueColorSpaces(t *testing.T) {
 
 	output := string(result)
 
-	// All must produce hex output (no CSS functions)
-	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "<color") && strings.Contains(line, ">") {
-			start := strings.Index(line, ">") + 1
-			end := strings.LastIndex(line, "<")
-			if start > 0 && end > start {
-				val := line[start:end]
-				// low value colors → near-black hex values
-				if !strings.HasPrefix(val, "#") {
-					t.Errorf("non-hex color value: %q in line: %s", val, line)
-				}
-			}
+	// Assert exact hex values for low-value/edge-case colors
+	for _, tc := range []struct {
+		name string
+		hex  string
+	}{
+		{"srgb-low", "#030508"},       // srgb [0.01, 0.02, 0.03] → near-black
+		{"a98-negative", "#000083"},   // a98-rgb [-0.1, 0.01, 0.5] → clamped negative
+		{"prophoto-low", "#050207"},   // prophoto-rgb [0.02, 0.01, 0.03] → near-black
+		{"rec2020-low", "#020F14"},    // rec2020 [0.01, 0.02, 0.03] → near-black
+	} {
+		if !strings.Contains(output, tc.hex) {
+			t.Errorf("expected %s for %s, got:\n%s", tc.hex, tc.name, output)
 		}
 	}
 }
