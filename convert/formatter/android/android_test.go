@@ -54,8 +54,9 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 		{"display-p3", "#FF7626"},      // display-p3 [1, 0.5, 0.25] → sRGB
 		{"a98-rgb", "#E7662B"},         // a98-rgb [0.8, 0.4, 0.2] → sRGB
 	} {
-		if !strings.Contains(output, tc.hex) {
-			t.Errorf("expected %s for %s, got:\n%s", tc.hex, tc.name, output)
+		expectedToken := `<color name="color_` + strings.ReplaceAll(tc.name, "-", "_") + `">` + tc.hex + `</color>`
+		if !strings.Contains(output, expectedToken) {
+			t.Errorf("expected token %q for %s, got:\n%s", expectedToken, tc.name, output)
 		}
 	}
 
@@ -193,8 +194,9 @@ func TestFormat_WideGamutColorSpaces(t *testing.T) {
 		{"xyz-d65", "#DF7773"},         // xyz-d65 [0.4, 0.3, 0.2] → sRGB
 		{"srgb-linear", "#BC9559"},     // srgb-linear [0.5, 0.3, 0.1] → sRGB
 	} {
-		if !strings.Contains(output, tc.hex) {
-			t.Errorf("expected %s for %s, got:\n%s", tc.hex, tc.name, output)
+		expectedToken := `<color name="color_` + strings.ReplaceAll(tc.name, "-", "_") + `">` + tc.hex + `</color>`
+		if !strings.Contains(output, expectedToken) {
+			t.Errorf("expected token %q for %s, got:\n%s", expectedToken, tc.name, output)
 		}
 	}
 
@@ -347,8 +349,9 @@ func TestFormat_LowValueColorSpaces(t *testing.T) {
 		{"prophoto-low", "#050207"},   // prophoto-rgb [0.02, 0.01, 0.03] → near-black
 		{"rec2020-low", "#020F14"},    // rec2020 [0.01, 0.02, 0.03] → near-black
 	} {
-		if !strings.Contains(output, tc.hex) {
-			t.Errorf("expected %s for %s, got:\n%s", tc.hex, tc.name, output)
+		expectedToken := `<color name="color_` + strings.ReplaceAll(tc.name, "-", "_") + `">` + tc.hex + `</color>`
+		if !strings.Contains(output, expectedToken) {
+			t.Errorf("expected token %q for %s, got:\n%s", expectedToken, tc.name, output)
 		}
 	}
 }
