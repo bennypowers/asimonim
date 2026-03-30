@@ -27,3 +27,7 @@ extensions/zed/target/
 
 # Generated HTML output
 dist/**/*.html
+
+# Hugo docs output
+docs/public/
+docs/resources/

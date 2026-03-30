@@ -1,0 +1,52 @@
+baseURL: https://bennypowers.dev/asimonim/
+languageCode: en-us
+title: asimonim
+enableRobotsTXT: true
+relativeURLs: false
+canonifyURLs: true
+enableGitInfo: true
+params:
+  uniqueHomePage: true
+  repo: https://github.com/bennypowers/asimonim
+  enableDarkMode: true
+  enableCopyright: true
+  keywords: []
+  logo:
+    lightMode: images/logo.svg
+    darkMode: images/logo.svg
+  author:
+    name: Benny Powers
+    url: https://bennypowers.com
+  source:
+    iconDark: images/github-dark.svg
+    iconLight: images/github-light.svg
+    url: https://github.com/bennypowers/asimonim
+pagination:
+  disableAliases: false
+  pagerSize: 10
+  path: page
+outputs:
+  home:
+    - HTML
+    - RSS
+    - JSON
+markup:
+  goldmark:
+    parser:
+      wrapStandAloneImageWithinParagraph: false
+      attribute:
+        block: true
+        title: true
+    renderer:
+      unsafe: true
+  highlight:
+    noClasses: false
+    lineNos: false
+    lineNumbersInTable: false
+    style: github
+    tabWidth: 2
+security:
+  enableInlineShortcodes: true
+search:
+  on: true
+  global: true

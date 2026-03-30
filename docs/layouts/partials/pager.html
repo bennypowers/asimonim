@@ -1,0 +1,54 @@
+{{- $searchURL := "/search/" -}}
+{{- $prev := .NextInSection -}}
+{{- $next := .PrevInSection -}}
+
+{{- /* Filter out search page */ -}}
+{{- with $prev }}{{ if eq .RelPermalink $searchURL }}{{ $prev = nil }}{{ end }}{{ end -}}
+{{- with $next }}{{ if eq .RelPermalink $searchURL }}{{ $next = nil }}{{ end }}{{ end -}}
+
+{{- /* Fall back to cross-section navigation when no siblings */ -}}
+{{- if not $prev -}}
+  {{- $allPages := (site.GetPage "/docs").RegularPagesRecursive.ByWeight -}}
+  {{- range $i, $p := $allPages -}}
+    {{- if eq $p.RelPermalink $.RelPermalink -}}
+      {{- if gt $i 0 -}}
+        {{- $prev = index $allPages (sub $i 1) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if not $next -}}
+  {{- $allPages := (site.GetPage "/docs").RegularPagesRecursive.ByWeight -}}
+  {{- range $i, $p := $allPages -}}
+    {{- if eq $p.RelPermalink $.RelPermalink -}}
+      {{- if lt $i (sub (len $allPages) 1) -}}
+        {{- $next = index $allPages (add $i 1) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+<div class="pager{{ if not $prev }} pager-lean{{ end }}">
+  {{ with $prev }}
+  <div class="pager-item prev">
+    <a href="{{ .Permalink }}" class="pager-link cta primary" title="{{ .Title }}" rel="prev">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-label="Previous">
+        <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+      </svg>
+      <span class="pager-label">{{ .Title }}</span>
+    </a>
+  </div>
+  {{ end }}
+
+  {{ with $next }}
+  <div class="pager-item next">
+    <a href="{{ .Permalink }}" class="pager-link cta primary" title="{{ .Title }}" rel="next">
+      <span class="pager-label">{{ .Title }}</span>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-label="Next">
+        <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
+      </svg>
+    </a>
+  </div>
+  {{ end }}
+</div>

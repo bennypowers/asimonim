@@ -1,0 +1,37 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{{- hugo.Generator }}
+<link rel="shortcut icon" type="image/svg+xml" href='{{ absURL "images/logo.svg" }}'>
+{{- $t := .Title }}
+{{- $s := site.Title }}
+{{- if in (lower $s) (lower $t) }}
+{{- $t = false }}
+{{- end }}
+<title>{{ if and $t (ne (trim (lower $s) "") (trim (lower $t) "")) }}{{ $t }} | {{ end }}{{ $s }}</title>
+
+<link rel="stylesheet" href="{{ absURL "css/styles.css" }}">
+
+{{- $config := site.Params }}
+{{- with $config.customCSS }}
+{{- range . -}}
+<link rel="stylesheet" href="{{ . }}">
+{{- end }}
+{{- end }}
+
+{{- with $config.metaThemeColor }}
+<meta name="theme-color" content="{{ . }}">
+{{- end }}
+
+{{- if .Description }}
+<meta name="description" content="{{ .Description }}">
+{{- else if .IsPage }}
+<meta name="description" content="{{ plainify .Summary }}">
+{{- else if $config.Description }}
+<meta name="descripion" content="{{ $config.Description }}">
+{{- end }}
+<script type="importmap">{{ site.Data.importmap | jsonify }}</script>
+
+<!-- Highlight.js themes -->
+<link id="hljs-light" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/styles/github.min.css">
+<link id="hljs-dark" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/styles/github-dark.min.css" disabled>
+

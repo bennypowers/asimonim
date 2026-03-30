@@ -1,0 +1,53 @@
+[[main]]
+  name = "Getting Started"
+  pageRef = "/docs/installation/"
+  identifier = "getting-started"
+  weight = 10
+
+[[main]]
+  name = "Installation"
+  pageRef = "/docs/installation/"
+  parent = "getting-started"
+  weight = 10
+
+[[main]]
+  name = "Quick Start"
+  pageRef = "/docs/quick-start/"
+  parent = "getting-started"
+  weight = 20
+
+[[main]]
+  name = "Editor Integration"
+  pageRef = "/docs/editors/"
+  parent = "getting-started"
+  weight = 30
+
+[[main]]
+  name = "LSP Features"
+  pageRef = "/docs/lsp/"
+  parent = "getting-started"
+  weight = 40
+
+[[main]]
+  name = "Reference"
+  pageRef = "/docs/reference/"
+  identifier = "reference"
+  weight = 20
+
+[[main]]
+  name = "Commands"
+  pageRef = "/docs/reference/commands/"
+  parent = "reference"
+  weight = 10
+
+[[main]]
+  name = "Configuration"
+  pageRef = "/docs/reference/configuration/"
+  parent = "reference"
+  weight = 20
+
+[[main]]
+  name = "Schemas"
+  pageRef = "/docs/reference/schemas/"
+  parent = "reference"
+  weight = 30
