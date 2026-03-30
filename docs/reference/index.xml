@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Reference on asimonim</title><link>https://bennypowers.dev/asimonim/docs/reference/</link><description>Recent content in Reference on asimonim</description><generator>Hugo</generator><language>en</language><atom:link href="https://bennypowers.dev/asimonim/docs/reference/index.xml" rel="self" type="application/rss+xml"/><item><title>Configuration</title><link>https://bennypowers.dev/asimonim/docs/reference/configuration/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/reference/configuration/</guid><description>&lt;p>Asimonim reads configuration from &lt;code>.config/design-tokens.{yaml,yml,json}&lt;/code>:&lt;/p>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-yaml" data-lang="yaml">&lt;span class="line">&lt;span class="cl">&lt;span class="c"># .config/design-tokens.yaml&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">prefix&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="s2">&amp;#34;rh&amp;#34;&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">resolvers&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>- &lt;span class="l">./tokens.resolver.json&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>- &lt;span class="l">npm:@acme/tokens/tokens.resolver.json&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">files&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>- &lt;span class="l">./tokens.json&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>- &lt;span class="l">./tokens/**/*.yaml&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>- &lt;span class="nt">path&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">npm:@rhds/tokens/json/rhds.tokens.json&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w"> &lt;/span>&lt;span class="nt">prefix&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">rh&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">groupMarkers&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="s2">&amp;#34;_&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="s2">&amp;#34;@&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="s2">&amp;#34;DEFAULT&amp;#34;&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">schema&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">draft&lt;/span>&lt;span class="w">
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="w">&lt;/span>&lt;span class="nt">cdn&lt;/span>&lt;span class="p">:&lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="l">unpkg &lt;/span>&lt;span class="w"> &lt;/span>&lt;span class="c"># CDN for network fallback (unpkg, esm.sh, esm.run, jspm, jsdelivr)&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter>&lt;p>When running commands without file arguments, files from config are used:&lt;/p>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">asimonim list &lt;span class="c1"># Uses files from config&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim validate &lt;span class="c1"># Uses files from config&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter>&lt;p>The language server also reads from &lt;code>package.json&lt;/code>:&lt;/p></description></item><item><title>Schema Versions</title><link>https://bennypowers.dev/asimonim/docs/reference/schemas/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/reference/schemas/</guid><description>&lt;p>Asimonim supports multiple DTCG schema versions:&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th>Version&lt;/th>
+ &lt;th>References&lt;/th>
+ &lt;th>Colors&lt;/th>
+ &lt;th>Features&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td>Draft&lt;/td>
+ &lt;td>&lt;code>{token.path}&lt;/code>&lt;/td>
+ &lt;td>Strings&lt;/td>
+ &lt;td>Group markers&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>v2025.10&lt;/td>
+ &lt;td>&lt;code>{token.path}&lt;/code> or &lt;code>$ref: &amp;quot;#/path&amp;quot;&lt;/code>&lt;/td>
+ &lt;td>Structured&lt;/td>
+ &lt;td>&lt;code>$extends&lt;/code>, &lt;code>$root&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>Schema version is automatically detected from file contents, or can be forced with the &lt;code>--schema&lt;/code> flag.&lt;/p>
+&lt;h2 id="editors-draft">Editor&amp;rsquo;s Draft&lt;/h2>
+&lt;p>The original DTCG format:&lt;/p>
+&lt;ul>
+&lt;li>String color values (hex, rgb, hsl, named colors)&lt;/li>
+&lt;li>Curly brace references: &lt;code>{color.brand.primary}&lt;/code>&lt;/li>
+&lt;li>Group markers for root tokens: &lt;code>_&lt;/code>, &lt;code>@&lt;/code>, &lt;code>DEFAULT&lt;/code>&lt;/li>
+&lt;/ul>
+&lt;p>See 
+&lt;a href="https://second-editors-draft.tr.designtokens.org/format/" 
+ target="_blank" 
+ rel="noopener">Editor&amp;rsquo;s Draft specification
+&lt;/a>.&lt;/p>
+&lt;h2 id="202510-stable">2025.10 Stable&lt;/h2>
+&lt;p>The latest stable specification:&lt;/p></description></item></channel></rss>

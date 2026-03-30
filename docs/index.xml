@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Documentation on asimonim</title><link>https://bennypowers.dev/asimonim/docs/</link><description>Recent content in Documentation on asimonim</description><generator>Hugo</generator><language>en</language><atom:link href="https://bennypowers.dev/asimonim/docs/index.xml" rel="self" type="application/rss+xml"/><item><title>Installation</title><link>https://bennypowers.dev/asimonim/docs/installation/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/installation/</guid><description>&lt;h2 id="npm">npm&lt;/h2>
+
+&lt;code-highlighter>
+ &lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">npm install -g @pwrs/asimonim&lt;/span>&lt;/span>&lt;/code>&lt;/pre>
+&lt;/code-highlighter>&lt;h2 id="gentoo-linux">Gentoo Linux&lt;/h2>
+&lt;p>Enable the &lt;code>bennypowers&lt;/code> overlay, then install:&lt;/p>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">eselect repository &lt;span class="nb">enable&lt;/span> bennypowers
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">emaint sync -r bennypowers
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">emerge dev-util/asimonim&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter>&lt;h2 id="from-source">From Source&lt;/h2>
+
+&lt;code-highlighter>
+ &lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">go install bennypowers.dev/asimonim@latest&lt;/span>&lt;/span>&lt;/code>&lt;/pre>
+&lt;/code-highlighter></description></item><item><title>Quick Start</title><link>https://bennypowers.dev/asimonim/docs/quick-start/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/quick-start/</guid><description>&lt;p>Validate your design token files:&lt;/p>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Validate token files&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim validate tokens.json
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># List all tokens&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim list tokens.json
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Output as CSS custom properties&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim list tokens.json --format css
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Search for color tokens&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim search &lt;span class="s2">&amp;#34;primary&amp;#34;&lt;/span> tokens.json --type color&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter></description></item><item><title>Editor Integration</title><link>https://bennypowers.dev/asimonim/docs/editors/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/editors/</guid><description>&lt;p>Asimonim includes a built-in language server (&lt;code>asimonim lsp&lt;/code>) with editor
+extensions for VS Code, Zed, and Claude Code.&lt;/p>
+&lt;p>Any editor with LSP support can use Asimonim. Run &lt;code>asimonim lsp&lt;/code> as the
+language server command, with document selectors for CSS, HTML, Twig, PHP,
+JavaScript, TypeScript, JSON, and YAML.&lt;/p>
+&lt;h2 id="vs-code">VS Code&lt;/h2>
+&lt;p>Install 
+&lt;a href="https://marketplace.visualstudio.com/items?itemName=pwrs.design-tokens-language-server-vscode" 
+ target="_blank" 
+ rel="noopener">Design Tokens Language Server
+&lt;/a> from the VS Code Marketplace.&lt;/p>
+&lt;h2 id="zed">Zed&lt;/h2>
+&lt;p>Install 
+&lt;a href="https://zed.dev/extensions/design-tokens" 
+ target="_blank" 
+ rel="noopener">design-tokens
+&lt;/a> from the Zed extension registry.&lt;/p>
+&lt;h2 id="claude-code">Claude Code&lt;/h2>
+&lt;p>Asimonim is available as a 
+&lt;a href="https://github.com/bennypowers/asimonim" 
+ target="_blank" 
+ rel="noopener">Claude Code plugin
+&lt;/a>.&lt;/p></description></item></channel></rss>

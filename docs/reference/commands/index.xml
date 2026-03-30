@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Commands on asimonim</title><link>https://bennypowers.dev/asimonim/docs/reference/commands/</link><description>Recent content in Commands on asimonim</description><generator>Hugo</generator><language>en</language><atom:link href="https://bennypowers.dev/asimonim/docs/reference/commands/index.xml" rel="self" type="application/rss+xml"/><item><title>validate</title><link>https://bennypowers.dev/asimonim/docs/reference/commands/validate/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/reference/commands/validate/</guid><description>&lt;p>Validate design token files for correctness and schema compliance.&lt;/p>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-text" data-lang="text">&lt;span class="line">&lt;span class="cl">Usage:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> asimonim validate [files...]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Flags:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> -s, --schema string Force schema version (draft, v2025.10)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> --strict Fail on warnings
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> --quiet Only output errors&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter>&lt;h2 id="examples">Examples&lt;/h2>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Validate multiple files&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim validate colors.json spacing.json typography.json
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Force a specific schema version&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim validate tokens.json --schema v2025.10
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Quiet mode for CI&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim validate tokens.json --quiet&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter></description></item><item><title>list</title><link>https://bennypowers.dev/asimonim/docs/reference/commands/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/reference/commands/list/</guid><description>&lt;p>List all tokens from design token files with optional filtering and formatting.&lt;/p>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-text" data-lang="text">&lt;span class="line">&lt;span class="cl">Usage:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> asimonim list [files...]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Flags:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> -s, --schema string Force schema version (draft, v2025.10)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> --type string Filter by token type
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> --resolved Show resolved values (follow aliases)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> --format string Output format: table, json, css (default &amp;#34;table&amp;#34;)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> --css Shorthand for --format css&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter>&lt;h2 id="examples">Examples&lt;/h2>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># List all tokens as a table&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim list tokens.json
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Output as JSON&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim list tokens.json --format json
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate CSS custom properties&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim list tokens.json --format css
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Show only color tokens with resolved values&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim list tokens.json --type color --resolved&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter></description></item><item><title>search</title><link>https://bennypowers.dev/asimonim/docs/reference/commands/search/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/reference/commands/search/</guid><description>&lt;p>Search design tokens by name, value, or type.&lt;/p>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-text" data-lang="text">&lt;span class="line">&lt;span class="cl">Usage:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> asimonim search &amp;lt;query&amp;gt; [files...]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Flags:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> -s, --schema string Force schema version (draft, v2025.10)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> --name Search names only
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> --value Search values only
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> --type string Filter by token type
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> --regex Treat query as a regular expression
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> --format string Output format: table, json, names (default &amp;#34;table&amp;#34;)&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter>&lt;h2 id="examples">Examples&lt;/h2>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Search by name or value&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim search &lt;span class="s2">&amp;#34;blue&amp;#34;&lt;/span> tokens.json
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Search names only with regex&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim search &lt;span class="s2">&amp;#34;^color\.&amp;#34;&lt;/span> tokens.json --name --regex
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Find all dimension tokens containing &amp;#34;spacing&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim search &lt;span class="s2">&amp;#34;spacing&amp;#34;&lt;/span> tokens.json --type dimension
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Output matching token names only&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim search &lt;span class="s2">&amp;#34;primary&amp;#34;&lt;/span> tokens.json --format names&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter></description></item><item><title>convert</title><link>https://bennypowers.dev/asimonim/docs/reference/commands/convert/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/reference/commands/convert/</guid><description>&lt;p>Convert and combine DTCG token files between formats.&lt;/p>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-text" data-lang="text">&lt;span class="line">&lt;span class="cl">Usage:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> asimonim convert [files...]
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Flags:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> -o, --output string Output file (default: stdout)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> -f, --format string Output format (default &amp;#34;dtcg&amp;#34;)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> -p, --prefix string Prefix for output variable names
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> --flatten Flatten to shallow structure (dtcg/json formats only)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> -d, --delimiter string Delimiter for flattened keys (default &amp;#34;-&amp;#34;)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> -s, --schema string Force output schema version (draft, v2025.10)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> -i, --in-place Overwrite input files with converted output&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter>&lt;h2 id="output-formats">Output Formats&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th>Format&lt;/th>
+ &lt;th>Extension&lt;/th>
+ &lt;th>Description&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td>&lt;code>dtcg&lt;/code>&lt;/td>
+ &lt;td>&lt;code>.json&lt;/code>&lt;/td>
+ &lt;td>DTCG-compliant JSON (default)&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>json&lt;/code>&lt;/td>
+ &lt;td>&lt;code>.json&lt;/code>&lt;/td>
+ &lt;td>Flat key-value JSON&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>android&lt;/code>&lt;/td>
+ &lt;td>&lt;code>.xml&lt;/code>&lt;/td>
+ &lt;td>Android-style XML resources&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>swift&lt;/code>&lt;/td>
+ &lt;td>&lt;code>.swift&lt;/code>&lt;/td>
+ &lt;td>iOS Swift constants with native SwiftUI Color&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>js&lt;/code>&lt;/td>
+ &lt;td>&lt;code>.ts&lt;/code>, &lt;code>.js&lt;/code>, &lt;code>.cts&lt;/code>, &lt;code>.cjs&lt;/code>&lt;/td>
+ &lt;td>JavaScript/TypeScript (see JS options below)&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>scss&lt;/code>&lt;/td>
+ &lt;td>&lt;code>.scss&lt;/code>&lt;/td>
+ &lt;td>SCSS variables with kebab-case names&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>css&lt;/code>&lt;/td>
+ &lt;td>&lt;code>.css&lt;/code>&lt;/td>
+ &lt;td>CSS custom properties&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>snippets&lt;/code>&lt;/td>
+ &lt;td>&lt;code>.code-snippets&lt;/code>, &lt;code>.tmSnippet&lt;/code>, &lt;code>.json&lt;/code>&lt;/td>
+ &lt;td>Editor snippets (VSCode, TextMate, or Zed)&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="js-format-options">JS Format Options&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th>Flag&lt;/th>
+ &lt;th>Values&lt;/th>
+ &lt;th>Default&lt;/th>
+ &lt;th>Description&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td>&lt;code>--js-module&lt;/code>&lt;/td>
+ &lt;td>&lt;code>esm&lt;/code>, &lt;code>cjs&lt;/code>&lt;/td>
+ &lt;td>&lt;code>esm&lt;/code>&lt;/td>
+ &lt;td>Module system (ESM or CommonJS)&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>--js-types&lt;/code>&lt;/td>
+ &lt;td>&lt;code>ts&lt;/code>, &lt;code>jsdoc&lt;/code>&lt;/td>
+ &lt;td>&lt;code>ts&lt;/code>&lt;/td>
+ &lt;td>Type system (TypeScript or JSDoc)&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>--js-export&lt;/code>&lt;/td>
+ &lt;td>&lt;code>values&lt;/code>, &lt;code>map&lt;/code>&lt;/td>
+ &lt;td>&lt;code>values&lt;/code>&lt;/td>
+ &lt;td>Export form (simple values or TokenMap)&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="examples">Examples&lt;/h2>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-bash" data-lang="bash">&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Flatten tokens to shallow structure&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --flatten tokens/*.yaml -o flat.json
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Convert from Editor&amp;#39;s Draft to v2025.10 (stable)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --schema v2025.10 tokens.yaml -o stable.json
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># In-place schema conversion&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --in-place --schema v2025.10 tokens/*.yaml
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Combine multiple files&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert colors.yaml spacing.yaml -o combined.json
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate TypeScript ESM module (default JS output)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --format js -o tokens.ts tokens/*.yaml
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate TypeScript CommonJS module&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --format js --js-module cjs -o tokens.cts tokens/*.yaml
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate JavaScript with JSDoc types&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --format js --js-types jsdoc -o tokens.js tokens/*.yaml
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate TokenMap class for typed token access&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --format js --js-export map -o tokens.ts tokens/*.yaml
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate SCSS variables with prefix&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --format scss --prefix rh -o _tokens.scss tokens/*.yaml
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate Android XML resources&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --format android -o values/tokens.xml tokens/*.yaml
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate iOS Swift constants&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --format swift -o DesignTokens.swift tokens/*.yaml
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate CSS custom properties&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --format css -o tokens.css tokens/*.yaml
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate CSS with :host selector (for shadow DOM)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --format css --css-selector :host -o tokens.css tokens/*.yaml
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate Lit CSS module&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --format css --css-module lit -o tokens.css.ts tokens/*.yaml
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate VSCode snippets&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --format snippets -o tokens.code-snippets tokens/*.yaml
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate TextMate snippets&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --format snippets --snippet-type textmate -o tokens.tmSnippet tokens/*.yaml
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Generate Zed editor snippets&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">asimonim convert --format snippets --snippet-type zed -o css.json tokens/*.yaml&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter>&lt;h2 id="css-output">CSS Output&lt;/h2>
+&lt;p>The &lt;code>css&lt;/code> format generates CSS custom properties from tokens:&lt;/p></description></item><item><title>mcp</title><link>https://bennypowers.dev/asimonim/docs/reference/commands/mcp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/reference/commands/mcp/</guid><description>&lt;p>Launch a Model Context Protocol (MCP) server for AI-assisted development with
+design tokens. The server communicates over stdin/stdout using JSON-RPC.&lt;/p>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-text" data-lang="text">&lt;span class="line">&lt;span class="cl">Usage:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> asimonim mcp&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter>&lt;p>The MCP server discovers tokens from:&lt;/p>
+&lt;ul>
+&lt;li>Local token files specified in &lt;code>.config/design-tokens.yaml&lt;/code>&lt;/li>
+&lt;li>npm/jsr dependencies with &lt;code>designTokens&lt;/code> field or export condition&lt;/li>
+&lt;li>Resolver documents referenced in config&lt;/li>
+&lt;/ul>
+&lt;h2 id="tools">Tools&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th>Tool&lt;/th>
+ &lt;th>Description&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td>&lt;code>validate_tokens&lt;/code>&lt;/td>
+ &lt;td>Validate token files for correctness, detect circular references, report deprecated tokens&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>search_tokens&lt;/code>&lt;/td>
+ &lt;td>Search tokens by name, value, description, or type with regex support&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>convert_tokens&lt;/code>&lt;/td>
+ &lt;td>Convert tokens to CSS, SCSS, JavaScript, Swift, Android XML, or other formats&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="resources">Resources&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th>URI&lt;/th>
+ &lt;th>Description&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td>&lt;code>asimonim://tokens&lt;/code>&lt;/td>
+ &lt;td>List available token sources with counts&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>asimonim://tokens/{source}&lt;/code>&lt;/td>
+ &lt;td>All tokens from a specific source&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>asimonim://token/{source}/{path}&lt;/code>&lt;/td>
+ &lt;td>Individual token detail&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>asimonim://config&lt;/code>&lt;/td>
+ &lt;td>Workspace configuration&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="example-claude-code-settingsjson">Example (Claude Code &lt;code>settings.json&lt;/code>)&lt;/h2>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-json" data-lang="json">&lt;span class="line">&lt;span class="cl">&lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nt">&amp;#34;mcpServers&amp;#34;&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nt">&amp;#34;asimonim&amp;#34;&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nt">&amp;#34;command&amp;#34;&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="s2">&amp;#34;asimonim&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nt">&amp;#34;args&amp;#34;&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="p">[&lt;/span>&lt;span class="s2">&amp;#34;mcp&amp;#34;&lt;/span>&lt;span class="p">]&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter></description></item><item><title>lsp</title><link>https://bennypowers.dev/asimonim/docs/reference/commands/lsp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/reference/commands/lsp/</guid><description>&lt;p>Start the language server for editor integration.&lt;/p>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-text" data-lang="text">&lt;span class="line">&lt;span class="cl">Usage:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> asimonim lsp&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter>&lt;p>The LSP server communicates over stdin/stdout using JSON-RPC. It is typically
+launched by an editor extension rather than manually.&lt;/p>
+&lt;p>See 
+&lt;a href="https://bennypowers.dev/asimonim/docs/editors/">Editor Integration
+&lt;/a> for setup instructions
+and 
+&lt;a href="https://bennypowers.dev/asimonim/docs/lsp/">LSP Features
+&lt;/a> for supported capabilities.&lt;/p></description></item><item><title>version</title><link>https://bennypowers.dev/asimonim/docs/reference/commands/version/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/reference/commands/version/</guid><description>&lt;p>Display version information.&lt;/p>
+
+&lt;code-highlighter>
+ &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-text" data-lang="text">&lt;span class="line">&lt;span class="cl">Usage:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> asimonim version
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Flags:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> --format string Output format: text, json (default &amp;#34;text&amp;#34;)&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;/code-highlighter></description></item></channel></rss>
