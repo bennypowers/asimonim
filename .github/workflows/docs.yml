@@ -7,6 +7,9 @@ on:
     paths:
       - 'docs/**'
 
+permissions:
+  contents: write
+
 jobs:
   docs:
     runs-on: ubuntu-latest
