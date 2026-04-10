@@ -2,6 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {{- hugo.Generator }}
 <link rel="shortcut icon" type="image/svg+xml" href='{{ absURL "images/logo.svg" }}'>
+<link rel="canonical" href="{{ .Permalink }}">
 {{- $t := .Title }}
 {{- $s := site.Title }}
 {{- if in (lower $s) (lower $t) }}
