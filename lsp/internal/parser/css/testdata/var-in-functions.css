@@ -1,0 +1,39 @@
+/* var() inside calc() */
+.calc-single {
+  width: calc(var(--spacing-small) * 2);
+}
+
+.calc-second-operand {
+  width: calc(100% - var(--sidebar-width));
+}
+
+.calc-multiple {
+  padding: calc(var(--pad-top) + var(--pad-bottom));
+}
+
+.calc-with-fallbacks {
+  margin: calc(var(--gap-x, 10px) + var(--gap-y, 20px));
+}
+
+/* var() inside min(), max(), clamp() */
+.min-single {
+  width: min(var(--max-width), 100px);
+}
+
+.max-multiple {
+  height: max(var(--min-height), var(--content-height));
+}
+
+.clamp-all {
+  font-size: clamp(var(--font-min), var(--font-preferred), var(--font-max));
+}
+
+/* deeply nested: calc inside min */
+.nested-functions {
+  width: min(calc(var(--base-width) * 2), var(--max-width));
+}
+
+/* var() next to non-var functions */
+.mixed-functions {
+  padding: calc(var(--spacing) + env(safe-area-inset-top));
+}

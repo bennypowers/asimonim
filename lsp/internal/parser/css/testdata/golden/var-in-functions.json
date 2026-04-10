@@ -1,0 +1,230 @@
+{
+  "Variables": [],
+  "VarCalls": [
+    {
+      "Fallback": null,
+      "TokenName": "--spacing-small",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 2,
+          "Character": 14
+        },
+        "End": {
+          "Line": 2,
+          "Character": 34
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--sidebar-width",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 6,
+          "Character": 21
+        },
+        "End": {
+          "Line": 6,
+          "Character": 41
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--pad-top",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 10,
+          "Character": 16
+        },
+        "End": {
+          "Line": 10,
+          "Character": 30
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--pad-bottom",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 10,
+          "Character": 33
+        },
+        "End": {
+          "Line": 10,
+          "Character": 50
+        }
+      }
+    },
+    {
+      "Fallback": "10px",
+      "TokenName": "--gap-x",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 14,
+          "Character": 15
+        },
+        "End": {
+          "Line": 14,
+          "Character": 33
+        }
+      }
+    },
+    {
+      "Fallback": "20px",
+      "TokenName": "--gap-y",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 14,
+          "Character": 36
+        },
+        "End": {
+          "Line": 14,
+          "Character": 54
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--max-width",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 19,
+          "Character": 13
+        },
+        "End": {
+          "Line": 19,
+          "Character": 29
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--min-height",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 23,
+          "Character": 14
+        },
+        "End": {
+          "Line": 23,
+          "Character": 31
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--content-height",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 23,
+          "Character": 33
+        },
+        "End": {
+          "Line": 23,
+          "Character": 54
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--font-min",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 27,
+          "Character": 19
+        },
+        "End": {
+          "Line": 27,
+          "Character": 34
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--font-preferred",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 27,
+          "Character": 36
+        },
+        "End": {
+          "Line": 27,
+          "Character": 57
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--font-max",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 27,
+          "Character": 59
+        },
+        "End": {
+          "Line": 27,
+          "Character": 74
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--base-width",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 32,
+          "Character": 18
+        },
+        "End": {
+          "Line": 32,
+          "Character": 35
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--max-width",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 32,
+          "Character": 42
+        },
+        "End": {
+          "Line": 32,
+          "Character": 58
+        }
+      }
+    },
+    {
+      "Fallback": null,
+      "TokenName": "--spacing",
+      "Type": 1,
+      "Range": {
+        "Start": {
+          "Line": 37,
+          "Character": 16
+        },
+        "End": {
+          "Line": 37,
+          "Character": 30
+        }
+      }
+    }
+  ]
+}
