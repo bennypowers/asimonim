@@ -1,12 +1,17 @@
 package css_test
 
 import (
+	"encoding/json"
+	"flag"
+	"os"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/parser/css"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var update = flag.Bool("update", false, "update golden files")
 
 // TestParseSimpleCSSVariable tests parsing a simple CSS custom property declaration
 func TestParseSimpleCSSVariable(t *testing.T) {
@@ -365,6 +370,43 @@ func TestParseMultilineDeclaration(t *testing.T) {
 
 	assert.Len(t, result.Variables, 1)
 	assert.Len(t, result.VarCalls, 3, "Should find 3 var() calls across multiple rules")
+}
+
+// TestParseVarInsideCSSFunctions tests var() calls nested inside CSS functions like calc(), min(), max(), clamp()
+func TestParseVarInsideCSSFunctions(t *testing.T) {
+	source, err := os.ReadFile("testdata/var-in-functions.css")
+	require.NoError(t, err)
+
+	parser := css.AcquireParser()
+	defer css.ReleaseParser(parser)
+
+	result, err := parser.Parse(string(source))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	golden := "testdata/golden/var-in-functions.json"
+
+	if *update {
+		data, marshalErr := json.MarshalIndent(result, "", "  ")
+		require.NoError(t, marshalErr)
+		writeErr := os.WriteFile(golden, append(data, '\n'), 0o644)
+		require.NoError(t, writeErr)
+		return
+	}
+
+	goldenData, err := os.ReadFile(golden)
+	require.NoError(t, err)
+
+	var expected css.ParseResult
+	err = json.Unmarshal(goldenData, &expected)
+	require.NoError(t, err)
+
+	require.Equal(t, len(expected.VarCalls), len(result.VarCalls), "var call count")
+	assert.Empty(t, result.Variables, "fixture has no custom property declarations")
+
+	for i, vc := range result.VarCalls {
+		assert.Equal(t, *expected.VarCalls[i], *vc, "var call %d", i)
+	}
 }
 
 // TestParseVarFunctionWithComplexFontFallback tests various font-family patterns
