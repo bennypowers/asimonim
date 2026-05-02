@@ -68,14 +68,12 @@ func hintForVarCall(req *types.RequestContext, requestRange protocol.Range, varC
 		return zero, false
 	}
 
-	padLeft := true
 	return protocol.InlayHint{
 		Position: protocol.Position{
 			Line:      varCall.Range.End.Line,
 			Character: varCall.Range.End.Character - 1,
 		},
-		Label:       ", " + displayValue,
-		PaddingLeft: &padLeft,
+		Label: ", " + displayValue,
 	}, true
 }
 

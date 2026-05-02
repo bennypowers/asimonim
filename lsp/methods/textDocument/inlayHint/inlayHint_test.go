@@ -6,6 +6,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
+	"bennypowers.dev/asimonim/schema"
+	fixtureutil "bennypowers.dev/asimonim/testutil"
 	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 	"github.com/stretchr/testify/assert"
@@ -13,19 +15,18 @@ import (
 )
 
 func TestInlayHint_VarCallShowsResolvedValue(t *testing.T) {
+	allTokens := fixtureutil.ParseFixtureTokens(t, "fixtures/v2025_10/all-color-spaces", schema.V2025_10)
+	// spacing.small: {value: 4, unit: "px"} -> 4px
+	spacingSmall := fixtureutil.TokenByPath(t, allTokens, "spacing.small")
+
 	ctx := testutil.NewMockServerContext()
 	glspCtx := &glsp.Context{}
 	req := types.NewRequestContext(ctx, glspCtx)
-
-	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
-		Name:  "spacing.lg",
-		Value: "24px",
-		Type:  "dimension",
-	}))
+	require.NoError(t, ctx.TokenManager().Add(spacingSmall))
 
 	uri := "file:///test.css"
-	// padding: var(--spacing-lg);
-	cssContent := `.box { padding: var(--spacing-lg); }`
+	// `.box { padding: var(--spacing-small); }`
+	cssContent := `.box { padding: var(--spacing-small); }`
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := InlayHint(req, &protocol.InlayHintParams{
@@ -40,14 +41,12 @@ func TestInlayHint_VarCallShowsResolvedValue(t *testing.T) {
 	require.Len(t, result, 1)
 
 	// Hint positioned before closing paren of var()
-	// `.box { padding: var(--spacing-lg); }`
-	//                                   ^ position 32 (before closing paren)
+	// `.box { padding: var(--spacing-small); }`
+	//                                      ^ position 35 (before closing paren)
 	assert.Equal(t, uint32(0), result[0].Position.Line)
-	assert.Equal(t, uint32(32), result[0].Position.Character)
-	// Label is ", 24px" to look like a fallback value
-	assert.Equal(t, ", 24px", result[0].Label)
-	padLeft := true
-	assert.Equal(t, &padLeft, result[0].PaddingLeft)
+	assert.Equal(t, uint32(35), result[0].Position.Character)
+	// spacing.small DisplayValue = "4px"
+	assert.Equal(t, ", 4px", result[0].Label)
 }
 
 func TestInlayHint_UnknownTokenSkipped(t *testing.T) {
@@ -92,6 +91,9 @@ func TestInlayHint_EmptyDocument(t *testing.T) {
 }
 
 func TestInlayHint_DisabledBySetting(t *testing.T) {
+	allTokens := fixtureutil.ParseFixtureTokens(t, "fixtures/v2025_10/all-color-spaces", schema.V2025_10)
+	spacingSmall := fixtureutil.TokenByPath(t, allTokens, "spacing.small")
+
 	ctx := testutil.NewMockServerContext()
 	disabled := false
 	cfg := ctx.GetConfig()
@@ -100,15 +102,10 @@ func TestInlayHint_DisabledBySetting(t *testing.T) {
 
 	glspCtx := &glsp.Context{}
 	req := types.NewRequestContext(ctx, glspCtx)
-
-	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
-		Name:  "spacing.lg",
-		Value: "24px",
-		Type:  "dimension",
-	}))
+	require.NoError(t, ctx.TokenManager().Add(spacingSmall))
 
 	uri := "file:///test.css"
-	cssContent := `.box { padding: var(--spacing-lg); }`
+	cssContent := `.box { padding: var(--spacing-small); }`
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := InlayHint(req, &protocol.InlayHintParams{
@@ -124,19 +121,16 @@ func TestInlayHint_DisabledBySetting(t *testing.T) {
 }
 
 func TestInlayHint_VarCallWithExistingFallback(t *testing.T) {
+	allTokens := fixtureutil.ParseFixtureTokens(t, "fixtures/v2025_10/all-color-spaces", schema.V2025_10)
+	spacingSmall := fixtureutil.TokenByPath(t, allTokens, "spacing.small")
+
 	ctx := testutil.NewMockServerContext()
 	glspCtx := &glsp.Context{}
 	req := types.NewRequestContext(ctx, glspCtx)
-
-	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
-		Name:  "spacing.lg",
-		Value: "24px",
-		Type:  "dimension",
-	}))
+	require.NoError(t, ctx.TokenManager().Add(spacingSmall))
 
 	uri := "file:///test.css"
-	// var() already has a fallback - no hint needed
-	cssContent := `.box { padding: var(--spacing-lg, 16px); }`
+	cssContent := `.box { padding: var(--spacing-small, 16px); }`
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := InlayHint(req, &protocol.InlayHintParams{
@@ -152,25 +146,22 @@ func TestInlayHint_VarCallWithExistingFallback(t *testing.T) {
 }
 
 func TestInlayHint_MultipleVarCalls(t *testing.T) {
+	allTokens := fixtureutil.ParseFixtureTokens(t, "fixtures/v2025_10/all-color-spaces", schema.V2025_10)
+	// spacing.small: {value: 4, unit: "px"} -> 4px
+	spacingSmall := fixtureutil.TokenByPath(t, allTokens, "spacing.small")
+	// spacing.medium: {value: 1.5, unit: "rem"} -> 1.5rem
+	spacingMedium := fixtureutil.TokenByPath(t, allTokens, "spacing.medium")
+
 	ctx := testutil.NewMockServerContext()
 	glspCtx := &glsp.Context{}
 	req := types.NewRequestContext(ctx, glspCtx)
-
-	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
-		Name:  "spacing.sm",
-		Value: "8px",
-		Type:  "dimension",
-	}))
-	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
-		Name:  "spacing.lg",
-		Value: "24px",
-		Type:  "dimension",
-	}))
+	require.NoError(t, ctx.TokenManager().Add(spacingSmall))
+	require.NoError(t, ctx.TokenManager().Add(spacingMedium))
 
 	uri := "file:///test.css"
 	cssContent := `.box {
-  padding: var(--spacing-sm);
-  margin: var(--spacing-lg);
+  padding: var(--spacing-small);
+  margin: var(--spacing-medium);
 }`
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
@@ -184,21 +175,27 @@ func TestInlayHint_MultipleVarCalls(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, result, 2)
+
+	// spacing.small on line 1: ", 4px"
+	assert.Equal(t, uint32(1), result[0].Position.Line)
+	assert.Equal(t, ", 4px", result[0].Label)
+	// spacing.medium on line 2: ", 1.5rem"
+	assert.Equal(t, uint32(2), result[1].Position.Line)
+	assert.Equal(t, ", 1.5rem", result[1].Label)
 }
 
 func TestInlayHint_ColorToken(t *testing.T) {
+	allTokens := fixtureutil.ParseFixtureTokens(t, "fixtures/v2025_10/all-color-spaces", schema.V2025_10)
+	// color.srgb-hex: structured color -> DisplayValue = "#FF6B36"
+	colorHex := fixtureutil.TokenByPath(t, allTokens, "color.srgb-hex")
+
 	ctx := testutil.NewMockServerContext()
 	glspCtx := &glsp.Context{}
 	req := types.NewRequestContext(ctx, glspCtx)
-
-	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
-		Name:  "color.primary",
-		Value: "#ff0000",
-		Type:  "color",
-	}))
+	require.NoError(t, ctx.TokenManager().Add(colorHex))
 
 	uri := "file:///test.css"
-	cssContent := `.btn { color: var(--color-primary); }`
+	cssContent := `.btn { color: var(--color-srgb-hex); }`
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := InlayHint(req, &protocol.InlayHintParams{
@@ -211,23 +208,22 @@ func TestInlayHint_ColorToken(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, result, 1)
-	// color.primary DisplayValue = "#ff0000"
-	assert.Equal(t, ", #ff0000", result[0].Label)
+	// color.srgb-hex DisplayValue = "#FF6B36"
+	assert.Equal(t, ", #FF6B36", result[0].Label)
 }
 
 func TestInlayHint_HTMLDocument(t *testing.T) {
+	allTokens := fixtureutil.ParseFixtureTokens(t, "fixtures/v2025_10/all-color-spaces", schema.V2025_10)
+	// spacing.small: {value: 4, unit: "px"} -> 4px
+	spacingSmall := fixtureutil.TokenByPath(t, allTokens, "spacing.small")
+
 	ctx := testutil.NewMockServerContext()
 	glspCtx := &glsp.Context{}
 	req := types.NewRequestContext(ctx, glspCtx)
-
-	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
-		Name:  "spacing.lg",
-		Value: "24px",
-		Type:  "dimension",
-	}))
+	require.NoError(t, ctx.TokenManager().Add(spacingSmall))
 
 	uri := "file:///test.html"
-	htmlContent := `<style>.box { padding: var(--spacing-lg); }</style>`
+	htmlContent := `<style>.box { padding: var(--spacing-small); }</style>`
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "html", 1, htmlContent))
 
 	result, err := InlayHint(req, &protocol.InlayHintParams{
@@ -240,7 +236,8 @@ func TestInlayHint_HTMLDocument(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, result, 1)
-	assert.Equal(t, ", 24px", result[0].Label)
+	// spacing.small DisplayValue = "4px"
+	assert.Equal(t, ", 4px", result[0].Label)
 }
 
 func TestInlayHint_MissingDocument(t *testing.T) {
