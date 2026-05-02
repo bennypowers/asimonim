@@ -9,8 +9,8 @@ import (
 	fixtureutil "bennypowers.dev/asimonim/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tliron/glsp"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	"github.com/bennypowers/glsp"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 func TestCompletion_CSSVariableCompletion(t *testing.T) {
@@ -101,6 +101,91 @@ func TestCompletion_AllTokens(t *testing.T) {
 
 	// Should return all tokens when prefix is just "--"
 	assert.Equal(t, 2, len(completionList.Items))
+}
+
+func TestCompletion_FilterText(t *testing.T) {
+	addPrefixedTokens := func(ctx *testutil.MockServerContext) {
+		_ = ctx.TokenManager().Add(&tokens.Token{
+			Name:   "color.primary",
+			Value:  "#ff0000",
+			Prefix: "rh",
+		})
+		_ = ctx.TokenManager().Add(&tokens.Token{
+			Name:   "spacing.small",
+			Value:  "8px",
+			Prefix: "rh",
+		})
+	}
+
+	t.Run("typing prefix without dashes strips -- from FilterText", func(t *testing.T) {
+		ctx := testutil.NewMockServerContext()
+		glspCtx := &glsp.Context{}
+		req := types.NewRequestContext(ctx, glspCtx)
+		addPrefixedTokens(ctx)
+
+		uri := "file:///test.css"
+		// word at cursor: "rh"
+		cssContent := `.button { color: rh }`
+		_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+
+		result, err := Completion(req, &protocol.CompletionParams{
+			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				Position:     protocol.Position{Line: 0, Character: 18},
+			},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		completionList, ok := result.(*protocol.CompletionList)
+		require.True(t, ok)
+		assert.Equal(t, 2, len(completionList.Items))
+
+		filterTexts := make([]string, len(completionList.Items))
+		for i, item := range completionList.Items {
+			require.NotNil(t, item.FilterText)
+			filterTexts[i] = *item.FilterText
+		}
+		// --rh-color-primary → rh-color-primary (stripped --)
+		assert.Contains(t, filterTexts, "rh-color-primary")
+		assert.Contains(t, filterTexts, "rh-spacing-small")
+	})
+
+	t.Run("typing with -- keeps full CSS var name as FilterText", func(t *testing.T) {
+		ctx := testutil.NewMockServerContext()
+		glspCtx := &glsp.Context{}
+		req := types.NewRequestContext(ctx, glspCtx)
+		addPrefixedTokens(ctx)
+
+		uri := "file:///test.css"
+		// word at cursor: "--rh"
+		cssContent := `.button { color: --rh }`
+		_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+
+		result, err := Completion(req, &protocol.CompletionParams{
+			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				Position:     protocol.Position{Line: 0, Character: 20},
+			},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		completionList, ok := result.(*protocol.CompletionList)
+		require.True(t, ok)
+		assert.Equal(t, 2, len(completionList.Items))
+
+		filterTexts := make([]string, len(completionList.Items))
+		for i, item := range completionList.Items {
+			require.NotNil(t, item.FilterText)
+			filterTexts[i] = *item.FilterText
+		}
+		// --rh-color-primary kept as-is (word already has --)
+		assert.Contains(t, filterTexts, "--rh-color-primary")
+		assert.Contains(t, filterTexts, "--rh-spacing-small")
+	})
 }
 
 func TestCompletion_NonCSSDocument(t *testing.T) {

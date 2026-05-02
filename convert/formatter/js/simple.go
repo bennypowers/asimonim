@@ -121,7 +121,7 @@ func FormatJSDoc(desc string) string {
 	var sb strings.Builder
 	sb.WriteString("/**\n")
 	for _, line := range strings.Split(desc, "\n") {
-		sb.WriteString(fmt.Sprintf(" * %s\n", line))
+		fmt.Fprintf(&sb, " * %s\n", line)
 	}
 	sb.WriteString(" */\n")
 	return sb.String()
@@ -144,9 +144,9 @@ func formatJSDocWithType(desc, jsType string) string {
 	var sb strings.Builder
 	sb.WriteString("/**\n")
 	for _, line := range strings.Split(desc, "\n") {
-		sb.WriteString(fmt.Sprintf(" * %s\n", line))
+		fmt.Fprintf(&sb, " * %s\n", line)
 	}
-	sb.WriteString(fmt.Sprintf(" * @type {%s}\n", jsType))
+	fmt.Fprintf(&sb, " * @type {%s}\n", jsType)
 	sb.WriteString(" */\n")
 	return sb.String()
 }

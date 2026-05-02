@@ -46,7 +46,7 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 	if opts.Prefix != "" {
 		enumName = formatter.ToPascalCase(opts.Prefix) + "Tokens"
 	}
-	sb.WriteString(fmt.Sprintf("public enum %s {\n", enumName))
+	fmt.Fprintf(&sb, "public enum %s {\n", enumName)
 
 	groups := formatter.GroupByType(tokens)
 	typeOrder := []string{
@@ -66,8 +66,8 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 			continue
 		}
 
-		sb.WriteString(fmt.Sprintf("\n    // MARK: - %s\n", formatter.ToTitleCase(tokenType)))
-		sb.WriteString(fmt.Sprintf("    public enum %s {\n", swiftEnumName(tokenType)))
+		fmt.Fprintf(&sb, "\n    // MARK: - %s\n", formatter.ToTitleCase(tokenType))
+		fmt.Fprintf(&sb, "    public enum %s {\n", swiftEnumName(tokenType))
 
 		sorted := formatter.SortTokens(group)
 		for _, tok := range sorted {
@@ -76,9 +76,9 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 			swiftValue := toSwiftValue(tok.Type, value)
 
 			if tok.Description != "" {
-				sb.WriteString(fmt.Sprintf("        /// %s\n", tok.Description))
+				fmt.Fprintf(&sb, "        /// %s\n", tok.Description)
 			}
-			sb.WriteString(fmt.Sprintf("        public static let %s = %s\n", name, swiftValue))
+			fmt.Fprintf(&sb, "        public static let %s = %s\n", name, swiftValue)
 		}
 
 		sb.WriteString("    }\n")
@@ -92,7 +92,7 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 			name := formatter.ToCamelCase(strings.Join(tok.Path, "-"))
 			value := formatter.ResolvedValue(tok)
 			swiftValue := toSwiftValue(tok.Type, value)
-			sb.WriteString(fmt.Sprintf("        public static let %s = %s\n", name, swiftValue))
+			fmt.Fprintf(&sb, "        public static let %s = %s\n", name, swiftValue)
 		}
 		sb.WriteString("    }\n")
 	}

@@ -10,8 +10,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tliron/glsp"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	"github.com/bennypowers/glsp"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // TestServerInitialization tests the full server initialization flow
@@ -28,16 +28,15 @@ func TestServerInitialization(t *testing.T) {
 
 		// Initialize server
 		ctx := &glsp.Context{}
-		initParams := &protocol.InitializeParams{
-			RootURI:  &workspaceURI,
-			RootPath: &workspacePath,
-			ClientInfo: &struct {
-				Name    string  `json:"name"`
-				Version *string `json:"version,omitempty"`
-			}{
-				Name:    "test-client",
-				Version: strPtr("1.0.0"),
-			},
+		initParams := &protocol.InitializeParams{}
+		initParams.RootURI = &workspaceURI
+		initParams.RootPath = &workspacePath
+		initParams.ClientInfo = &struct {
+			Name    string  `json:"name"`
+			Version *string `json:"version,omitempty"`
+		}{
+			Name:    "test-client",
+			Version: strPtr("1.0.0"),
 		}
 
 		req := types.NewRequestContext(server, ctx)
@@ -46,14 +45,10 @@ func TestServerInitialization(t *testing.T) {
 		require.NotNil(t, result)
 
 		// Verify capabilities are returned
-		resultMap, ok := result.(struct {
-			Capabilities any                                  `json:"capabilities"`
-			ServerInfo   *protocol.InitializeResultServerInfo `json:"serverInfo,omitempty"`
-		})
-		require.True(t, ok, "Result should be InitializeResult struct")
-		assert.NotNil(t, resultMap.Capabilities)
-		assert.NotNil(t, resultMap.ServerInfo)
-		assert.Equal(t, "design-tokens-language-server", resultMap.ServerInfo.Name)
+		initResult, ok := result.(protocol.InitializeResult)
+		require.True(t, ok, "Result should be InitializeResult")
+		assert.NotNil(t, initResult.ServerInfo)
+		assert.Equal(t, "design-tokens-language-server", initResult.ServerInfo.Name)
 	})
 
 	t.Run("Initialize without workspace root", func(t *testing.T) {
@@ -62,13 +57,12 @@ func TestServerInitialization(t *testing.T) {
 		defer func() { _ = server.Close() }()
 
 		ctx := &glsp.Context{}
-		initParams := &protocol.InitializeParams{
-			ClientInfo: &struct {
-				Name    string  `json:"name"`
-				Version *string `json:"version,omitempty"`
-			}{
-				Name: "test-client",
-			},
+		initParams := &protocol.InitializeParams{}
+		initParams.ClientInfo = &struct {
+			Name    string  `json:"name"`
+			Version *string `json:"version,omitempty"`
+		}{
+			Name: "test-client",
 		}
 
 		req := types.NewRequestContext(server, ctx)

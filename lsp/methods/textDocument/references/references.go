@@ -12,7 +12,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/tidwall/jsonc"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 	"gopkg.in/yaml.v3"
 )
 

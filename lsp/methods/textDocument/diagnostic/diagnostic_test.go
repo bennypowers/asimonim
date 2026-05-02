@@ -9,8 +9,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tliron/glsp"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	"github.com/bennypowers/glsp"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 func TestGetDiagnostics_DeprecatedToken(t *testing.T) {
@@ -178,7 +178,7 @@ func TestDocumentDiagnostic(t *testing.T) {
 	cssContent := `.button { padding: var(--spacing-old); }`
 	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
 
-	params := &DocumentDiagnosticParams{
+	params := &protocol.DocumentDiagnosticParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
 	}
 
@@ -187,9 +187,9 @@ func TestDocumentDiagnostic(t *testing.T) {
 	require.NotNil(t, result)
 
 	// Check that result is a RelatedFullDocumentDiagnosticReport
-	report, ok := result.(RelatedFullDocumentDiagnosticReport)
+	report, ok := result.(protocol.RelatedFullDocumentDiagnosticReport)
 	require.True(t, ok, "Result should be RelatedFullDocumentDiagnosticReport")
-	assert.Equal(t, string(DiagnosticFull), report.Kind)
+	assert.Equal(t, string(protocol.DocumentDiagnosticReportKindFull), report.Kind)
 	assert.Len(t, report.Items, 1)
 }
 

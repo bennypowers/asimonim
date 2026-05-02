@@ -24,9 +24,10 @@ import (
 	semantictokens "bennypowers.dev/asimonim/lsp/methods/textDocument/semanticTokens"
 	"bennypowers.dev/asimonim/lsp/methods/workspace"
 	"bennypowers.dev/asimonim/lsp/types"
-	"github.com/tliron/glsp"
-	protocol "github.com/tliron/glsp/protocol_3_16"
-	"github.com/tliron/glsp/server"
+	"github.com/bennypowers/glsp"
+	protocol316 "github.com/bennypowers/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"github.com/bennypowers/glsp/server"
 )
 
 // Verify that Server implements ServerContext interface
@@ -76,31 +77,31 @@ func NewServer(opts ...Option) (*Server, error) {
 
 	// Create the GLSP server with our handlers wrapped with middleware
 	protocolHandler := protocol.Handler{
-		Initialize:                      method(s, "initialize", lifecycle.Initialize),
-		Initialized:                     notify(s, "initialized", lifecycle.Initialized),
-		Shutdown:                        noParam(s, "shutdown", lifecycle.Shutdown),
-		SetTrace:                        notify(s, "$/setTrace", lifecycle.SetTrace),
-		WorkspaceDidChangeConfiguration: notify(s, "workspace/didChangeConfiguration", workspace.DidChangeConfiguration),
-		WorkspaceDidChangeWatchedFiles:  notify(s, "workspace/didChangeWatchedFiles", workspace.DidChangeWatchedFiles),
-		TextDocumentDidOpen:             notify(s, "textDocument/didOpen", textDocument.DidOpen),
-		TextDocumentDidChange:           notify(s, "textDocument/didChange", textDocument.DidChange),
-		TextDocumentDidClose:            notify(s, "textDocument/didClose", textDocument.DidClose),
-		TextDocumentHover:               method(s, "textDocument/hover", hover.Hover),
-		TextDocumentCompletion:          method(s, "textDocument/completion", completion.Completion),
-		CompletionItemResolve:           method(s, "completionItem/resolve", completion.CompletionResolve),
-		TextDocumentDefinition:          method(s, "textDocument/definition", definition.Definition),
-		TextDocumentReferences:          method(s, "textDocument/references", references.References),
-		TextDocumentColor:               method(s, "textDocument/documentColor", documentcolor.DocumentColor),
-		TextDocumentColorPresentation:   method(s, "textDocument/colorPresentation", documentcolor.ColorPresentation),
-		TextDocumentCodeAction:          method(s, "textDocument/codeAction", codeaction.CodeAction),
-		CodeActionResolve:               method(s, "codeAction/resolve", codeaction.CodeActionResolve),
-		TextDocumentSemanticTokensFull:  method(s, "textDocument/semanticTokens/full", semantictokens.SemanticTokensFull),
+		Handler: protocol316.Handler{
+			Initialized:                        notify(s, "initialized", lifecycle.Initialized),
+			Shutdown:                           noParam(s, "shutdown", lifecycle.Shutdown),
+			SetTrace:                           notify(s, "$/setTrace", lifecycle.SetTrace),
+			WorkspaceDidChangeConfiguration:    notify(s, "workspace/didChangeConfiguration", workspace.DidChangeConfiguration),
+			WorkspaceDidChangeWatchedFiles:     notify(s, "workspace/didChangeWatchedFiles", workspace.DidChangeWatchedFiles),
+			TextDocumentDidOpen:                notify(s, "textDocument/didOpen", textDocument.DidOpen),
+			TextDocumentDidChange:              notify(s, "textDocument/didChange", textDocument.DidChange),
+			TextDocumentDidClose:               notify(s, "textDocument/didClose", textDocument.DidClose),
+			TextDocumentHover:                  method(s, "textDocument/hover", hover.Hover),
+			TextDocumentCompletion:             method(s, "textDocument/completion", completion.Completion),
+			CompletionItemResolve:              method(s, "completionItem/resolve", completion.CompletionResolve),
+			TextDocumentDefinition:             method(s, "textDocument/definition", definition.Definition),
+			TextDocumentReferences:             method(s, "textDocument/references", references.References),
+			TextDocumentColor:                  method(s, "textDocument/documentColor", documentcolor.DocumentColor),
+			TextDocumentColorPresentation:      method(s, "textDocument/colorPresentation", documentcolor.ColorPresentation),
+			TextDocumentCodeAction:             method(s, "textDocument/codeAction", codeaction.CodeAction),
+			CodeActionResolve:                  method(s, "codeAction/resolve", codeaction.CodeActionResolve),
+			TextDocumentSemanticTokensFull:     method(s, "textDocument/semanticTokens/full", semantictokens.SemanticTokensFull),
+			TextDocumentSemanticTokensFullDelta: method(s, "textDocument/semanticTokens/full/delta", semantictokens.SemanticTokensFullDelta),
+		},
+		Initialize:             method(s, "initialize", lifecycle.Initialize),
+		TextDocumentDiagnostic: method(s, "textDocument/diagnostic", diagnostic.DocumentDiagnostic),
 	}
 
-	// WORKAROUND: Wrap with custom handler to support LSP 3.17 features
-	// The CustomHandler intercepts LSP 3.17 methods (like textDocument/diagnostic)
-	// before they reach protocol.Handler, which only knows about LSP 3.16 methods.
-	// When glsp is updated to LSP 3.17, we can remove CustomHandler and use protocol_3_17.Handler directly.
 	customHandler := &CustomHandler{
 		Handler: &protocolHandler,
 		server:  s,

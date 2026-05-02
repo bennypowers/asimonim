@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/tliron/glsp"
+	"github.com/bennypowers/glsp"
 )
 
 // RequestContext contains all request-scoped data for an LSP method call.

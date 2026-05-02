@@ -128,11 +128,11 @@ func (s *Server) handleValidate(
 	var hasErrors, hasWarnings bool
 
 	for _, src := range parsed.Sources {
-		sb.WriteString(fmt.Sprintf("Source: %s\n", src.Source))
+		fmt.Fprintf(&sb, "Source: %s\n", src.Source)
 
 		graph := resolver.BuildDependencyGraph(src.Tokens)
 		if cycle := graph.FindCycle(); cycle != nil {
-			sb.WriteString(fmt.Sprintf("  ERROR: Circular reference: %v\n", cycle))
+			fmt.Fprintf(&sb, "  ERROR: Circular reference: %v\n", cycle)
 			hasErrors = true
 			continue
 		}
@@ -148,10 +148,10 @@ func (s *Server) handleValidate(
 		if len(src.Tokens) > 0 && src.Tokens[0].SchemaVersion != schema.Unknown {
 			srcVersion = src.Tokens[0].SchemaVersion
 		}
-		sb.WriteString(fmt.Sprintf("  %d tokens, schema: %s\n", len(src.Tokens), srcVersion))
+		fmt.Fprintf(&sb, "  %d tokens, schema: %s\n", len(src.Tokens), srcVersion)
 		if deprecatedCount > 0 {
 			hasWarnings = true
-			sb.WriteString(fmt.Sprintf("  WARNING: %d deprecated token(s)\n", deprecatedCount))
+			fmt.Fprintf(&sb, "  WARNING: %d deprecated token(s)\n", deprecatedCount)
 		}
 	}
 

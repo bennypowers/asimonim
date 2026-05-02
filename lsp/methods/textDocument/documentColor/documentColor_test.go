@@ -8,8 +8,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tliron/glsp"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	"github.com/bennypowers/glsp"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 func TestDocumentColor_ColorTokenInVar(t *testing.T) {
@@ -520,6 +520,56 @@ func TestParseColor(t *testing.T) {
 		{
 			name:        "just hash",
 			input:       "#",
+			expected:    nil,
+			expectError: true,
+		},
+		{
+			// light-dark(var(--light, #003366), var(--dark, #b9dafc)) → #003366
+			name:  "light-dark with var fallbacks",
+			input: "light-dark(var(--rh-color-on-light, #003366), var(--rh-color-on-dark, #b9dafc))",
+			expected: &protocol.Color{
+				Red:   0.0,
+				Green: 0.2,
+				Blue:  0.4,
+				Alpha: 1.0,
+			},
+		},
+		{
+			// light-dark(#ff0000, #00ff00) → #ff0000
+			name:  "light-dark with plain colors",
+			input: "light-dark(#ff0000, #00ff00)",
+			expected: &protocol.Color{
+				Red:   1.0,
+				Green: 0.0,
+				Blue:  0.0,
+				Alpha: 1.0,
+			},
+		},
+		{
+			// Nested var() with nested fallback
+			name:  "light-dark with nested var fallback",
+			input: "light-dark(var(--a, var(--b, #0000ff)), var(--c, #ff0000))",
+			expected: &protocol.Color{
+				Red:   0.0,
+				Green: 0.0,
+				Blue:  1.0,
+				Alpha: 1.0,
+			},
+		},
+		{
+			// light-dark(rgb(255, 0, 0), rgb(0, 255, 0)) — commas inside nested parens at depth>0
+			name:  "light-dark with rgb function in first arg",
+			input: "light-dark(rgb(255, 0, 0), rgb(0, 255, 0))",
+			expected: &protocol.Color{
+				Red:   1.0,
+				Green: 0.0,
+				Blue:  0.0,
+				Alpha: 1.0,
+			},
+		},
+		{
+			name:        "light-dark with no parseable color",
+			input:       "light-dark(var(--a), var(--b))",
 			expected:    nil,
 			expectError: true,
 		},

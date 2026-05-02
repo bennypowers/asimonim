@@ -9,7 +9,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/methods/textDocument"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // FixtureRoot returns the path to the test fixtures directory
@@ -126,25 +126,25 @@ func LoadNonTokenFixture(t *testing.T, name string) []byte {
 // SetCodeActionLiteralSupport sets the client capabilities to support CodeAction literals.
 // Call this before tests that use code actions.
 func SetCodeActionLiteralSupport(server *lsp.Server) {
-	server.SetClientCapabilities(protocol.ClientCapabilities{
-		TextDocument: &protocol.TextDocumentClientCapabilities{
-			CodeAction: &protocol.CodeActionClientCapabilities{
-				CodeActionLiteralSupport: &struct {
-					CodeActionKind struct {
-						ValueSet []protocol.CodeActionKind `json:"valueSet"`
-					} `json:"codeActionKind"`
-				}{
-					CodeActionKind: struct {
-						ValueSet []protocol.CodeActionKind `json:"valueSet"`
-					}{
-						ValueSet: []protocol.CodeActionKind{
-							protocol.CodeActionKindQuickFix,
-							protocol.CodeActionKindRefactorRewrite,
-						},
-					},
+	textDoc := &protocol.TextDocumentClientCapabilities{}
+	textDoc.CodeAction = &protocol.CodeActionClientCapabilities{
+		CodeActionLiteralSupport: &struct {
+			CodeActionKind struct {
+				ValueSet []protocol.CodeActionKind `json:"valueSet"`
+			} `json:"codeActionKind"`
+		}{
+			CodeActionKind: struct {
+				ValueSet []protocol.CodeActionKind `json:"valueSet"`
+			}{
+				ValueSet: []protocol.CodeActionKind{
+					protocol.CodeActionKindQuickFix,
+					protocol.CodeActionKindRefactorRewrite,
 				},
 			},
 		},
+	}
+	server.SetClientCapabilities(protocol.ClientCapabilities{
+		TextDocument: textDoc,
 	})
 }
 

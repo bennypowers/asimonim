@@ -9,7 +9,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/test/integration/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // TestCompletionBasic tests basic completion functionality
@@ -221,30 +221,30 @@ func TestCompletionSnippetFormat(t *testing.T) {
 
 	// Set client capabilities to support snippets
 	snippetSupport := true
-	server.SetClientCapabilities(protocol.ClientCapabilities{
-		TextDocument: &protocol.TextDocumentClientCapabilities{
-			Completion: &protocol.CompletionClientCapabilities{
-				CompletionItem: &struct {
-					SnippetSupport            *bool                   `json:"snippetSupport,omitempty"`
-					CommitCharactersSupport   *bool                   `json:"commitCharactersSupport,omitempty"`
-					DocumentationFormat       []protocol.MarkupKind   `json:"documentationFormat,omitempty"`
-					DeprecatedSupport         *bool                   `json:"deprecatedSupport,omitempty"`
-					PreselectSupport          *bool                   `json:"preselectSupport,omitempty"`
-					TagSupport                *struct {
-						ValueSet []protocol.CompletionItemTag `json:"valueSet"`
-					} `json:"tagSupport,omitempty"`
-					InsertReplaceSupport      *bool                   `json:"insertReplaceSupport,omitempty"`
-					ResolveSupport            *struct {
-						Properties []string `json:"properties"`
-					} `json:"resolveSupport,omitempty"`
-					InsertTextModeSupport     *struct {
-						ValueSet []protocol.InsertTextMode `json:"valueSet"`
-					} `json:"insertTextModeSupport,omitempty"`
-				}{
-					SnippetSupport: &snippetSupport,
-				},
-			},
+	textDoc := &protocol.TextDocumentClientCapabilities{}
+	textDoc.Completion = &protocol.CompletionClientCapabilities{
+		CompletionItem: &struct {
+			SnippetSupport          *bool                   `json:"snippetSupport,omitempty"`
+			CommitCharactersSupport *bool                   `json:"commitCharactersSupport,omitempty"`
+			DocumentationFormat     []protocol.MarkupKind   `json:"documentationFormat,omitempty"`
+			DeprecatedSupport       *bool                   `json:"deprecatedSupport,omitempty"`
+			PreselectSupport        *bool                   `json:"preselectSupport,omitempty"`
+			TagSupport              *struct {
+				ValueSet []protocol.CompletionItemTag `json:"valueSet"`
+			} `json:"tagSupport,omitempty"`
+			InsertReplaceSupport *bool `json:"insertReplaceSupport,omitempty"`
+			ResolveSupport       *struct {
+				Properties []string `json:"properties"`
+			} `json:"resolveSupport,omitempty"`
+			InsertTextModeSupport *struct {
+				ValueSet []protocol.InsertTextMode `json:"valueSet"`
+			} `json:"insertTextModeSupport,omitempty"`
+		}{
+			SnippetSupport: &snippetSupport,
 		},
+	}
+	server.SetClientCapabilities(protocol.ClientCapabilities{
+		TextDocument: textDoc,
 	})
 
 	// Request completion - see fixture for position

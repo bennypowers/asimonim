@@ -738,15 +738,15 @@ func groupTokens(tokens []*token.Token, splitBy string) map[string][]*token.Toke
 
 // getSplitKey returns the split key for a token based on the split strategy.
 func getSplitKey(tok *token.Token, splitBy string) string {
-	switch {
-	case splitBy == "" || splitBy == "topLevel":
+	switch splitBy {
+	case "", "topLevel":
 		// Default: first path segment
 		if len(tok.Path) > 0 {
 			return tok.Path[0]
 		}
 		return "other"
 
-	case splitBy == "type":
+	case "type":
 		// Group by token type
 		if tok.Type != "" {
 			return tok.Type

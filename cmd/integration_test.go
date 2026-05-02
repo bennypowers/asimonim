@@ -419,7 +419,7 @@ func TestExecute(t *testing.T) {
 	}
 	os.Stdout = w
 	defer func() { os.Stdout = oldStdout }()
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	err := cmd.Execute()
 

@@ -92,11 +92,11 @@ func (o *ObjectColorValue) ToCSS() string {
 		}
 		switch v := comp.(type) {
 		case float64:
-			sb.WriteString(fmt.Sprintf("%.4g", v))
+			fmt.Fprintf(&sb, "%.4g", v)
 		case string:
 			sb.WriteString(v) // "none" keyword
 		default:
-			sb.WriteString(fmt.Sprintf("%v", v))
+			fmt.Fprintf(&sb, "%v", v)
 		}
 	}
 	compStr := sb.String()

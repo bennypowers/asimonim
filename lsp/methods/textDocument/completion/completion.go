@@ -11,7 +11,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/position"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // Template for token documentation
@@ -71,7 +71,7 @@ func Completion(req *types.RequestContext, params *protocol.CompletionParams) (a
 	}
 
 	// Filter tokens by the current word
-	var items []protocol.CompletionItem
+	items := make([]protocol.CompletionItem, 0)
 	normalizedWord := normalizeTokenName(word)
 
 	for _, token := range req.Server.TokenManager().GetAll() {
@@ -93,8 +93,14 @@ func Completion(req *types.RequestContext, params *protocol.CompletionParams) (a
 				insertText = fmt.Sprintf("var(%s)", cssVar)
 			}
 
+			filterText := cssVar
+			if !strings.HasPrefix(word, "--") {
+				filterText = strings.TrimPrefix(cssVar, "--")
+			}
+
 			item := protocol.CompletionItem{
 				Label:            cssVar,
+				FilterText:       &filterText,
 				Kind:             &kind,
 				InsertTextFormat: &insertTextFormat,
 				InsertText:       &insertText,

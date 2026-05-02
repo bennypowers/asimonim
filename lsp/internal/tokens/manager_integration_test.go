@@ -33,12 +33,12 @@ func TestMultiSchemaWorkspace_Integration(t *testing.T) {
 	// Add tokens to manager
 	for _, tok := range draftTokens {
 		tok.FilePath = "draft-tokens.json"
-		manager.Add(tok)
+		_ = manager.Add(tok)
 	}
 
 	for _, tok := range v2025Tokens {
 		tok.FilePath = "2025-tokens.json"
-		manager.Add(tok)
+		_ = manager.Add(tok)
 	}
 
 	// Verify both schemas are loaded
@@ -91,12 +91,12 @@ func TestMultiSchemaWorkspace_TokenIsolation(t *testing.T) {
 	// Add tokens with file paths
 	for _, tok := range draftTokens {
 		tok.FilePath = "draft-tokens.json"
-		manager.Add(tok)
+		_ = manager.Add(tok)
 	}
 
 	for _, tok := range v2025Tokens {
 		tok.FilePath = "2025-tokens.json"
-		manager.Add(tok)
+		_ = manager.Add(tok)
 	}
 
 	// Test that removing one file doesn't affect the other
@@ -135,8 +135,8 @@ func TestMultiSchemaWorkspace_QualifiedLookup(t *testing.T) {
 		},
 	}
 
-	manager.Add(draftToken)
-	manager.Add(v2025Token)
+	_ = manager.Add(draftToken)
+	_ = manager.Add(v2025Token)
 
 	// Qualified lookup by file path
 	draftLookup := manager.GetQualified("color-brand-primary", "draft.json")
@@ -158,19 +158,19 @@ func TestMultiSchemaWorkspace_SchemaVersionPerFile(t *testing.T) {
 	manager := tokens.NewManager()
 
 	// Add tokens from different files with different schemas
-	manager.Add(&tokens.Token{
+	_ = manager.Add(&tokens.Token{
 		Name:          "draft-token",
 		SchemaVersion: schema.Draft,
 		FilePath:      "draft.json",
 	})
 
-	manager.Add(&tokens.Token{
+	_ = manager.Add(&tokens.Token{
 		Name:          "v2025-token",
 		SchemaVersion: schema.V2025_10,
 		FilePath:      "2025.json",
 	})
 
-	manager.Add(&tokens.Token{
+	_ = manager.Add(&tokens.Token{
 		Name:          "another-draft-token",
 		SchemaVersion: schema.Draft,
 		FilePath:      "draft.json",
@@ -193,10 +193,10 @@ func TestMultiSchemaWorkspace_SourceFiles(t *testing.T) {
 	manager := tokens.NewManager()
 
 	// Add tokens from multiple files
-	manager.Add(&tokens.Token{Name: "token1", FilePath: "file1.json"})
-	manager.Add(&tokens.Token{Name: "token2", FilePath: "file2.json"})
-	manager.Add(&tokens.Token{Name: "token3", FilePath: "file1.json"}) // Duplicate file
-	manager.Add(&tokens.Token{Name: "token4", FilePath: "file3.json"})
+	_ = manager.Add(&tokens.Token{Name: "token1", FilePath: "file1.json"})
+	_ = manager.Add(&tokens.Token{Name: "token2", FilePath: "file2.json"})
+	_ = manager.Add(&tokens.Token{Name: "token3", FilePath: "file1.json"}) // Duplicate file
+	_ = manager.Add(&tokens.Token{Name: "token4", FilePath: "file3.json"})
 
 	sourceFiles := manager.GetSourceFiles()
 
