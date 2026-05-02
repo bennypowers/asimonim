@@ -8,7 +8,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/parser"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/mazznoer/csscolorparser"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // DocumentColor handles the textDocument/documentColor request
@@ -187,19 +187,99 @@ func ColorPresentation(req *types.RequestContext, params *protocol.ColorPresenta
 	return presentations, nil
 }
 
+const maxColorParseDepth = 10
+
 // parseColor parses a color string (hex, rgb, rgba, hsl, hsla, etc.) and returns a protocol.Color
 func parseColor(value string) (*protocol.Color, error) {
+	return parseColorDepth(value, 0)
+}
+
+func parseColorDepth(value string, depth int) (*protocol.Color, error) {
+	if depth > maxColorParseDepth {
+		return nil, fmt.Errorf("exceeded max nesting depth parsing color: %s", value)
+	}
+
 	value = strings.TrimSpace(value)
 
-	// Use csscolorparser for all color formats (hex, rgb, rgba, hsl, hsla, named colors, etc.)
-	// This is a battle-tested library that handles all CSS color formats correctly
+	if strings.HasPrefix(value, "light-dark(") {
+		return parseLightDarkColor(value, depth)
+	}
+
+	if strings.HasPrefix(value, "var(") {
+		if fallback := extractVarFallback(value); fallback != "" {
+			return parseColorDepth(fallback, depth+1)
+		}
+		return nil, fmt.Errorf("unsupported color format: %s", value)
+	}
+
+	return parseCSSColor(value)
+}
+
+// parseLightDarkColor extracts and parses the light-mode color from light-dark().
+// For values like light-dark(var(--x, #fff), var(--y, #000)), extracts the
+// first argument's fallback color.
+func parseLightDarkColor(value string, depth int) (*protocol.Color, error) {
+	inner := strings.TrimPrefix(value, "light-dark(")
+	inner = strings.TrimSuffix(inner, ")")
+
+	lightArg := extractFirstBalancedArg(inner)
+	if lightArg == "" {
+		return nil, fmt.Errorf("unsupported light-dark format: %s", value)
+	}
+
+	lightArg = strings.TrimSpace(lightArg)
+
+	return parseColorDepth(lightArg, depth+1)
+}
+
+// extractFirstBalancedArg extracts the first comma-separated argument,
+// respecting nested parentheses.
+func extractFirstBalancedArg(s string) string {
+	depth := 0
+	for i, ch := range s {
+		switch ch {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		case ',':
+			if depth == 0 {
+				return s[:i]
+			}
+		}
+	}
+	return s
+}
+
+// extractVarFallback extracts the fallback value from a var() expression.
+// For var(--name, fallback), returns "fallback".
+func extractVarFallback(varExpr string) string {
+	inner := strings.TrimPrefix(varExpr, "var(")
+	inner = strings.TrimSuffix(inner, ")")
+
+	// Find the comma after the custom property name, respecting nesting
+	depth := 0
+	for i, ch := range inner {
+		switch ch {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		case ',':
+			if depth == 0 {
+				return strings.TrimSpace(inner[i+1:])
+			}
+		}
+	}
+	return ""
+}
+
+func parseCSSColor(value string) (*protocol.Color, error) {
 	parsed, err := csscolorparser.Parse(value)
 	if err != nil {
 		return nil, fmt.Errorf("unsupported color format: %s", value)
 	}
 
-	// Convert csscolorparser.Color to protocol.Color
-	// csscolorparser.Color has R, G, B, A fields as float64 values (0-1)
 	return &protocol.Color{
 		Red:   protocol.Decimal(parsed.R),
 		Green: protocol.Decimal(parsed.G),

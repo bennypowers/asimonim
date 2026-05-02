@@ -7,14 +7,11 @@ import (
 
 	"bennypowers.dev/asimonim/lsp/internal/parser"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
-// This is an LSP 3.17 feature. Since glsp v0.2.2 only supports LSP 3.16, this handler
-// is called via CustomHandler which intercepts the method before it reaches protocol.Handler.
-
-// DocumentDiagnostic handles the textDocument/diagnostic request (pull diagnostics)
-func DocumentDiagnostic(req *types.RequestContext, params *DocumentDiagnosticParams) (any, error) {
+// DocumentDiagnostic handles the textDocument/diagnostic request (pull diagnostics, LSP 3.17)
+func DocumentDiagnostic(req *types.RequestContext, params *protocol.DocumentDiagnosticParams) (any, error) {
 	uri := params.TextDocument.URI
 	log.Info("Pull diagnostics requested for: %s", uri)
 
@@ -24,10 +21,11 @@ func DocumentDiagnostic(req *types.RequestContext, params *DocumentDiagnosticPar
 		return nil, err
 	}
 
-	// Return a full document diagnostic report
-	return RelatedFullDocumentDiagnosticReport{
-		Kind:  string(DiagnosticFull),
-		Items: diagnostics,
+	return protocol.RelatedFullDocumentDiagnosticReport{
+		FullDocumentDiagnosticReport: protocol.FullDocumentDiagnosticReport{
+			Kind:  string(protocol.DocumentDiagnosticReportKindFull),
+			Items: diagnostics,
+		},
 	}, nil
 }
 

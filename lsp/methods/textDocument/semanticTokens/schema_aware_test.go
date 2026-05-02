@@ -30,7 +30,7 @@ func TestSemanticTokens_Draft_CurlyBraceReferences(t *testing.T) {
 	doc := documents.NewDocument("file:///test.json", "json", 1, content)
 
 	// Add the token that the reference points to
-	mockServer.TokenManager().Add(&tokens.Token{
+	_ = mockServer.TokenManager().Add(&tokens.Token{
 		Name:  "color-primary",
 		Value: "#FF0000",
 	})

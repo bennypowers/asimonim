@@ -9,7 +9,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/test/integration/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // TestSemanticTokens_JSONWithReferences tests semantic tokens for JSON file with token references
@@ -278,7 +278,7 @@ func TestSemanticTokensDelta_FullWorkflow(t *testing.T) {
 	originalResultID := *fullResult.ResultID
 
 	// Second request: request delta with same document (no changes)
-	deltaResult, err := semantictokens.SemanticTokensFullDelta(req, &semantictokens.SemanticTokensDeltaParams{
+	deltaResult, err := semantictokens.SemanticTokensFullDelta(req, &protocol.SemanticTokensDeltaParams{
 		TextDocument:     protocol.TextDocumentIdentifier{URI: "file:///tokens.json"},
 		PreviousResultID: originalResultID,
 	})
@@ -307,7 +307,7 @@ func TestSemanticTokensDelta_StaleResultID(t *testing.T) {
 
 	// Request delta with invalid/stale result ID
 	req := types.NewRequestContext(server, nil)
-	result, err := semantictokens.SemanticTokensFullDelta(req, &semantictokens.SemanticTokensDeltaParams{
+	result, err := semantictokens.SemanticTokensFullDelta(req, &protocol.SemanticTokensDeltaParams{
 		TextDocument:     protocol.TextDocumentIdentifier{URI: "file:///tokens.json"},
 		PreviousResultID: "invalid-result-id-that-does-not-exist",
 	})
@@ -363,7 +363,7 @@ func TestSemanticTokensDelta_CacheInvalidationOnClose(t *testing.T) {
 	// Re-open and request delta with old result ID
 	testutil.OpenTokenFixture(t, server, uri, "semantic-tokens/tokens.json")
 
-	result, err := semantictokens.SemanticTokensFullDelta(req, &semantictokens.SemanticTokensDeltaParams{
+	result, err := semantictokens.SemanticTokensFullDelta(req, &protocol.SemanticTokensDeltaParams{
 		TextDocument:     protocol.TextDocumentIdentifier{URI: uri},
 		PreviousResultID: originalResultID,
 	})

@@ -8,7 +8,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/methods/textDocument/definition"
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +34,7 @@ func TestDefinition_Draft_CurlyBraceReference(t *testing.T) {
 	mockServer.AddDocument(doc)
 
 	// Add the token with definition location
-	mockServer.TokenManager().Add(&tokens.Token{
+	_ = mockServer.TokenManager().Add(&tokens.Token{
 		Name:          "color-primary",
 		Value:         "#FF0000",
 		DefinitionURI: "file:///test.json",
@@ -95,7 +95,7 @@ func TestDefinition_2025_JSONPointerReference(t *testing.T) {
 	mockServer.AddDocument(doc)
 
 	// Add the token with definition location
-	mockServer.TokenManager().Add(&tokens.Token{
+	_ = mockServer.TokenManager().Add(&tokens.Token{
 		Name:          "color-primary",
 		Value:         "srgb color",
 		DefinitionURI: "file:///test.json",
@@ -179,7 +179,7 @@ func TestDefinition_TokenFile_TokenWithoutDefinitionURI(t *testing.T) {
 	doc := documents.NewDocument("file:///test.json", "json", 1, content)
 	mockServer.AddDocument(doc)
 
-	mockServer.TokenManager().Add(&tokens.Token{
+	_ = mockServer.TokenManager().Add(&tokens.Token{
 		Name:  "color-primary",
 		Value: "#FF0000",
 		// No DefinitionURI or Path
@@ -238,7 +238,7 @@ func TestDefinition_TokenFile_CRLFLineEndings(t *testing.T) {
 	doc := documents.NewDocument("file:///test.json", "json", 1, content)
 	mockServer.AddDocument(doc)
 
-	mockServer.TokenManager().Add(&tokens.Token{
+	_ = mockServer.TokenManager().Add(&tokens.Token{
 		Name:          "color-primary",
 		Value:         "#FF0000",
 		DefinitionURI: "file:///test.json",
@@ -288,7 +288,7 @@ func TestDefinition_TokenFile_CursorOnNonReferenceLine(t *testing.T) {
 	doc := documents.NewDocument("file:///test.json", "json", 1, content)
 	mockServer.AddDocument(doc)
 
-	mockServer.TokenManager().Add(&tokens.Token{
+	_ = mockServer.TokenManager().Add(&tokens.Token{
 		Name:          "color-primary",
 		Value:         "#FF0000",
 		DefinitionURI: "file:///test.json",
@@ -336,7 +336,7 @@ func TestDefinition_TokenFile_GetLineTextFromDocument(t *testing.T) {
 	mockServer.AddDocument(doc)
 
 	// Token definition is also in this open document
-	mockServer.TokenManager().Add(&tokens.Token{
+	_ = mockServer.TokenManager().Add(&tokens.Token{
 		Name:          "color-primary",
 		Value:         "#FF0000",
 		DefinitionURI: "file:///tokens.json",
@@ -387,7 +387,7 @@ func TestDefinition_TokenFile_GetLineTextOutOfBounds(t *testing.T) {
 	mockServer.AddDocument(doc)
 
 	// Token definition URI points to an open document but line is beyond bounds
-	mockServer.TokenManager().Add(&tokens.Token{
+	_ = mockServer.TokenManager().Add(&tokens.Token{
 		Name:          "color-primary",
 		Value:         "#FF0000",
 		DefinitionURI: "file:///tokens.json",
@@ -437,7 +437,7 @@ func TestDefinition_TokenFile_GetLineTextFromDisk(t *testing.T) {
 
 	// Token definition is in a different file that's NOT opened in the editor
 	// The file doesn't exist on disk, so getLineText will error and fall back
-	mockServer.TokenManager().Add(&tokens.Token{
+	_ = mockServer.TokenManager().Add(&tokens.Token{
 		Name:          "color-primary",
 		Value:         "#FF0000",
 		DefinitionURI: "file:///nonexistent-definition-file.json",

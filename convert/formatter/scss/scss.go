@@ -58,7 +58,7 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 
 	for _, groupName := range groupNames {
 		group := groups[groupName]
-		sb.WriteString(fmt.Sprintf("// %s\n", formatter.ToTitleCase(groupName)))
+		fmt.Fprintf(&sb, "// %s\n", formatter.ToTitleCase(groupName))
 
 		sorted := formatter.SortTokens(group)
 		for _, tok := range sorted {
@@ -68,9 +68,9 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 			scssValue := toSCSSValue(tok.Type, value)
 
 			if tok.Description != "" {
-				sb.WriteString(fmt.Sprintf("/// %s\n", tok.Description))
+				fmt.Fprintf(&sb, "/// %s\n", tok.Description)
 			}
-			sb.WriteString(fmt.Sprintf("$%s: %s;\n", name, scssValue))
+			fmt.Fprintf(&sb, "$%s: %s;\n", name, scssValue)
 		}
 		sb.WriteString("\n")
 	}

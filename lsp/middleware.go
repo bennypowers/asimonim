@@ -7,7 +7,7 @@ import (
 
 	"bennypowers.dev/asimonim/lsp/methods/workspace"
 	"bennypowers.dev/asimonim/lsp/types"
-	"github.com/tliron/glsp"
+	"github.com/bennypowers/glsp"
 )
 
 // method wraps an LSP handler that returns (result, error) with middleware

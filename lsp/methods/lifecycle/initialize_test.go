@@ -8,8 +8,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tliron/glsp"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	"github.com/bennypowers/glsp"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 func TestInitialize(t *testing.T) {
@@ -19,9 +19,8 @@ func TestInitialize(t *testing.T) {
 		req := types.NewRequestContext(ctx, glspCtx)
 		rootURI := "file:///workspace"
 
-		params := &protocol.InitializeParams{
-			RootURI: &rootURI,
-		}
+		params := &protocol.InitializeParams{}
+		params.RootURI = &rootURI
 
 		result, err := Initialize(req, params)
 		require.NoError(t, err)
@@ -38,9 +37,8 @@ func TestInitialize(t *testing.T) {
 		req := types.NewRequestContext(ctx, glspCtx)
 		rootPath := "/workspace"
 
-		params := &protocol.InitializeParams{
-			RootPath: &rootPath,
-		}
+		params := &protocol.InitializeParams{}
+		params.RootPath = &rootPath
 
 		result, err := Initialize(req, params)
 		require.NoError(t, err)
@@ -63,10 +61,7 @@ func TestInitialize(t *testing.T) {
 		require.NotNil(t, result)
 
 		// Result should have Capabilities and ServerInfo fields
-		initResult := result.(struct {
-			Capabilities interface{}                          `json:"capabilities"`
-			ServerInfo   *protocol.InitializeResultServerInfo `json:"serverInfo,omitempty"`
-		})
+		initResult := result.(protocol.InitializeResult)
 
 		assert.NotNil(t, initResult.Capabilities)
 		assert.NotNil(t, initResult.ServerInfo)
@@ -98,32 +93,27 @@ func TestInitialize(t *testing.T) {
 		result, err := Initialize(req, params)
 		require.NoError(t, err)
 
-		initResult := result.(struct {
-			Capabilities interface{}                          `json:"capabilities"`
-			ServerInfo   *protocol.InitializeResultServerInfo `json:"serverInfo,omitempty"`
-		})
+		initResult := result.(protocol.InitializeResult)
 
-		caps, ok := initResult.Capabilities.(map[string]interface{})
-		require.True(t, ok, "Capabilities should be a map")
+		caps := initResult.Capabilities
 
 		// Verify all expected capabilities are present
-		assert.Contains(t, caps, "textDocumentSync")
-		assert.Contains(t, caps, "hoverProvider")
-		assert.Contains(t, caps, "completionProvider")
-		assert.Contains(t, caps, "definitionProvider")
-		assert.Contains(t, caps, "referencesProvider")
-		assert.Contains(t, caps, "codeActionProvider")
-		assert.Contains(t, caps, "colorProvider")
-		assert.Contains(t, caps, "semanticTokensProvider")
-		assert.Contains(t, caps, "diagnosticProvider")
+		assert.NotNil(t, caps.TextDocumentSync)
+		assert.NotNil(t, caps.HoverProvider)
+		assert.NotNil(t, caps.CompletionProvider)
+		assert.NotNil(t, caps.DefinitionProvider)
+		assert.NotNil(t, caps.ReferencesProvider)
+		assert.NotNil(t, caps.CodeActionProvider)
+		assert.NotNil(t, caps.ColorProvider)
+		assert.NotNil(t, caps.SemanticTokensProvider)
+		assert.NotNil(t, caps.DiagnosticProvider)
 
-		// Verify resolve providers are enabled
-		completionProvider, ok := caps["completionProvider"].(protocol.CompletionOptions)
-		assert.True(t, ok)
-		assert.NotNil(t, completionProvider.ResolveProvider)
-		assert.True(t, *completionProvider.ResolveProvider)
+		// Verify completion provider options
+		assert.NotNil(t, caps.CompletionProvider.ResolveProvider)
+		assert.True(t, *caps.CompletionProvider.ResolveProvider)
+		assert.Equal(t, []string{"-"}, caps.CompletionProvider.TriggerCharacters)
 
-		codeActionProvider, ok := caps["codeActionProvider"].(protocol.CodeActionOptions)
+		codeActionProvider, ok := caps.CodeActionProvider.(protocol.CodeActionOptions)
 		assert.True(t, ok)
 		assert.NotNil(t, codeActionProvider.ResolveProvider)
 		assert.True(t, *codeActionProvider.ResolveProvider)
@@ -135,14 +125,13 @@ func TestInitialize(t *testing.T) {
 		req := types.NewRequestContext(ctx, glspCtx)
 
 		clientVersion := "1.85.0"
-		params := &protocol.InitializeParams{
-			ClientInfo: &struct {
-				Name    string  `json:"name"`
-				Version *string `json:"version,omitempty"`
-			}{
-				Name:    "vscode",
-				Version: &clientVersion,
-			},
+		params := &protocol.InitializeParams{}
+		params.ClientInfo = &struct {
+			Name    string  `json:"name"`
+			Version *string `json:"version,omitempty"`
+		}{
+			Name:    "vscode",
+			Version: &clientVersion,
 		}
 
 		result, err := Initialize(req, params)
@@ -173,31 +162,31 @@ func TestInitialize_StoresClientCapabilities(t *testing.T) {
 		glspCtx := &glsp.Context{}
 		req := types.NewRequestContext(ctx, glspCtx)
 
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.Completion = &protocol.CompletionClientCapabilities{
+			CompletionItem: &struct {
+				SnippetSupport          *bool                   `json:"snippetSupport,omitempty"`
+				CommitCharactersSupport *bool                   `json:"commitCharactersSupport,omitempty"`
+				DocumentationFormat     []protocol.MarkupKind   `json:"documentationFormat,omitempty"`
+				DeprecatedSupport       *bool                   `json:"deprecatedSupport,omitempty"`
+				PreselectSupport        *bool                   `json:"preselectSupport,omitempty"`
+				TagSupport              *struct {
+					ValueSet []protocol.CompletionItemTag `json:"valueSet"`
+				} `json:"tagSupport,omitempty"`
+				InsertReplaceSupport *bool `json:"insertReplaceSupport,omitempty"`
+				ResolveSupport       *struct {
+					Properties []string `json:"properties"`
+				} `json:"resolveSupport,omitempty"`
+				InsertTextModeSupport *struct {
+					ValueSet []protocol.InsertTextMode `json:"valueSet"`
+				} `json:"insertTextModeSupport,omitempty"`
+			}{
+				SnippetSupport: boolPtr(true),
+			},
+		}
 		params := &protocol.InitializeParams{
 			Capabilities: protocol.ClientCapabilities{
-				TextDocument: &protocol.TextDocumentClientCapabilities{
-					Completion: &protocol.CompletionClientCapabilities{
-						CompletionItem: &struct {
-							SnippetSupport            *bool                   `json:"snippetSupport,omitempty"`
-							CommitCharactersSupport   *bool                   `json:"commitCharactersSupport,omitempty"`
-							DocumentationFormat       []protocol.MarkupKind   `json:"documentationFormat,omitempty"`
-							DeprecatedSupport         *bool                   `json:"deprecatedSupport,omitempty"`
-							PreselectSupport          *bool                   `json:"preselectSupport,omitempty"`
-							TagSupport                *struct {
-								ValueSet []protocol.CompletionItemTag `json:"valueSet"`
-							} `json:"tagSupport,omitempty"`
-							InsertReplaceSupport      *bool                   `json:"insertReplaceSupport,omitempty"`
-							ResolveSupport            *struct {
-								Properties []string `json:"properties"`
-							} `json:"resolveSupport,omitempty"`
-							InsertTextModeSupport     *struct {
-								ValueSet []protocol.InsertTextMode `json:"valueSet"`
-							} `json:"insertTextModeSupport,omitempty"`
-						}{
-							SnippetSupport: boolPtr(true),
-						},
-					},
-				},
+				TextDocument: textDoc,
 			},
 		}
 

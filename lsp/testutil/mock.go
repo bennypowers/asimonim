@@ -7,8 +7,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	semantictokens "bennypowers.dev/asimonim/lsp/methods/textDocument/semanticTokens"
 	"bennypowers.dev/asimonim/lsp/types"
-	"github.com/tliron/glsp"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	"github.com/bennypowers/glsp"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // MockServerContext implements types.ServerContext for testing.

@@ -1,7 +1,7 @@
 package semantictokens
 
 import (
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // ComputeDelta computes the minimal edits needed to transform oldData into newData.

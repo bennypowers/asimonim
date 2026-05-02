@@ -5,7 +5,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/log"
 
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // DidOpen handles the textDocument/didOpen notification

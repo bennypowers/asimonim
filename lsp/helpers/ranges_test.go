@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	sitter "github.com/tree-sitter/go-tree-sitter"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // TestRangesIntersect tests the RangesIntersect function with half-open range semantics [start, end)

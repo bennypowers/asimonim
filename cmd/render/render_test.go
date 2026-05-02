@@ -423,7 +423,7 @@ func captureStdout(t *testing.T, fn func()) string {
 	os.Stdout = w
 	defer func() { os.Stdout = old }()
 	fn()
-	w.Close()
+	_ = w.Close()
 	var buf bytes.Buffer
 	if _, readErr := buf.ReadFrom(r); readErr != nil {
 		t.Fatalf("failed to read captured output: %v", readErr)
@@ -658,9 +658,9 @@ func TestMarkdownWithOptionsGolden(t *testing.T) {
 
 	_ = MarkdownWithOptions(rows, opts)
 
-	w.Close()
+	_ = w.Close()
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	os.Stdout = old
 
 	actual := buf.String()

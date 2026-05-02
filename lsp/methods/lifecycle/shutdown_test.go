@@ -6,7 +6,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/tliron/glsp"
+	"github.com/bennypowers/glsp"
 )
 
 func TestShutdown(t *testing.T) {

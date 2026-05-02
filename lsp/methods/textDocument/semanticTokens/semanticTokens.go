@@ -7,7 +7,7 @@ import (
 
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 
@@ -178,16 +178,10 @@ func SemanticTokensRange(req *types.RequestContext, params *protocol.SemanticTok
 	}, nil
 }
 
-// SemanticTokensDeltaParams is the params for textDocument/semanticTokens/full/delta request
-type SemanticTokensDeltaParams struct {
-	TextDocument     protocol.TextDocumentIdentifier `json:"textDocument"`
-	PreviousResultID string                          `json:"previousResultId"`
-}
-
 // SemanticTokensFullDelta handles the textDocument/semanticTokens/full/delta request
 // Returns either SemanticTokens (full) or SemanticTokensDelta depending on whether
 // the previous result ID is still valid and a delta can be computed.
-func SemanticTokensFullDelta(req *types.RequestContext, params *SemanticTokensDeltaParams) (any, error) {
+func SemanticTokensFullDelta(req *types.RequestContext, params *protocol.SemanticTokensDeltaParams) (any, error) {
 	uri := params.TextDocument.URI
 	log.Info("Semantic tokens delta requested for: %s (previousResultId: %s)", uri, params.PreviousResultID)
 

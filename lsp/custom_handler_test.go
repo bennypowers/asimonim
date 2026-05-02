@@ -7,16 +7,13 @@ import (
 
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
-	"bennypowers.dev/asimonim/lsp/methods/textDocument/diagnostic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tliron/glsp"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	"github.com/bennypowers/glsp"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
-// TestCustomHandler_DiagnosticMethod tests the custom handler for textDocument/diagnostic
-func TestCustomHandler_DiagnosticMethod(t *testing.T) {
-	// Create server
+func TestCustomHandler_InitializeInterception(t *testing.T) {
 	server := &Server{
 		documents:   documents.NewManager(),
 		tokens:      tokens.NewManager(),
@@ -24,75 +21,7 @@ func TestCustomHandler_DiagnosticMethod(t *testing.T) {
 		loadedFiles: make(map[string]*TokenFileOptions),
 	}
 
-	// Create custom handler
-	handler := &CustomHandler{
-		Handler: &protocol.Handler{},
-		server:  server,
-	}
-
-	t.Run("textDocument/diagnostic with valid params", func(t *testing.T) {
-		params := diagnostic.DocumentDiagnosticParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
-		}
-		paramsJSON, err := json.Marshal(params)
-		require.NoError(t, err)
-
-		ctx := &glsp.Context{
-			Method: "textDocument/diagnostic",
-			Params: paramsJSON,
-		}
-
-		result, validMethod, validParams, err := handler.Handle(ctx)
-		assert.True(t, validMethod, "Should recognize textDocument/diagnostic as valid method")
-		assert.True(t, validParams, "Should parse params successfully")
-		assert.NoError(t, err)
-		assert.NotNil(t, result)
-	})
-
-	t.Run("textDocument/diagnostic with invalid JSON", func(t *testing.T) {
-		// Actually malformed JSON
-		invalidJSON := []byte(`{invalid json`)
-
-		ctx := &glsp.Context{
-			Method: "textDocument/diagnostic",
-			Params: invalidJSON,
-		}
-
-		_, validMethod, validParams, err := handler.Handle(ctx)
-		assert.True(t, validMethod, "Should recognize method even with invalid JSON")
-		assert.False(t, validParams, "Should fail to parse malformed JSON")
-		assert.Error(t, err)
-	})
-
-	t.Run("standard LSP methods not intercepted by CustomHandler", func(t *testing.T) {
-		// Test that CustomHandler doesn't intercept standard LSP methods
-		// (i.e., they fall through to the base handler, not handled by our custom code)
-
-		// Send a hover request with valid params
-		params := protocol.HoverParams{
-			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
-				Position:     protocol.Position{Line: 0, Character: 0},
-			},
-		}
-		paramsJSON, err := json.Marshal(params)
-		require.NoError(t, err)
-
-		ctx := &glsp.Context{
-			Method: "textDocument/hover",
-			Params: paramsJSON,
-		}
-
-		// Call the handler - it should fall through to protocol.Handler
-		_, validMethod, _, _ := handler.Handle(ctx)
-
-		// The method should be recognized by the base handler
-		// If CustomHandler tried to intercept it, we'd get different behavior
-		assert.True(t, validMethod, "Should pass through to base handler and recognize the method")
-	})
-
-	t.Run("initialize intercepts pull diagnostics detection", func(t *testing.T) {
-		// Create a handler with initialize set up
+	t.Run("detects pull diagnostics capability from initialize params", func(t *testing.T) {
 		initHandler := &protocol.Handler{}
 		initHandler.Initialize = func(ctx *glsp.Context, params *protocol.InitializeParams) (any, error) {
 			return protocol.InitializeResult{
@@ -105,7 +34,6 @@ func TestCustomHandler_DiagnosticMethod(t *testing.T) {
 			server:  server,
 		}
 
-		// Send initialize with pull diagnostics capability
 		paramsJSON := []byte(`{
 			"capabilities": {
 				"textDocument": {
@@ -124,53 +52,86 @@ func TestCustomHandler_DiagnosticMethod(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		// Verify the capability was actually detected and stored
 		cap := server.ClientDiagnosticCapability()
 		require.NotNil(t, cap, "pull diagnostics capability should be detected")
 		assert.True(t, *cap, "pull diagnostics should be true")
 	})
 
-	t.Run("semanticTokens/full/delta with valid params", func(t *testing.T) {
-		// Open the document so it can be found
-		server.DocumentManager().DidOpen("file:///test.css", "css", 1, ".btn { color: var(--c); }")
+	t.Run("no pull diagnostics when client lacks capability", func(t *testing.T) {
+		server.clientDiagnosticCapability = nil
+
+		initHandler := &protocol.Handler{}
+		initHandler.Initialize = func(ctx *glsp.Context, params *protocol.InitializeParams) (any, error) {
+			return protocol.InitializeResult{
+				Capabilities: protocol.ServerCapabilities{},
+			}, nil
+		}
 
 		h := &CustomHandler{
-			Handler: &protocol.Handler{},
+			Handler: initHandler,
 			server:  server,
 		}
 
-		params := map[string]any{
-			"textDocument":     map[string]any{"uri": "file:///test.css"},
-			"previousResultId": "prev-id",
+		paramsJSON := []byte(`{"capabilities": {"textDocument": {}}}`)
+
+		ctx := &glsp.Context{
+			Method: "initialize",
+			Params: paramsJSON,
+		}
+
+		_, _, _, err := h.Handle(ctx)
+		assert.NoError(t, err)
+
+		cap := server.ClientDiagnosticCapability()
+		require.NotNil(t, cap)
+		assert.False(t, *cap, "pull diagnostics should be false without diagnostic capability")
+	})
+
+	t.Run("passes non-initialize methods through to base handler", func(t *testing.T) {
+		handler := &protocol.Handler{}
+		handler.SetInitialized(true)
+
+		h := &CustomHandler{
+			Handler: handler,
+			server:  server,
+		}
+
+		params := protocol.HoverParams{
+			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
+				Position:     protocol.Position{Line: 0, Character: 0},
+			},
 		}
 		paramsJSON, err := json.Marshal(params)
 		require.NoError(t, err)
 
 		ctx := &glsp.Context{
-			Method: "textDocument/semanticTokens/full/delta",
+			Method: "textDocument/hover",
 			Params: paramsJSON,
 		}
 
-		_, validMethod, validParams, err := h.Handle(ctx)
-		assert.True(t, validMethod)
-		assert.True(t, validParams)
-		assert.NoError(t, err)
+		_, validMethod, _, _ := h.Handle(ctx)
+		assert.False(t, validMethod, "No hover handler set, so method should not be valid")
+	})
+}
+
+func TestDetectPullDiagnosticsSupport(t *testing.T) {
+	t.Run("returns true when diagnostic capability present", func(t *testing.T) {
+		params := []byte(`{"capabilities": {"textDocument": {"diagnostic": {"dynamicRegistration": true}}}}`)
+		assert.True(t, DetectPullDiagnosticsSupport(params))
 	})
 
-	t.Run("semanticTokens/full/delta with invalid JSON", func(t *testing.T) {
-		h := &CustomHandler{
-			Handler: &protocol.Handler{},
-			server:  server,
-		}
+	t.Run("returns false when diagnostic capability absent", func(t *testing.T) {
+		params := []byte(`{"capabilities": {"textDocument": {}}}`)
+		assert.False(t, DetectPullDiagnosticsSupport(params))
+	})
 
-		ctx := &glsp.Context{
-			Method: "textDocument/semanticTokens/full/delta",
-			Params: []byte(`{invalid`),
-		}
+	t.Run("returns false for invalid JSON", func(t *testing.T) {
+		assert.False(t, DetectPullDiagnosticsSupport([]byte(`{invalid`)))
+	})
 
-		_, validMethod, validParams, err := h.Handle(ctx)
-		assert.True(t, validMethod)
-		assert.False(t, validParams)
-		assert.Error(t, err)
+	t.Run("returns false when textDocument is null", func(t *testing.T) {
+		params := []byte(`{"capabilities": {"textDocument": null}}`)
+		assert.False(t, DetectPullDiagnosticsSupport(params))
 	})
 }

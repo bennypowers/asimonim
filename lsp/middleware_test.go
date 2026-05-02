@@ -11,12 +11,12 @@ import (
 	semantictokens "bennypowers.dev/asimonim/lsp/methods/textDocument/semanticTokens"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/tliron/glsp"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	"github.com/bennypowers/glsp"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // Verify compile-time interface satisfaction
-var _ = (*glsp.Context)(nil)
+var _ types.ServerContext = (*mockServerContext)(nil)
 
 // mockServerContext implements types.ServerContext for testing.
 // It provides a minimal implementation with stable state across method calls.

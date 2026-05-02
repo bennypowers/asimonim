@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"bennypowers.dev/asimonim/lsp/internal/log"
-	"github.com/tliron/glsp"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	"github.com/bennypowers/glsp"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // LogError logs an error message to stderr and optionally to the LSP client

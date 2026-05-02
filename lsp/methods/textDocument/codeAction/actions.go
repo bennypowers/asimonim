@@ -8,7 +8,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/helpers/css"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // createReplacementAction creates a code action to replace a deprecated token with a recommended token.

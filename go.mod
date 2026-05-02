@@ -3,6 +3,7 @@ module bennypowers.dev/asimonim
 go 1.25.5
 
 require (
+	github.com/bennypowers/glsp v0.0.0-20260501152441-74e714d631a0
 	github.com/bmatcuk/doublestar/v4 v4.9.2
 	github.com/lucasb-eyer/go-colorful v1.4.0
 	github.com/mazznoer/csscolorparser v0.1.8
@@ -11,7 +12,6 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/jsonc v0.3.2
-	github.com/tliron/glsp v0.2.2
 	github.com/tree-sitter/go-tree-sitter v0.25.0
 	github.com/tree-sitter/tree-sitter-css v0.23.2
 	github.com/tree-sitter/tree-sitter-html v0.23.2

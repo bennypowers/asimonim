@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"bennypowers.dev/asimonim/lsp/internal/position"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // Manager manages text documents for the language server

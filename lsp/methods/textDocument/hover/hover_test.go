@@ -11,8 +11,8 @@ import (
 	fixtureutil "bennypowers.dev/asimonim/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tliron/glsp"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	"github.com/bennypowers/glsp"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // TestIsPositionInRange tests the isPositionInRange function with half-open range semantics [start, end)

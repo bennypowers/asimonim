@@ -9,7 +9,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 const (
@@ -24,25 +24,25 @@ func ptrIntegerOrString(s string) *protocol.IntegerOrString {
 
 // setCodeActionLiteralSupport sets the client capabilities to support CodeAction literals
 func setCodeActionLiteralSupport(s *lsp.Server) {
-	s.SetClientCapabilities(protocol.ClientCapabilities{
-		TextDocument: &protocol.TextDocumentClientCapabilities{
-			CodeAction: &protocol.CodeActionClientCapabilities{
-				CodeActionLiteralSupport: &struct {
-					CodeActionKind struct {
-						ValueSet []protocol.CodeActionKind `json:"valueSet"`
-					} `json:"codeActionKind"`
-				}{
-					CodeActionKind: struct {
-						ValueSet []protocol.CodeActionKind `json:"valueSet"`
-					}{
-						ValueSet: []protocol.CodeActionKind{
-							protocol.CodeActionKindQuickFix,
-							protocol.CodeActionKindRefactorRewrite,
-						},
-					},
+	textDoc := &protocol.TextDocumentClientCapabilities{}
+	textDoc.CodeAction = &protocol.CodeActionClientCapabilities{
+		CodeActionLiteralSupport: &struct {
+			CodeActionKind struct {
+				ValueSet []protocol.CodeActionKind `json:"valueSet"`
+			} `json:"codeActionKind"`
+		}{
+			CodeActionKind: struct {
+				ValueSet []protocol.CodeActionKind `json:"valueSet"`
+			}{
+				ValueSet: []protocol.CodeActionKind{
+					protocol.CodeActionKindQuickFix,
+					protocol.CodeActionKindRefactorRewrite,
 				},
 			},
 		},
+	}
+	s.SetClientCapabilities(protocol.ClientCapabilities{
+		TextDocument: textDoc,
 	})
 }
 
@@ -365,24 +365,24 @@ func TestCodeAction_LiteralSupport(t *testing.T) {
 		})
 
 		// Set client capabilities with codeActionLiteralSupport
-		s.SetClientCapabilities(protocol.ClientCapabilities{
-			TextDocument: &protocol.TextDocumentClientCapabilities{
-				CodeAction: &protocol.CodeActionClientCapabilities{
-					CodeActionLiteralSupport: &struct {
-						CodeActionKind struct {
-							ValueSet []protocol.CodeActionKind `json:"valueSet"`
-						} `json:"codeActionKind"`
-					}{
-						CodeActionKind: struct {
-							ValueSet []protocol.CodeActionKind `json:"valueSet"`
-						}{
-							ValueSet: []protocol.CodeActionKind{
-								protocol.CodeActionKindRefactorRewrite,
-							},
-						},
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.CodeAction = &protocol.CodeActionClientCapabilities{
+			CodeActionLiteralSupport: &struct {
+				CodeActionKind struct {
+					ValueSet []protocol.CodeActionKind `json:"valueSet"`
+				} `json:"codeActionKind"`
+			}{
+				CodeActionKind: struct {
+					ValueSet []protocol.CodeActionKind `json:"valueSet"`
+				}{
+					ValueSet: []protocol.CodeActionKind{
+						protocol.CodeActionKindRefactorRewrite,
 					},
 				},
 			},
+		}
+		s.SetClientCapabilities(protocol.ClientCapabilities{
+			TextDocument: textDoc,
 		})
 
 		uri := "file:///test.css"
@@ -418,12 +418,12 @@ func TestCodeAction_LiteralSupport(t *testing.T) {
 		})
 
 		// Set client capabilities WITHOUT codeActionLiteralSupport
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.CodeAction = &protocol.CodeActionClientCapabilities{
+			// No CodeActionLiteralSupport - legacy client
+		}
 		s.SetClientCapabilities(protocol.ClientCapabilities{
-			TextDocument: &protocol.TextDocumentClientCapabilities{
-				CodeAction: &protocol.CodeActionClientCapabilities{
-					// No CodeActionLiteralSupport - legacy client
-				},
-			},
+			TextDocument: textDoc,
 		})
 
 		uri := "file:///test.css"

@@ -162,7 +162,7 @@ func TestOSFileSystem_Open(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open error: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	buf := make([]byte, 12)
 	n, err := f.Read(buf)

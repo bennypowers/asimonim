@@ -13,7 +13,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/parser/css"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // hoverData wraps a Token with additional structured fields for hover rendering.

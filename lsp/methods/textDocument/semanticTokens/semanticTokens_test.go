@@ -11,7 +11,7 @@ import (
 	semantictokens "bennypowers.dev/asimonim/lsp/methods/textDocument/semanticTokens"
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 func TestGetSemanticTokensForDocument(t *testing.T) {
@@ -261,7 +261,7 @@ func TestSemanticTokensFullDelta_ReturnsEmptyDeltaWhenUnchanged(t *testing.T) {
 	}
 
 	// Second: request delta with same result ID (no changes)
-	deltaResult, err := semantictokens.SemanticTokensFullDelta(req, &semantictokens.SemanticTokensDeltaParams{
+	deltaResult, err := semantictokens.SemanticTokensFullDelta(req, &protocol.SemanticTokensDeltaParams{
 		TextDocument:     protocol.TextDocumentIdentifier{URI: uri},
 		PreviousResultID: *fullResult.ResultID,
 	})
@@ -302,7 +302,7 @@ func TestSemanticTokensFullDelta_ReturnsFullWhenPreviousResultIDNotFound(t *test
 
 	// Request delta with non-existent result ID
 	req := types.NewRequestContext(s, nil)
-	result, err := semantictokens.SemanticTokensFullDelta(req, &semantictokens.SemanticTokensDeltaParams{
+	result, err := semantictokens.SemanticTokensFullDelta(req, &protocol.SemanticTokensDeltaParams{
 		TextDocument:     protocol.TextDocumentIdentifier{URI: uri},
 		PreviousResultID: "non-existent-result-id",
 	})
@@ -326,7 +326,7 @@ func TestSemanticTokensFullDelta_DocumentNotFound(t *testing.T) {
 	s := testutil.NewMockServerContext()
 
 	req := types.NewRequestContext(s, nil)
-	_, err := semantictokens.SemanticTokensFullDelta(req, &semantictokens.SemanticTokensDeltaParams{
+	_, err := semantictokens.SemanticTokensFullDelta(req, &protocol.SemanticTokensDeltaParams{
 		TextDocument:     protocol.TextDocumentIdentifier{URI: "file:///non-existent.json"},
 		PreviousResultID: "some-id",
 	})
@@ -346,7 +346,7 @@ func TestSemanticTokensFullDelta_NonTokenFile(t *testing.T) {
 	_ = s.DocumentManager().DidOpen(uri, "css", 1, ".foo { color: red; }")
 
 	req := types.NewRequestContext(s, nil)
-	result, err := semantictokens.SemanticTokensFullDelta(req, &semantictokens.SemanticTokensDeltaParams{
+	result, err := semantictokens.SemanticTokensFullDelta(req, &protocol.SemanticTokensDeltaParams{
 		TextDocument:     protocol.TextDocumentIdentifier{URI: uri},
 		PreviousResultID: "some-id",
 	})

@@ -19,8 +19,8 @@ import (
 	semantictokens "bennypowers.dev/asimonim/lsp/methods/textDocument/semanticTokens"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tliron/glsp"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	"github.com/bennypowers/glsp"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // TestHandlers_WrappersSmokeTest verifies that protocol handler wrappers
@@ -151,7 +151,7 @@ func TestHandlers_WrappersSmokeTest(t *testing.T) {
 	})
 
 	t.Run("DocumentDiagnostic", func(t *testing.T) {
-		params := &diagnostic.DocumentDiagnosticParams{
+		params := &protocol.DocumentDiagnosticParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
 		}
 		req := types.NewRequestContext(server, ctx)
@@ -492,10 +492,10 @@ func TestServer_SupportsSnippets(t *testing.T) {
 		s, err := NewServer()
 		require.NoError(t, err)
 
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.Completion = &protocol.CompletionClientCapabilities{}
 		s.SetClientCapabilities(protocol.ClientCapabilities{
-			TextDocument: &protocol.TextDocumentClientCapabilities{
-				Completion: &protocol.CompletionClientCapabilities{},
-			},
+			TextDocument: textDoc,
 		})
 		assert.False(t, s.SupportsSnippets())
 	})
@@ -504,28 +504,28 @@ func TestServer_SupportsSnippets(t *testing.T) {
 		s, err := NewServer()
 		require.NoError(t, err)
 
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.Completion = &protocol.CompletionClientCapabilities{
+			CompletionItem: &struct {
+				SnippetSupport          *bool                 `json:"snippetSupport,omitempty"`
+				CommitCharactersSupport *bool                 `json:"commitCharactersSupport,omitempty"`
+				DocumentationFormat     []protocol.MarkupKind `json:"documentationFormat,omitempty"`
+				DeprecatedSupport       *bool                 `json:"deprecatedSupport,omitempty"`
+				PreselectSupport        *bool                 `json:"preselectSupport,omitempty"`
+				TagSupport              *struct {
+					ValueSet []protocol.CompletionItemTag `json:"valueSet"`
+				} `json:"tagSupport,omitempty"`
+				InsertReplaceSupport *bool `json:"insertReplaceSupport,omitempty"`
+				ResolveSupport       *struct {
+					Properties []string `json:"properties"`
+				} `json:"resolveSupport,omitempty"`
+				InsertTextModeSupport *struct {
+					ValueSet []protocol.InsertTextMode `json:"valueSet"`
+				} `json:"insertTextModeSupport,omitempty"`
+			}{},
+		}
 		s.SetClientCapabilities(protocol.ClientCapabilities{
-			TextDocument: &protocol.TextDocumentClientCapabilities{
-				Completion: &protocol.CompletionClientCapabilities{
-					CompletionItem: &struct {
-						SnippetSupport          *bool    `json:"snippetSupport,omitempty"`
-						CommitCharactersSupport *bool    `json:"commitCharactersSupport,omitempty"`
-						DocumentationFormat     []protocol.MarkupKind `json:"documentationFormat,omitempty"`
-						DeprecatedSupport       *bool    `json:"deprecatedSupport,omitempty"`
-						PreselectSupport        *bool    `json:"preselectSupport,omitempty"`
-						TagSupport              *struct {
-							ValueSet []protocol.CompletionItemTag `json:"valueSet"`
-						} `json:"tagSupport,omitempty"`
-						InsertReplaceSupport    *bool `json:"insertReplaceSupport,omitempty"`
-						ResolveSupport          *struct {
-							Properties []string `json:"properties"`
-						} `json:"resolveSupport,omitempty"`
-						InsertTextModeSupport   *struct {
-							ValueSet []protocol.InsertTextMode `json:"valueSet"`
-						} `json:"insertTextModeSupport,omitempty"`
-					}{},
-				},
-			},
+			TextDocument: textDoc,
 		})
 		assert.False(t, s.SupportsSnippets())
 	})
@@ -535,30 +535,30 @@ func TestServer_SupportsSnippets(t *testing.T) {
 		require.NoError(t, err)
 
 		snippetSupport := true
-		s.SetClientCapabilities(protocol.ClientCapabilities{
-			TextDocument: &protocol.TextDocumentClientCapabilities{
-				Completion: &protocol.CompletionClientCapabilities{
-					CompletionItem: &struct {
-						SnippetSupport          *bool    `json:"snippetSupport,omitempty"`
-						CommitCharactersSupport *bool    `json:"commitCharactersSupport,omitempty"`
-						DocumentationFormat     []protocol.MarkupKind `json:"documentationFormat,omitempty"`
-						DeprecatedSupport       *bool    `json:"deprecatedSupport,omitempty"`
-						PreselectSupport        *bool    `json:"preselectSupport,omitempty"`
-						TagSupport              *struct {
-							ValueSet []protocol.CompletionItemTag `json:"valueSet"`
-						} `json:"tagSupport,omitempty"`
-						InsertReplaceSupport    *bool `json:"insertReplaceSupport,omitempty"`
-						ResolveSupport          *struct {
-							Properties []string `json:"properties"`
-						} `json:"resolveSupport,omitempty"`
-						InsertTextModeSupport   *struct {
-							ValueSet []protocol.InsertTextMode `json:"valueSet"`
-						} `json:"insertTextModeSupport,omitempty"`
-					}{
-						SnippetSupport: &snippetSupport,
-					},
-				},
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.Completion = &protocol.CompletionClientCapabilities{
+			CompletionItem: &struct {
+				SnippetSupport          *bool                 `json:"snippetSupport,omitempty"`
+				CommitCharactersSupport *bool                 `json:"commitCharactersSupport,omitempty"`
+				DocumentationFormat     []protocol.MarkupKind `json:"documentationFormat,omitempty"`
+				DeprecatedSupport       *bool                 `json:"deprecatedSupport,omitempty"`
+				PreselectSupport        *bool                 `json:"preselectSupport,omitempty"`
+				TagSupport              *struct {
+					ValueSet []protocol.CompletionItemTag `json:"valueSet"`
+				} `json:"tagSupport,omitempty"`
+				InsertReplaceSupport *bool `json:"insertReplaceSupport,omitempty"`
+				ResolveSupport       *struct {
+					Properties []string `json:"properties"`
+				} `json:"resolveSupport,omitempty"`
+				InsertTextModeSupport *struct {
+					ValueSet []protocol.InsertTextMode `json:"valueSet"`
+				} `json:"insertTextModeSupport,omitempty"`
+			}{
+				SnippetSupport: &snippetSupport,
 			},
+		}
+		s.SetClientCapabilities(protocol.ClientCapabilities{
+			TextDocument: textDoc,
 		})
 		assert.True(t, s.SupportsSnippets())
 	})
@@ -594,12 +594,12 @@ func TestServer_PreferredHoverFormat(t *testing.T) {
 		s, err := NewServer()
 		require.NoError(t, err)
 
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.Hover = &protocol.HoverClientCapabilities{
+			ContentFormat: []protocol.MarkupKind{},
+		}
 		s.SetClientCapabilities(protocol.ClientCapabilities{
-			TextDocument: &protocol.TextDocumentClientCapabilities{
-				Hover: &protocol.HoverClientCapabilities{
-					ContentFormat: []protocol.MarkupKind{},
-				},
-			},
+			TextDocument: textDoc,
 		})
 		assert.Equal(t, protocol.MarkupKindMarkdown, s.PreferredHoverFormat())
 	})
@@ -608,12 +608,12 @@ func TestServer_PreferredHoverFormat(t *testing.T) {
 		s, err := NewServer()
 		require.NoError(t, err)
 
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.Hover = &protocol.HoverClientCapabilities{
+			ContentFormat: []protocol.MarkupKind{protocol.MarkupKindPlainText, protocol.MarkupKindMarkdown},
+		}
 		s.SetClientCapabilities(protocol.ClientCapabilities{
-			TextDocument: &protocol.TextDocumentClientCapabilities{
-				Hover: &protocol.HoverClientCapabilities{
-					ContentFormat: []protocol.MarkupKind{protocol.MarkupKindPlainText, protocol.MarkupKindMarkdown},
-				},
-			},
+			TextDocument: textDoc,
 		})
 		assert.Equal(t, protocol.MarkupKindPlainText, s.PreferredHoverFormat())
 	})
@@ -649,10 +649,10 @@ func TestServer_SupportsDefinitionLinks(t *testing.T) {
 		s, err := NewServer()
 		require.NoError(t, err)
 
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.Definition = &protocol.DefinitionClientCapabilities{}
 		s.SetClientCapabilities(protocol.ClientCapabilities{
-			TextDocument: &protocol.TextDocumentClientCapabilities{
-				Definition: &protocol.DefinitionClientCapabilities{},
-			},
+			TextDocument: textDoc,
 		})
 		assert.False(t, s.SupportsDefinitionLinks())
 	})
@@ -662,12 +662,12 @@ func TestServer_SupportsDefinitionLinks(t *testing.T) {
 		require.NoError(t, err)
 
 		linkSupport := true
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.Definition = &protocol.DefinitionClientCapabilities{
+			LinkSupport: &linkSupport,
+		}
 		s.SetClientCapabilities(protocol.ClientCapabilities{
-			TextDocument: &protocol.TextDocumentClientCapabilities{
-				Definition: &protocol.DefinitionClientCapabilities{
-					LinkSupport: &linkSupport,
-				},
-			},
+			TextDocument: textDoc,
 		})
 		assert.True(t, s.SupportsDefinitionLinks())
 	})
@@ -703,10 +703,10 @@ func TestServer_SupportsDiagnosticRelatedInfo(t *testing.T) {
 		s, err := NewServer()
 		require.NoError(t, err)
 
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.PublishDiagnostics = &protocol.PublishDiagnosticsClientCapabilities{}
 		s.SetClientCapabilities(protocol.ClientCapabilities{
-			TextDocument: &protocol.TextDocumentClientCapabilities{
-				PublishDiagnostics: &protocol.PublishDiagnosticsClientCapabilities{},
-			},
+			TextDocument: textDoc,
 		})
 		assert.False(t, s.SupportsDiagnosticRelatedInfo())
 	})
@@ -716,12 +716,12 @@ func TestServer_SupportsDiagnosticRelatedInfo(t *testing.T) {
 		require.NoError(t, err)
 
 		relatedInfo := true
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.PublishDiagnostics = &protocol.PublishDiagnosticsClientCapabilities{
+			RelatedInformation: &relatedInfo,
+		}
 		s.SetClientCapabilities(protocol.ClientCapabilities{
-			TextDocument: &protocol.TextDocumentClientCapabilities{
-				PublishDiagnostics: &protocol.PublishDiagnosticsClientCapabilities{
-					RelatedInformation: &relatedInfo,
-				},
-			},
+			TextDocument: textDoc,
 		})
 		assert.True(t, s.SupportsDiagnosticRelatedInfo())
 	})
@@ -1018,7 +1018,8 @@ func TestPublishDiagnostics_NotifiesClient(t *testing.T) {
 	require.NoError(t, err)
 
 	// Open a CSS document so GetDiagnostics has something to work with
-	s.DocumentManager().DidOpen("file:///test.css", "css", 1, ".btn { color: var(--c); }")
+	err = s.DocumentManager().DidOpen("file:///test.css", "css", 1, ".btn { color: var(--c); }")
+	require.NoError(t, err)
 
 	// Add a token so diagnostics can resolve
 	tok := &tokens.Token{Name: "c", Value: "#ff0000", Type: "color"}
@@ -1095,12 +1096,10 @@ func TestServer_SupportsCodeActionLiterals(t *testing.T) {
 		s, err := NewServer()
 		require.NoError(t, err)
 
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.CodeAction = &protocol.CodeActionClientCapabilities{}
 		s.SetClientCapabilities(protocol.ClientCapabilities{
-			TextDocument: &protocol.TextDocumentClientCapabilities{
-				CodeAction: &protocol.CodeActionClientCapabilities{
-					// No CodeActionLiteralSupport
-				},
-			},
+			TextDocument: textDoc,
 		})
 		assert.False(t, s.SupportsCodeActionLiterals())
 	})
@@ -1109,22 +1108,22 @@ func TestServer_SupportsCodeActionLiterals(t *testing.T) {
 		s, err := NewServer()
 		require.NoError(t, err)
 
-		s.SetClientCapabilities(protocol.ClientCapabilities{
-			TextDocument: &protocol.TextDocumentClientCapabilities{
-				CodeAction: &protocol.CodeActionClientCapabilities{
-					CodeActionLiteralSupport: &struct {
-						CodeActionKind struct {
-							ValueSet []protocol.CodeActionKind `json:"valueSet"`
-						} `json:"codeActionKind"`
-					}{
-						CodeActionKind: struct {
-							ValueSet []protocol.CodeActionKind `json:"valueSet"`
-						}{
-							ValueSet: []protocol.CodeActionKind{protocol.CodeActionKindRefactorRewrite},
-						},
-					},
+		textDoc := &protocol.TextDocumentClientCapabilities{}
+		textDoc.CodeAction = &protocol.CodeActionClientCapabilities{
+			CodeActionLiteralSupport: &struct {
+				CodeActionKind struct {
+					ValueSet []protocol.CodeActionKind `json:"valueSet"`
+				} `json:"codeActionKind"`
+			}{
+				CodeActionKind: struct {
+					ValueSet []protocol.CodeActionKind `json:"valueSet"`
+				}{
+					ValueSet: []protocol.CodeActionKind{protocol.CodeActionKindRefactorRewrite},
 				},
 			},
+		}
+		s.SetClientCapabilities(protocol.ClientCapabilities{
+			TextDocument: textDoc,
 		})
 		assert.True(t, s.SupportsCodeActionLiterals())
 	})

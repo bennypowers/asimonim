@@ -11,7 +11,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/helpers"
 	"bennypowers.dev/asimonim/lsp/helpers/css"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/tliron/glsp/protocol_3_16"
+	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // validateCSSDocument validates that the document exists and supports CSS extraction.
