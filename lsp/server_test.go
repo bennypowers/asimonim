@@ -1018,7 +1018,8 @@ func TestPublishDiagnostics_NotifiesClient(t *testing.T) {
 	require.NoError(t, err)
 
 	// Open a CSS document so GetDiagnostics has something to work with
-	_ = s.DocumentManager().DidOpen("file:///test.css", "css", 1, ".btn { color: var(--c); }")
+	err = s.DocumentManager().DidOpen("file:///test.css", "css", 1, ".btn { color: var(--c); }")
+	require.NoError(t, err)
 
 	// Add a token so diagnostics can resolve
 	tok := &tokens.Token{Name: "c", Value: "#ff0000", Type: "color"}

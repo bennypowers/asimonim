@@ -16,7 +16,7 @@ import (
 )
 
 // Verify compile-time interface satisfaction
-var _ = (*glsp.Context)(nil)
+var _ types.ServerContext = (*mockServerContext)(nil)
 
 // mockServerContext implements types.ServerContext for testing.
 // It provides a minimal implementation with stable state across method calls.
