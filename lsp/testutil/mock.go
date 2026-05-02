@@ -344,6 +344,14 @@ func (m *MockServerContext) SetSupportsCodeActionLiterals(supports bool) {
 	m.supportsCodeActionLiterals = &supports
 }
 
+// InlayHintsEnabled returns whether inlay hints are enabled in config.
+func (m *MockServerContext) InlayHintsEnabled() bool {
+	if m.config.InlayHints == nil {
+		return true
+	}
+	return *m.config.InlayHints
+}
+
 // PublishDiagnostics publishes diagnostics for a document
 func (m *MockServerContext) PublishDiagnostics(context *glsp.Context, uri string) error {
 	if m.PublishDiagnosticsFunc != nil {

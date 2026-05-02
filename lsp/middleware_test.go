@@ -65,6 +65,7 @@ func (m *mockServerContext) ShouldProcessAsTokenFile(uri string) bool { return t
 func (m *mockServerContext) LoadTokensFromDocumentContent(uri, languageID, content string) error {
 	return nil
 }
+func (m *mockServerContext) InlayHintsEnabled() bool                      { return true }
 func (m *mockServerContext) Version() string                              { return "dev" }
 func (m *mockServerContext) SemanticTokenCache() types.SemanticTokenCacher {
 	if m.cache == nil {

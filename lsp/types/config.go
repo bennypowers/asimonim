@@ -51,6 +51,10 @@ type ServerConfig struct {
 	// Valid values: "unpkg", "esm.sh", "esm.run", "jspm", "jsdelivr".
 	// Defaults to "unpkg" if empty. Has no effect if NetworkFallback is false.
 	CDN string `json:"cdn,omitempty"`
+
+	// InlayHints enables inlay hints showing resolved token values next to var() calls.
+	// Defaults to true.
+	InlayHints *bool `json:"inlayHints,omitempty"`
 }
 
 // ServerState represents a snapshot of runtime state (NOT configuration)
@@ -63,6 +67,7 @@ type ServerState struct {
 
 // DefaultConfig returns the default server configuration
 func DefaultConfig() ServerConfig {
+	inlayHints := true
 	return ServerConfig{
 		TokensFiles: nil, // No default tokens - must be explicitly configured
 		Prefix:      "",
@@ -74,5 +79,6 @@ func DefaultConfig() ServerConfig {
 		NetworkFallback: false,
 		NetworkTimeout:  0,
 		CDN:             "",
+		InlayHints:      &inlayHints,
 	}
 }

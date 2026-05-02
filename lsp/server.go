@@ -20,6 +20,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/methods/textDocument/diagnostic"
 	documentcolor "bennypowers.dev/asimonim/lsp/methods/textDocument/documentColor"
 	"bennypowers.dev/asimonim/lsp/methods/textDocument/hover"
+	inlayhint "bennypowers.dev/asimonim/lsp/methods/textDocument/inlayHint"
 	"bennypowers.dev/asimonim/lsp/methods/textDocument/references"
 	semantictokens "bennypowers.dev/asimonim/lsp/methods/textDocument/semanticTokens"
 	"bennypowers.dev/asimonim/lsp/methods/workspace"
@@ -100,6 +101,7 @@ func NewServer(opts ...Option) (*Server, error) {
 		},
 		Initialize:             method(s, "initialize", lifecycle.Initialize),
 		TextDocumentDiagnostic: method(s, "textDocument/diagnostic", diagnostic.DocumentDiagnostic),
+		TextDocumentInlayHint:  method(s, "textDocument/inlayHint", inlayhint.InlayHint),
 	}
 
 	customHandler := &CustomHandler{
@@ -240,6 +242,16 @@ func (s *Server) SetClientCapabilities(caps protocol.ClientCapabilities) {
 	s.configMu.Lock()
 	defer s.configMu.Unlock()
 	s.clientCapabilities = &caps
+}
+
+// InlayHintsEnabled returns whether inlay hints are enabled in config.
+func (s *Server) InlayHintsEnabled() bool {
+	s.configMu.RLock()
+	defer s.configMu.RUnlock()
+	if s.config.InlayHints == nil {
+		return true
+	}
+	return *s.config.InlayHints
 }
 
 // SupportsSnippets returns whether the client supports snippet completions.

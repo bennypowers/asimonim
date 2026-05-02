@@ -66,6 +66,7 @@ func Initialize(req *types.RequestContext, params *protocol.InitializeParams) (a
 		ResolveProvider: boolPtr(true),
 	}
 	capabilities.ColorProvider = true
+	capabilities.InlayHintProvider = true
 	capabilities.SemanticTokensProvider = protocol.SemanticTokensOptions{
 		Legend: protocol.SemanticTokensLegend{
 			TokenTypes:     []string{"class", "property"},
