@@ -60,6 +60,9 @@ type ServerContext interface {
 	ClientCapabilities() *protocol.ClientCapabilities
 	SetClientCapabilities(caps protocol.ClientCapabilities)
 
+	// InlayHintsEnabled returns whether inlay hints are enabled in config
+	InlayHintsEnabled() bool
+
 	// Capability helpers derived from ClientCapabilities
 	SupportsSnippets() bool
 	PreferredHoverFormat() protocol.MarkupKind

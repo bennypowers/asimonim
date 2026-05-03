@@ -106,6 +106,7 @@ func (m *mockServerContextMinimal) ShouldProcessAsTokenFile(uri string) bool { r
 func (m *mockServerContextMinimal) LoadTokensFromDocumentContent(uri, languageID, content string) error {
 	return nil
 }
+func (m *mockServerContextMinimal) InlayHintsEnabled() bool                { return true }
 func (m *mockServerContextMinimal) Version() string                        { return "dev" }
 func (m *mockServerContextMinimal) SemanticTokenCache() SemanticTokenCacher {
 	if m.cache == nil {
