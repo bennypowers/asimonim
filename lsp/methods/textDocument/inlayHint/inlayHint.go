@@ -54,7 +54,7 @@ func hintForVarCall(req *types.RequestContext, requestRange protocol.Range, varC
 		return zero, false
 	}
 
-	if !varCallInRange(varCall, requestRange) {
+	if !hintPositionInRange(varCall, requestRange) {
 		return zero, false
 	}
 
@@ -77,17 +77,17 @@ func hintForVarCall(req *types.RequestContext, requestRange protocol.Range, varC
 	}, true
 }
 
-func varCallInRange(varCall *css.VarCall, r protocol.Range) bool {
-	if varCall.Range.End.Line < r.Start.Line {
+func hintPositionInRange(varCall *css.VarCall, r protocol.Range) bool {
+	line := varCall.Range.End.Line
+	char := varCall.Range.End.Character - 1
+
+	if line < r.Start.Line || line > r.End.Line {
 		return false
 	}
-	if varCall.Range.Start.Line > r.End.Line {
+	if line == r.Start.Line && char < r.Start.Character {
 		return false
 	}
-	if varCall.Range.End.Line == r.Start.Line && varCall.Range.End.Character < r.Start.Character {
-		return false
-	}
-	if varCall.Range.Start.Line == r.End.Line && varCall.Range.Start.Character > r.End.Character {
+	if line == r.End.Line && char >= r.End.Character {
 		return false
 	}
 	return true
