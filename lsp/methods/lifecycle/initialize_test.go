@@ -108,7 +108,7 @@ func TestInitialize(t *testing.T) {
 		assert.NotNil(t, caps.SemanticTokensProvider)
 		assert.NotNil(t, caps.DiagnosticProvider)
 		diagOpts, ok := caps.DiagnosticProvider.(protocol.DiagnosticOptions)
-		assert.True(t, ok)
+		require.True(t, ok)
 		assert.True(t, diagOpts.WorkspaceDiagnostics)
 
 		// Verify completion provider options

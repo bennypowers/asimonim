@@ -12,13 +12,21 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
+	"bennypowers.dev/asimonim/schema"
+	rootutil "bennypowers.dev/asimonim/testutil"
 	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var update = flag.Bool("update", false, "update golden files")
+func shouldUpdate() bool {
+	f := flag.Lookup("update")
+	if f == nil {
+		return false
+	}
+	return f.Value.String() == "true"
+}
 
 // loadFixtureCSS reads a CSS fixture file from testdata/workspace-diagnostic/.
 func loadFixtureCSS(t *testing.T, name string) string {
@@ -42,20 +50,11 @@ func TestWorkspaceDiagnostic_Golden(t *testing.T) {
 	glspCtx := &glsp.Context{}
 	req := types.NewRequestContext(ctx, glspCtx)
 
-	// color.old: deprecated token
-	_ = ctx.TokenManager().Add(&tokens.Token{
-		Name:               "color.old",
-		Value:              "#ff0000",
-		Type:               "color",
-		Deprecated:         true,
-		DeprecationMessage: "Use color.primary instead",
-	})
-	// color.primary: value is #0000ff, fixture uses wrong fallback #ff0000
-	_ = ctx.TokenManager().Add(&tokens.Token{
-		Name:  "color.primary",
-		Value: "#0000ff",
-		Type:  "color",
-	})
+	// Load tokens from fixture (color.old: deprecated, color.primary: #0000ff)
+	fixtureTokens := rootutil.ParseFixtureTokens(t, "workspace-diagnostic", schema.Draft)
+	for _, tok := range fixtureTokens {
+		_ = ctx.TokenManager().Add(tok)
+	}
 
 	// Open documents from fixtures
 	_ = ctx.DocumentManager().DidOpen(
@@ -99,7 +98,7 @@ func TestWorkspaceDiagnostic_Golden(t *testing.T) {
 
 	goldenPath := filepath.Join("testdata", "workspace-diagnostic", "golden.json")
 
-	if *update {
+	if shouldUpdate() {
 		err := os.WriteFile(goldenPath, actual, 0644)
 		require.NoError(t, err)
 		t.Log("Updated golden file")
