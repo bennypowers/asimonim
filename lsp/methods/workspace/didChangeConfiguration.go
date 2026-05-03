@@ -30,14 +30,13 @@ func DidChangeConfiguration(req *types.RequestContext, params *protocol.DidChang
 		log.Info("Warning: failed to reload tokens: %v", err)
 	}
 
-	// Republish diagnostics for all open documents (only if using push model)
-	// If client supports pull diagnostics (LSP 3.17), it will request them via textDocument/diagnostic
-	if !req.Server.UsePullDiagnostics() {
-		if req.GLSP != nil {
-			for _, doc := range req.Server.AllDocuments() {
-				if err := req.Server.PublishDiagnostics(req.GLSP, doc.URI()); err != nil {
-					log.Info("Warning: failed to publish diagnostics for %s: %v", doc.URI(), err)
-				}
+	// Refresh diagnostics for all open documents
+	if req.Server.UsePullDiagnostics() {
+		NotifyDiagnosticRefresh(req.GLSP)
+	} else if req.GLSP != nil {
+		for _, doc := range req.Server.AllDocuments() {
+			if err := req.Server.PublishDiagnostics(req.GLSP, doc.URI()); err != nil {
+				log.Info("Warning: failed to publish diagnostics for %s: %v", doc.URI(), err)
 			}
 		}
 	}
