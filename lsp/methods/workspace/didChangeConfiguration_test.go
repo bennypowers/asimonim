@@ -166,7 +166,14 @@ func TestDidChangeConfiguration_PublishesDiagnosticsForOpenDocs(t *testing.T) {
 
 func TestDidChangeConfiguration_SkipsDiagnosticsWithPullModel(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
+
+	// Track refresh notification
+	var refreshMethod string
+	glspCtx := &glsp.Context{
+		Notify: func(method string, params any) {
+			refreshMethod = method
+		},
+	}
 	req := types.NewRequestContext(ctx, glspCtx)
 	ctx.SetGLSPContext(glspCtx)
 
@@ -198,6 +205,8 @@ func TestDidChangeConfiguration_SkipsDiagnosticsWithPullModel(t *testing.T) {
 
 	// Should NOT have published diagnostics
 	assert.False(t, publishCalled, "Should not publish diagnostics with pull model")
+	// Should have sent workspace/diagnostic/refresh
+	assert.Equal(t, protocol.MethodWorkspaceDiagnosticRefresh, refreshMethod)
 }
 
 func TestDidChangeConfiguration_WithGroupMarkers(t *testing.T) {

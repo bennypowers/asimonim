@@ -102,6 +102,7 @@ func NewServer(opts ...Option) (*Server, error) {
 		Initialize:             method(s, "initialize", lifecycle.Initialize),
 		TextDocumentDiagnostic: method(s, "textDocument/diagnostic", diagnostic.DocumentDiagnostic),
 		TextDocumentInlayHint:  method(s, "textDocument/inlayHint", inlayhint.InlayHint),
+		WorkspaceDiagnostic:    method(s, "workspace/diagnostic", workspace.WorkspaceDiagnostic),
 	}
 
 	customHandler := &CustomHandler{

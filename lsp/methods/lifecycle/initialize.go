@@ -80,7 +80,7 @@ func Initialize(req *types.RequestContext, params *protocol.InitializeParams) (a
 	if supportsPullDiagnostics {
 		capabilities.DiagnosticProvider = protocol.DiagnosticOptions{
 			InterFileDependencies: false,
-			WorkspaceDiagnostics:  false,
+			WorkspaceDiagnostics:  true,
 		}
 	}
 

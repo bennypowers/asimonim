@@ -52,9 +52,10 @@ func DidChangeWatchedFiles(req *types.RequestContext, params *protocol.DidChange
 			log.Info("Warning: failed to reload tokens: %v", err)
 		}
 
-		// Republish diagnostics for all open documents (only if using push model)
-		// If client supports pull diagnostics (LSP 3.17), it will request them via textDocument/diagnostic
-		if !req.Server.UsePullDiagnostics() {
+		// Refresh diagnostics for all open documents
+		if req.Server.UsePullDiagnostics() {
+			NotifyDiagnosticRefresh(req.GLSP)
+		} else {
 			glspCtx := req.Server.GLSPContext()
 			if glspCtx != nil {
 				for _, doc := range req.Server.AllDocuments() {

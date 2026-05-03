@@ -7,6 +7,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHandleDidChangeWatchedFiles(t *testing.T) {
@@ -184,14 +186,19 @@ func TestHandleDidChangeWatchedFiles_NewlyCreatedFile(t *testing.T) {
 
 func TestHandleDidChangeWatchedFiles_SkipsDiagnosticsWithPullModel(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	req := types.NewRequestContext(ctx, nil)
 	ctx.SetRootPath("/workspace")
 
 	// Enable pull diagnostics
 	ctx.SetUsePullDiagnostics(true)
 
-	// Set up GLSP context
-	glspCtx := &glsp.Context{}
+	// Track refresh notification
+	var refreshMethod string
+	glspCtx := &glsp.Context{
+		Notify: func(method string, params any) {
+			refreshMethod = method
+		},
+	}
+	req := types.NewRequestContext(ctx, glspCtx)
 	ctx.SetGLSPContext(glspCtx)
 
 	// Track PublishDiagnostics calls - should NOT be called
@@ -222,14 +229,12 @@ func TestHandleDidChangeWatchedFiles_SkipsDiagnosticsWithPullModel(t *testing.T)
 	}
 
 	err := DidChangeWatchedFiles(req, params)
-	if err != nil {
-		t.Errorf("DidChangeWatchedFiles failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Should NOT have published diagnostics because pull model is active
-	if publishCalled {
-		t.Error("Expected PublishDiagnostics NOT to be called with pull diagnostics enabled")
-	}
+	assert.False(t, publishCalled, "Should not publish diagnostics with pull model")
+	// Should have sent workspace/diagnostic/refresh
+	assert.Equal(t, protocol.MethodWorkspaceDiagnosticRefresh, refreshMethod)
 }
 
 func TestHandleDidChangeWatchedFiles_EmptyChanges(t *testing.T) {
