@@ -115,11 +115,12 @@ func errorResult(text string) *mcp.CallToolResult {
 }
 
 func (s *Server) handleValidate(
-	_ context.Context,
-	_ *mcp.CallToolRequest,
+	ctx context.Context,
+	req *mcp.CallToolRequest,
 	input validateInput,
 ) (*mcp.CallToolResult, any, error) {
-	parsed, err := parseWorkspaceTokens(s.fs, s.cfg, input.Files, s.cwd)
+	cfg, cwd := s.configForRequest(ctx, sessionFromToolReq(req))
+	parsed, err := parseWorkspaceTokens(s.fs, cfg, input.Files, cwd)
 	if err != nil {
 		return errorResult(fmt.Sprintf("Validation error: %v", err)), nil, nil
 	}
@@ -170,8 +171,8 @@ func (s *Server) handleValidate(
 }
 
 func (s *Server) handleSearch(
-	_ context.Context,
-	_ *mcp.CallToolRequest,
+	ctx context.Context,
+	req *mcp.CallToolRequest,
 	input searchInput,
 ) (*mcp.CallToolResult, any, error) {
 	if input.Query == "" {
@@ -182,7 +183,8 @@ func (s *Server) handleSearch(
 		return errorResult("Error: name_only and value_only are mutually exclusive"), nil, nil
 	}
 
-	parsed, err := parseWorkspaceTokens(s.fs, s.cfg, nil, s.cwd)
+	cfg, cwd := s.configForRequest(ctx, sessionFromToolReq(req))
+	parsed, err := parseWorkspaceTokens(s.fs, cfg, nil, cwd)
 	if err != nil {
 		return errorResult(fmt.Sprintf("Error: %v", err)), nil, nil
 	}
@@ -234,8 +236,8 @@ func (s *Server) handleSearch(
 }
 
 func (s *Server) handleConvert(
-	_ context.Context,
-	_ *mcp.CallToolRequest,
+	ctx context.Context,
+	req *mcp.CallToolRequest,
 	input convertInput,
 ) (*mcp.CallToolResult, any, error) {
 	if input.Format == "" {
@@ -247,7 +249,8 @@ func (s *Server) handleConvert(
 		return errorResult(fmt.Sprintf("Error: %v", err)), nil, nil
 	}
 
-	parsed, err := parseWorkspaceTokens(s.fs, s.cfg, input.Files, s.cwd)
+	cfg, cwd := s.configForRequest(ctx, sessionFromToolReq(req))
+	parsed, err := parseWorkspaceTokens(s.fs, cfg, input.Files, cwd)
 	if err != nil {
 		return errorResult(fmt.Sprintf("Error: %v", err)), nil, nil
 	}
@@ -273,6 +276,13 @@ func (s *Server) handleConvert(
 	}
 
 	return textResult(string(output)), nil, nil
+}
+
+func sessionFromToolReq(req *mcp.CallToolRequest) *mcp.ServerSession {
+	if req == nil {
+		return nil
+	}
+	return req.Session
 }
 
 func matchString(s, query string, pattern *regexp.Regexp) bool {

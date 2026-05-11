@@ -13,7 +13,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"bennypowers.dev/asimonim/config"
 	"bennypowers.dev/asimonim/fs"
 	"bennypowers.dev/asimonim/internal/logger"
 	mcpserver "bennypowers.dev/asimonim/mcp"
@@ -52,13 +51,12 @@ func run(cmd *cobra.Command, _ []string) error {
 	logger.SetOutput(io.Discard)
 
 	filesystem := fs.NewOSFileSystem()
-	cfg := config.LoadOrDefault(filesystem, ".")
 
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 
-	server := mcpserver.NewServer(filesystem, cfg, cwd)
+	server := mcpserver.NewServer(filesystem, nil, cwd)
 	return server.Run(cmd.Context())
 }
