@@ -53,6 +53,13 @@ func newTokenDetail(tok *token.Token) tokenDetail {
 	}
 }
 
+func sessionFromResourceReq(req *mcp.ReadResourceRequest) *mcp.ServerSession {
+	if req == nil {
+		return nil
+	}
+	return req.Session
+}
+
 func (s *Server) setupResources() {
 	// asimonim://tokens - list available token sources
 	s.server.AddResource(&mcp.Resource{
@@ -88,14 +95,15 @@ func (s *Server) setupResources() {
 }
 
 func (s *Server) handleTokenSources(
-	_ context.Context,
+	ctx context.Context,
 	req *mcp.ReadResourceRequest,
 ) (*mcp.ReadResourceResult, error) {
 	if err := validateResourceRequest(req); err != nil {
 		return nil, err
 	}
 
-	parsed, err := parseWorkspaceTokens(s.fs, s.cfg, nil, s.cwd)
+	cfg, cwd := s.configForRequest(ctx, sessionFromResourceReq(req))
+	parsed, err := parseWorkspaceTokens(s.fs, cfg, nil, cwd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse tokens: %w", err)
 	}
@@ -123,18 +131,19 @@ func (s *Server) handleTokenSources(
 }
 
 func (s *Server) handleConfig(
-	_ context.Context,
+	ctx context.Context,
 	req *mcp.ReadResourceRequest,
 ) (*mcp.ReadResourceResult, error) {
 	if err := validateResourceRequest(req); err != nil {
 		return nil, err
 	}
 
+	cfg, _ := s.configForRequest(ctx, sessionFromResourceReq(req))
 	cfgData := map[string]any{
-		"prefix":    s.cfg.Prefix,
-		"schema":    s.cfg.Schema,
-		"files":     s.cfg.FilePaths(),
-		"resolvers": s.cfg.Resolvers,
+		"prefix":    cfg.Prefix,
+		"schema":    cfg.Schema,
+		"files":     cfg.FilePaths(),
+		"resolvers": cfg.Resolvers,
 	}
 
 	data, err := json.MarshalIndent(cfgData, "", "  ")
@@ -152,7 +161,7 @@ func (s *Server) handleConfig(
 }
 
 func (s *Server) handleTokensBySource(
-	_ context.Context,
+	ctx context.Context,
 	req *mcp.ReadResourceRequest,
 ) (*mcp.ReadResourceResult, error) {
 	if err := validateResourceRequest(req); err != nil {
@@ -165,7 +174,8 @@ func (s *Server) handleTokensBySource(
 		return nil, mcp.ResourceNotFoundError(req.Params.URI)
 	}
 
-	parsed, err := parseWorkspaceTokens(s.fs, s.cfg, nil, s.cwd)
+	cfg, cwd := s.configForRequest(ctx, sessionFromResourceReq(req))
+	parsed, err := parseWorkspaceTokens(s.fs, cfg, nil, cwd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse tokens: %w", err)
 	}
@@ -196,7 +206,7 @@ func (s *Server) handleTokensBySource(
 }
 
 func (s *Server) handleTokenDetail(
-	_ context.Context,
+	ctx context.Context,
 	req *mcp.ReadResourceRequest,
 ) (*mcp.ReadResourceResult, error) {
 	if err := validateResourceRequest(req); err != nil {
@@ -209,7 +219,8 @@ func (s *Server) handleTokenDetail(
 		return nil, mcp.ResourceNotFoundError(req.Params.URI)
 	}
 
-	parsed, err := parseWorkspaceTokens(s.fs, s.cfg, nil, s.cwd)
+	cfg, cwd := s.configForRequest(ctx, sessionFromResourceReq(req))
+	parsed, err := parseWorkspaceTokens(s.fs, cfg, nil, cwd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse tokens: %w", err)
 	}
