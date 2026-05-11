@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"encoding/json"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/uriutil"
@@ -110,6 +111,8 @@ func TestInitialize(t *testing.T) {
 		diagOpts, ok := caps.DiagnosticProvider.(protocol.DiagnosticOptions)
 		require.True(t, ok)
 		assert.True(t, diagOpts.WorkspaceDiagnostics)
+		require.NotNil(t, diagOpts.Identifier, "Identifier must be set to avoid Neovim null userdata crash")
+		assert.Equal(t, "asimonim", *diagOpts.Identifier)
 
 		// Verify completion provider options
 		assert.NotNil(t, caps.CompletionProvider.ResolveProvider)
@@ -120,6 +123,30 @@ func TestInitialize(t *testing.T) {
 		assert.True(t, ok)
 		assert.NotNil(t, codeActionProvider.ResolveProvider)
 		assert.True(t, *codeActionProvider.ResolveProvider)
+	})
+
+	t.Run("diagnostic identifier serializes as string not null", func(t *testing.T) {
+		ctx := testutil.NewMockServerContext()
+		glspCtx := &glsp.Context{}
+		req := types.NewRequestContext(ctx, glspCtx)
+		ctx.SetClientDiagnosticCapability(true)
+
+		params := &protocol.InitializeParams{
+			Capabilities: protocol.ClientCapabilities{
+				TextDocument: &protocol.TextDocumentClientCapabilities{},
+			},
+		}
+
+		result, err := Initialize(req, params)
+		require.NoError(t, err)
+
+		initResult := result.(protocol.InitializeResult)
+		data, err := json.Marshal(initResult.Capabilities)
+		require.NoError(t, err)
+
+		// Neovim crashes when identifier is null (Lua userdata vs string)
+		assert.NotContains(t, string(data), `"identifier":null`)
+		assert.Contains(t, string(data), `"identifier":"asimonim"`)
 	})
 
 	t.Run("handles client info", func(t *testing.T) {

@@ -12,6 +12,8 @@ github.com/bennypowers/glsp v0.0.0-20260501124255-83ab200c0f90 h1:IaAv5U5B8XKW5Z
 github.com/bennypowers/glsp v0.0.0-20260501124255-83ab200c0f90/go.mod h1:xY+tzLsKqII5jJc7lUADTw5a+ONpyuC1h2HG1WqQckw=
 github.com/bennypowers/glsp v0.0.0-20260501152441-74e714d631a0 h1:0lIJk99h9Q1ZvZQOf/euxXq2bVpppOzGSMNerKh3mWw=
 github.com/bennypowers/glsp v0.0.0-20260501152441-74e714d631a0/go.mod h1:xY+tzLsKqII5jJc7lUADTw5a+ONpyuC1h2HG1WqQckw=
+github.com/bennypowers/glsp v0.0.0-20260511074857-83c7f674baea h1:8JBUvL96De3eagEHxVID5cRCQdHseohaFof+l6GOo+Q=
+github.com/bennypowers/glsp v0.0.0-20260511074857-83c7f674baea/go.mod h1:xY+tzLsKqII5jJc7lUADTw5a+ONpyuC1h2HG1WqQckw=
 github.com/bmatcuk/doublestar/v4 v4.9.2 h1:b0mc6WyRSYLjzofB2v/0cuDUZ+MqoGyH3r0dVij35GI=
 github.com/bmatcuk/doublestar/v4 v4.9.2/go.mod h1:xBQ8jztBU6kakFMg+8WGxn0c6z1fTSPVIjEY1Wr7jzc=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=

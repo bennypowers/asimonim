@@ -79,6 +79,7 @@ func Initialize(req *types.RequestContext, params *protocol.InitializeParams) (a
 
 	if supportsPullDiagnostics {
 		capabilities.DiagnosticProvider = protocol.DiagnosticOptions{
+			Identifier:            strPtr("asimonim"),
 			InterFileDependencies: false,
 			WorkspaceDiagnostics:  true,
 		}
