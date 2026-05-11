@@ -134,8 +134,11 @@ func (s *Server) ensureListRoots(session *mcp.ServerSession) {
 }
 
 // fileURIToPath converts a file:// URI to a filesystem path.
-// Handles Windows drive letters (file:///C:/path → C:/path)
-// and percent-encoded characters (file:///my%20dir → /my dir).
+// Handles:
+//   - Unix paths: file:///home/user → /home/user
+//   - Windows drive letters: file:///C:/path → C:/path
+//   - UNC paths: file://server/share/path → //server/share/path
+//   - Percent-encoded characters: file:///my%20dir → /my dir
 func fileURIToPath(uri string) (string, error) {
 	u, err := url.Parse(uri)
 	if err != nil {
@@ -145,6 +148,10 @@ func fileURIToPath(uri string) (string, error) {
 		return "", &url.Error{Op: "parse", URL: uri, Err: url.InvalidHostError(u.Scheme)}
 	}
 	path := u.Path
+	if u.Host != "" {
+		// UNC-style: file://server/share → //server/share
+		path = "//" + u.Host + path
+	}
 	if path == "" {
 		return "", &url.Error{Op: "parse", URL: uri, Err: url.InvalidHostError("empty path")}
 	}

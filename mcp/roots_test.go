@@ -219,6 +219,7 @@ func TestFileURIToPath(t *testing.T) {
 	}{
 		{"unix path", "file:///home/user/project", "/home/user/project", false},
 		{"windows drive letter", "file:///C:/Users/project", "C:/Users/project", false},
+		{"UNC path", "file://server/share/project", "//server/share/project", false},
 		{"percent-encoded space", "file:///my%20project", "/my project", false},
 		{"non-file scheme", "http://example.com", "", true},
 		{"empty path", "file://", "", true},
@@ -299,39 +300,47 @@ func TestResolveConfigDoesNotHoldMutexDuringListRoots(t *testing.T) {
 	mfs := projectFS()
 	s := NewServer(mfs, nil, "/elsewhere")
 
-	// listRoots blocks for 50ms, simulating slow RPC
+	firstCallStarted := make(chan struct{})
+	unblock := make(chan struct{})
+	var callCount atomic.Int32
+
 	s.listRoots = func(_ context.Context) ([]*mcp.Root, error) {
-		time.Sleep(50 * time.Millisecond)
+		n := callCount.Add(1)
+		if n == 1 {
+			close(firstCallStarted)
+			<-unblock
+		}
 		return []*mcp.Root{{URI: "file:///project"}}, nil
 	}
 
-	// First goroutine triggers lazy resolution (slow listRoots)
-	// Second goroutine should not block on mutex during the RPC wait
-	start := time.Now()
 	var wg sync.WaitGroup
 	wg.Add(2)
 
+	// Goroutine 1: enters resolveConfig, calls listRoots, blocks on unblock channel
 	go func() {
 		defer wg.Done()
 		s.resolveConfig(context.Background())
 	}()
 
-	// Give first goroutine a head start
-	time.Sleep(5 * time.Millisecond)
+	// Wait for first listRoots call to start (proving mutex was released)
+	<-firstCallStarted
 
+	// Goroutine 2: if mutex released during RPC, this enters listRoots concurrently
 	go func() {
 		defer wg.Done()
 		s.resolveConfig(context.Background())
 	}()
 
+	// Give goroutine 2 time to enter listRoots
+	time.Sleep(10 * time.Millisecond)
+
+	// Second call should have entered listRoots while first is blocked.
+	// If mutex were held during RPC, callCount would still be 1.
+	assert.GreaterOrEqual(t, callCount.Load(), int32(2),
+		"second resolveConfig should enter listRoots while first is blocked (mutex not held during RPC)")
+
+	close(unblock)
 	wg.Wait()
-	elapsed := time.Since(start)
-
-	// If mutex held during RPC, both goroutines serialize: ~100ms total.
-	// If mutex released during RPC, second goroutine proceeds faster: ~50ms total.
-	// Use 80ms as threshold.
-	assert.Less(t, elapsed, 80*time.Millisecond,
-		"resolveConfig should not hold mutex during listRoots RPC (elapsed %v)", elapsed)
 }
 
 func TestRootsNilListRootsResult(t *testing.T) {
