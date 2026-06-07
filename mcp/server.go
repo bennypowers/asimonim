@@ -80,7 +80,7 @@ func (s *Server) resolveConfig(ctx context.Context) (*config.Config, string) {
 		return s.cfg, s.resolvedCwd()
 	}
 	s.rootDir = rootDir
-	s.cfg = config.LoadOrDefault(s.fs, rootDir)
+	s.cfg = config.LoadFullOrDefault(s.fs, rootDir)
 	return s.cfg, s.resolvedCwd()
 }
 

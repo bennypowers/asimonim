@@ -388,3 +388,81 @@ func TestRootsNilListRootsFuncFallbackToCwd(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, result.IsError, "nil listRoots func should fall back to cwd")
 }
+
+// packageJSONProjectFS creates a filesystem with package.json config and token file,
+// but no .config/design-tokens.yaml. Simulates projects that only configure
+// via designTokensLanguageServer in package.json.
+func packageJSONProjectFS() *mapfs.MapFileSystem {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"name": "my-design-system",
+		"designTokensLanguageServer": {
+			"prefix": "rh",
+			"tokensFiles": ["/project/tokens.json"]
+		}
+	}`, 0644)
+	mfs.AddFile("/project/tokens.json", `{
+		"color": {
+			"brand": {
+				"$type": "color",
+				"$value": "#EE0000"
+			}
+		}
+	}`, 0644)
+	return mfs
+}
+
+func TestSearchDiscoversConfigFromPackageJSON(t *testing.T) {
+	mfs := packageJSONProjectFS()
+	s := NewServer(mfs, nil, "/elsewhere")
+	s.listRoots = func(_ context.Context) ([]*mcp.Root, error) {
+		return []*mcp.Root{{URI: "file:///project"}}, nil
+	}
+
+	result, _, err := s.handleSearch(context.Background(), nil, searchInput{
+		Query: "brand",
+	})
+	require.NoError(t, err)
+	assert.False(t, result.IsError, "expected search to succeed via package.json discovery, got: %s", resultText(t, result))
+
+	var tokens []tokenSummary
+	require.NoError(t, json.Unmarshal([]byte(resultText(t, result)), &tokens))
+	assert.Len(t, tokens, 1)
+	assert.Equal(t, "color-brand", tokens[0].Name)
+}
+
+func TestValidateDiscoversConfigFromPackageJSON(t *testing.T) {
+	mfs := packageJSONProjectFS()
+	s := NewServer(mfs, nil, "/elsewhere")
+	s.listRoots = func(_ context.Context) ([]*mcp.Root, error) {
+		return []*mcp.Root{{URI: "file:///project"}}, nil
+	}
+
+	result, _, err := s.handleValidate(context.Background(), nil, validateInput{})
+	require.NoError(t, err)
+	assert.False(t, result.IsError, "expected validate to succeed via package.json, got: %s", resultText(t, result))
+	assert.Contains(t, resultText(t, result), "1 tokens")
+}
+
+func TestConfigResourceShowsPackageJSONFiles(t *testing.T) {
+	mfs := packageJSONProjectFS()
+	s := NewServer(mfs, nil, "/elsewhere")
+	s.listRoots = func(_ context.Context) ([]*mcp.Root, error) {
+		return []*mcp.Root{{URI: "file:///project"}}, nil
+	}
+
+	result, err := s.handleConfig(context.Background(), &mcp.ReadResourceRequest{
+		Params: &mcp.ReadResourceParams{URI: "asimonim://config"},
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Contents, 1)
+
+	var cfgData map[string]any
+	require.NoError(t, json.Unmarshal([]byte(result.Contents[0].Text), &cfgData))
+
+	assert.Equal(t, "rh", cfgData["prefix"])
+	files, ok := cfgData["files"].([]any)
+	require.True(t, ok, "files should be an array")
+	assert.Len(t, files, 1)
+	assert.Equal(t, "/project/tokens.json", files[0])
+}

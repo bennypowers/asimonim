@@ -69,6 +69,68 @@ func LoadOrDefault(filesystem asimfs.FileSystem, rootDir string) *Config {
 	return cfg
 }
 
+// LoadFull reads config from package.json first, then merges with
+// .config/design-tokens.{yaml,yml,json}. Package.json takes precedence.
+// Returns nil if neither source exists (not an error).
+func LoadFull(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
+	pkgCfg, err := LoadFromPackageJSON(filesystem, rootDir)
+	if err != nil {
+		return nil, err
+	}
+
+	fileCfg, err := Load(filesystem, rootDir)
+	if err != nil {
+		return nil, err
+	}
+
+	if pkgCfg == nil {
+		return fileCfg, nil
+	}
+
+	if fileCfg != nil {
+		mergeConfig(pkgCfg, fileCfg)
+	}
+
+	return pkgCfg, nil
+}
+
+// LoadFullOrDefault returns config from all sources or defaults if not found.
+func LoadFullOrDefault(filesystem asimfs.FileSystem, rootDir string) *Config {
+	cfg, err := LoadFull(filesystem, rootDir)
+	if err != nil || cfg == nil {
+		return Default()
+	}
+	return cfg
+}
+
+// mergeConfig fills empty fields in dst from src.
+func mergeConfig(dst, src *Config) {
+	if dst.Prefix == "" && src.Prefix != "" {
+		dst.Prefix = src.Prefix
+	}
+	if dst.Files == nil && src.Files != nil {
+		dst.Files = src.Files
+	}
+	if dst.Resolvers == nil && src.Resolvers != nil {
+		dst.Resolvers = src.Resolvers
+	}
+	if dst.GroupMarkers == nil && src.GroupMarkers != nil {
+		dst.GroupMarkers = src.GroupMarkers
+	}
+	if dst.Schema == "" && src.Schema != "" {
+		dst.Schema = src.Schema
+	}
+	if dst.CDN == "" && src.CDN != "" {
+		dst.CDN = src.CDN
+	}
+	if dst.Header == "" && src.Header != "" {
+		dst.Header = src.Header
+	}
+	if dst.Outputs == nil && src.Outputs != nil {
+		dst.Outputs = src.Outputs
+	}
+}
+
 // ExpandFiles expands glob patterns in Files and returns absolute paths.
 // Paths starting with npm: are passed through unchanged.
 func (c *Config) ExpandFiles(filesystem asimfs.FileSystem, rootDir string) ([]string, error) {

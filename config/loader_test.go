@@ -183,6 +183,224 @@ func TestConfig_OptionsForFile(t *testing.T) {
 	})
 }
 
+func TestLoadFull_PackageJSONOnly(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"designTokensLanguageServer": {
+			"prefix": "rh",
+			"tokensFiles": ["npm:@rhds/tokens/json/rhds.tokens.json"]
+		}
+	}`, 0644)
+
+	cfg, err := LoadFull(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("expected config from package.json, got nil")
+	}
+	if cfg.Prefix != "rh" {
+		t.Errorf("expected prefix 'rh', got %q", cfg.Prefix)
+	}
+	if len(cfg.Files) != 1 {
+		t.Fatalf("expected 1 file, got %d", len(cfg.Files))
+	}
+	if cfg.Files[0].Path != "npm:@rhds/tokens/json/rhds.tokens.json" {
+		t.Errorf("expected npm: specifier, got %q", cfg.Files[0].Path)
+	}
+}
+
+func TestLoadFull_ConfigFileOnly(t *testing.T) {
+	mfs := testutil.NewFixtureFS(t, "fixtures/config/simple", "/project")
+
+	cfg, err := LoadFull(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("expected config from .config/, got nil")
+	}
+	if cfg.Prefix != "rh" {
+		t.Errorf("expected prefix 'rh', got %q", cfg.Prefix)
+	}
+}
+
+func TestLoadFull_PackageJSONTakesPrecedence(t *testing.T) {
+	mfs := mapfs.New()
+	// package.json config
+	mfs.AddFile("/project/package.json", `{
+		"asimonim": {
+			"prefix": "from-pkg",
+			"tokensFiles": ["./pkg-tokens.json"]
+		}
+	}`, 0644)
+	// .config/ also present
+	mfs.AddFile("/project/.config/design-tokens.yaml", "prefix: from-config\nfiles:\n  - ./config-tokens.json\n", 0644)
+
+	cfg, err := LoadFull(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("expected config, got nil")
+	}
+	if cfg.Prefix != "from-pkg" {
+		t.Errorf("expected prefix 'from-pkg' from package.json, got %q", cfg.Prefix)
+	}
+	if len(cfg.Files) != 1 || cfg.Files[0].Path != "./pkg-tokens.json" {
+		t.Errorf("expected files from package.json, got %v", cfg.Files)
+	}
+}
+
+func TestLoadFull_MergesResolversFromConfigFile(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"asimonim": {
+			"prefix": "ds",
+			"tokensFiles": ["./tokens.json"]
+		}
+	}`, 0644)
+	mfs.AddFile("/project/.config/design-tokens.yaml", "resolvers:\n  - npm:@acme/tokens/resolver.json\n", 0644)
+
+	cfg, err := LoadFull(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("expected config, got nil")
+	}
+	// Prefix from package.json
+	if cfg.Prefix != "ds" {
+		t.Errorf("expected prefix 'ds', got %q", cfg.Prefix)
+	}
+	// Resolvers merged from .config/
+	if len(cfg.Resolvers) != 1 || cfg.Resolvers[0] != "npm:@acme/tokens/resolver.json" {
+		t.Errorf("expected resolvers from config file, got %v", cfg.Resolvers)
+	}
+}
+
+func TestLoadFull_NeitherExists(t *testing.T) {
+	mfs := mapfs.New()
+
+	cfg, err := LoadFull(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg != nil {
+		t.Errorf("expected nil when no config found, got %+v", cfg)
+	}
+}
+
+func TestLoadFull_MalformedPackageJSONBlocksConfigFile(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{not valid json`, 0644)
+	mfs.AddFile("/project/.config/design-tokens.yaml", "prefix: fallback\nfiles:\n  - ./tokens.json\n", 0644)
+
+	cfg, err := LoadFull(mfs, "/project")
+	if err == nil {
+		t.Fatal("expected error from malformed package.json")
+	}
+	if cfg != nil {
+		t.Errorf("expected nil config on error, got %+v", cfg)
+	}
+}
+
+func TestLoadFull_NonObjectConfigKeyBlocksConfigFile(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"asimonim": "not-an-object"
+	}`, 0644)
+	mfs.AddFile("/project/.config/design-tokens.yaml", "prefix: fallback\nfiles:\n  - ./tokens.json\n", 0644)
+
+	cfg, err := LoadFull(mfs, "/project")
+	if err == nil {
+		t.Fatal("expected error from non-object config key")
+	}
+	if cfg != nil {
+		t.Errorf("expected nil config on error, got %+v", cfg)
+	}
+}
+
+func TestLoadFull_MergesHeaderFromConfigFile(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"asimonim": {
+			"prefix": "ds",
+			"tokensFiles": ["./tokens.json"]
+		}
+	}`, 0644)
+	mfs.AddFile("/project/.config/design-tokens.yaml", "header: \"/* generated */\"\n", 0644)
+
+	cfg, err := LoadFull(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("expected config, got nil")
+	}
+	if cfg.Prefix != "ds" {
+		t.Errorf("expected prefix 'ds', got %q", cfg.Prefix)
+	}
+	if cfg.Header != "/* generated */" {
+		t.Errorf("expected header from config file, got %q", cfg.Header)
+	}
+}
+
+func TestLoadFull_EmptyTokensFilesNotOverridden(t *testing.T) {
+	mfs := mapfs.New()
+	// package.json explicitly sets empty tokensFiles
+	mfs.AddFile("/project/package.json", `{
+		"asimonim": {
+			"tokensFiles": []
+		}
+	}`, 0644)
+	// .config/ has files
+	mfs.AddFile("/project/.config/design-tokens.yaml", "files:\n  - ./should-not-appear.json\n", 0644)
+
+	cfg, err := LoadFull(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("expected config, got nil")
+	}
+	// Empty tokensFiles is explicit intent: "no files".
+	// mergeConfig must not fill from .config/.
+	if cfg.Files == nil {
+		t.Fatal("expected non-nil empty Files slice, got nil")
+	}
+	if len(cfg.Files) != 0 {
+		t.Errorf("expected 0 files (explicit empty), got %d: %v", len(cfg.Files), cfg.Files)
+	}
+}
+
+func TestLoadFullOrDefault_Found(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"asimonim": { "prefix": "test" }
+	}`, 0644)
+
+	cfg := LoadFullOrDefault(mfs, "/project")
+	if cfg == nil {
+		t.Fatal("expected config, got nil")
+	}
+	if cfg.Prefix != "test" {
+		t.Errorf("expected prefix 'test', got %q", cfg.Prefix)
+	}
+}
+
+func TestLoadFullOrDefault_NotFound(t *testing.T) {
+	mfs := mapfs.New()
+
+	cfg := LoadFullOrDefault(mfs, "/project")
+	if cfg == nil {
+		t.Fatal("expected default config, got nil")
+	}
+	if cfg.Prefix != "" {
+		t.Errorf("expected empty prefix in default, got %q", cfg.Prefix)
+	}
+}
+
 func TestConfig_FilePaths(t *testing.T) {
 	cfg := &Config{
 		Files: []FileSpec{

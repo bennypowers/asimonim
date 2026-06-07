@@ -58,7 +58,7 @@ jobs:
       - name: Test with coverage
         run: make test-coverage
 
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v7
         with:
           files: coverage.out
           token: ${{ secrets.CODECOV_PAT }}
