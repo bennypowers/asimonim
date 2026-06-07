@@ -304,6 +304,71 @@ func TestLoadFromPackageJSON_Schema(t *testing.T) {
 	assert.Equal(t, "draft", cfg.Schema)
 }
 
+func TestLoadFromPackageJSON_TokensFilesEmptyStringPath(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"asimonim": {
+			"tokensFiles": ""
+		}
+	}`, 0644)
+
+	_, err := LoadFromPackageJSON(mfs, "/project")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing path")
+}
+
+func TestLoadFromPackageJSON_TokensFilesObjectMissingPath(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"asimonim": {
+			"tokensFiles": [{"prefix": "custom"}]
+		}
+	}`, 0644)
+
+	_, err := LoadFromPackageJSON(mfs, "/project")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing path")
+}
+
+func TestLoadFromPackageJSON_PrefixWrongType(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"asimonim": {
+			"prefix": 42
+		}
+	}`, 0644)
+
+	_, err := LoadFromPackageJSON(mfs, "/project")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "prefix")
+}
+
+func TestLoadFromPackageJSON_CDNWrongType(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"asimonim": {
+			"cdn": true
+		}
+	}`, 0644)
+
+	_, err := LoadFromPackageJSON(mfs, "/project")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cdn")
+}
+
+func TestLoadFromPackageJSON_SchemaWrongType(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"asimonim": {
+			"schema": ["draft"]
+		}
+	}`, 0644)
+
+	_, err := LoadFromPackageJSON(mfs, "/project")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "schema")
+}
+
 func TestLoadFromPackageJSON_JSONC(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddFile("/project/package.json", `{

@@ -65,28 +65,30 @@ func LoadFromPackageJSON(filesystem asimfs.FileSystem, rootDir string) (*Config,
 	return buildConfigFromMap(configMap)
 }
 
+func parseStringField(m map[string]json.RawMessage, key string) (string, error) {
+	raw, ok := m[key]
+	if !ok {
+		return "", nil
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return "", fmt.Errorf("invalid type for %s: expected string", key)
+	}
+	return s, nil
+}
+
 func buildConfigFromMap(m map[string]json.RawMessage) (*Config, error) {
 	cfg := &Config{}
 
-	if raw, ok := m["prefix"]; ok {
-		var s string
-		if err := json.Unmarshal(raw, &s); err == nil {
-			cfg.Prefix = s
-		}
+	var err error
+	if cfg.Prefix, err = parseStringField(m, "prefix"); err != nil {
+		return nil, err
 	}
-
-	if raw, ok := m["cdn"]; ok {
-		var s string
-		if err := json.Unmarshal(raw, &s); err == nil {
-			cfg.CDN = s
-		}
+	if cfg.CDN, err = parseStringField(m, "cdn"); err != nil {
+		return nil, err
 	}
-
-	if raw, ok := m["schema"]; ok {
-		var s string
-		if err := json.Unmarshal(raw, &s); err == nil {
-			cfg.Schema = s
-		}
+	if cfg.Schema, err = parseStringField(m, "schema"); err != nil {
+		return nil, err
 	}
 
 	if raw, ok := m["groupMarkers"]; ok {
@@ -126,6 +128,9 @@ func parseTokensFiles(raw json.RawMessage) ([]FileSpec, error) {
 	// Try as single string
 	var single string
 	if err := json.Unmarshal(raw, &single); err == nil {
+		if single == "" {
+			return nil, fmt.Errorf("tokensFiles entry missing path")
+		}
 		return []FileSpec{{Path: single}}, nil
 	}
 
@@ -139,6 +144,9 @@ func parseTokensFiles(raw json.RawMessage) ([]FileSpec, error) {
 	for _, item := range arr {
 		var s string
 		if err := json.Unmarshal(item, &s); err == nil {
+			if s == "" {
+				return nil, fmt.Errorf("tokensFiles entry missing path")
+			}
 			specs = append(specs, FileSpec{Path: s})
 			continue
 		}
@@ -146,6 +154,9 @@ func parseTokensFiles(raw json.RawMessage) ([]FileSpec, error) {
 		var spec FileSpec
 		if err := json.Unmarshal(item, &spec); err != nil {
 			return nil, fmt.Errorf("invalid tokensFiles entry: %w", err)
+		}
+		if spec.Path == "" {
+			return nil, fmt.Errorf("tokensFiles entry missing path")
 		}
 		specs = append(specs, spec)
 	}
