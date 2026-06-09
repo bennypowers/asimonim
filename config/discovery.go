@@ -49,7 +49,7 @@ func (d *designTokensMeta) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &r); err != nil {
 		return err
 	}
-	d.Resolver = r.Resolver
+	d.Resolver = strings.TrimPrefix(r.Resolver, "./")
 	return nil
 }
 

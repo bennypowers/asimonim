@@ -405,6 +405,36 @@ func TestDiscoverDesignTokens_DeduplicateAcrossDepTypes(t *testing.T) {
 	}
 }
 
+func TestDiscoverDesignTokens_ResolverDotSlashNormalized(t *testing.T) {
+	// "resolver": "./tokens.resolver.json" should produce the same specifier
+	// as the string shorthand "./tokens.resolver.json" (no leading ./)
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"name": "test",
+		"dependencies": { "@dotslash/pkg": "^1.0.0" }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@dotslash/pkg/package.json", `{
+		"name": "@dotslash/pkg",
+		"designTokens": { "resolver": "./tokens.resolver.json" }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@dotslash/pkg/tokens.resolver.json", `{"version":"2025.10"}`, 0644)
+
+	results, err := DiscoverDesignTokens(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	// Specifier should not contain "./"
+	expected := "npm:@dotslash/pkg/tokens.resolver.json"
+	if results[0].Specifier != expected {
+		t.Errorf("expected specifier %q, got %q", expected, results[0].Specifier)
+	}
+}
+
 func TestDiscoverDesignTokens_EmptyStringNoFallthrough(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddFile("/project/package.json", `{
