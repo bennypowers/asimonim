@@ -1,0 +1,6 @@
+{
+  "name": "test-project",
+  "devDependencies": {
+    "@dev/tokens": "^1.0.0"
+  }
+}
