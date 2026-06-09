@@ -9,7 +9,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -20,40 +19,77 @@ import (
 
 // packageJSON represents the fields we care about from a package.json.
 type packageJSON struct {
-	Name            string           `json:"name"`
-	Dependencies    map[string]string `json:"dependencies"`
-	Exports         json.RawMessage  `json:"exports"`
-	DesignTokens    *designTokensMeta `json:"designTokens"`
+	Name             string            `json:"name"`
+	Dependencies     map[string]string `json:"dependencies"`
+	DevDependencies  map[string]string `json:"devDependencies"`
+	PeerDependencies map[string]string `json:"peerDependencies"`
+	Exports          json.RawMessage   `json:"exports"`
+	DesignTokens     *designTokensMeta `json:"designTokens"`
 }
 
 // designTokensMeta represents the "designTokens" field in package.json.
+// Supports both string shorthand ("./tokens.json") and object form ({"resolver": "..."}).
 type designTokensMeta struct {
-	Resolver string `json:"resolver"`
+	// Path is the file path from string shorthand form.
+	Path string
+	// Resolver is the resolver path from object form.
+	Resolver string
 }
 
-// DiscoverResolvers scans direct dependencies for DTCG resolver files.
+func (d *designTokensMeta) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		d.Path = strings.TrimPrefix(s, "./")
+		return nil
+	}
+	type raw struct {
+		Resolver string `json:"resolver"`
+	}
+	var r raw
+	if err := json.Unmarshal(data, &r); err != nil {
+		return err
+	}
+	d.Resolver = strings.TrimPrefix(r.Resolver, "./")
+	return nil
+}
+
+// DiscoverDesignTokens scans dependencies for DTCG token or resolver files.
 // It checks each dependency's package.json for:
-//   - A "designTokens" field with a "resolver" path
+//   - A "designTokens" string shorthand pointing to a file
+//   - A "designTokens" object with a "resolver" path
 //   - A "designTokens" export condition in the "exports" field
 //
-// Returns resolved file entries for all discovered resolvers.
-func DiscoverResolvers(filesystem asimfs.FileSystem, rootDir string) ([]*specifier.ResolvedFile, error) {
-	// Read the project's package.json to find direct dependencies
+// Scans dependencies, devDependencies, and peerDependencies.
+// Returns resolved file entries for all discovered files.
+func DiscoverDesignTokens(filesystem asimfs.FileSystem, rootDir string) ([]*specifier.ResolvedFile, error) {
 	projectPkg, err := readPackageJSON(filesystem, filepath.Join(rootDir, "package.json"))
 	if err != nil {
 		return nil, err
 	}
 	if projectPkg == nil {
-		// No package.json found — discovery is a no-op
 		return nil, nil
 	}
 
-	depNames := slices.Sorted(maps.Keys(projectPkg.Dependencies))
+	seen := make(map[string]bool)
+	var depNames []string
+	for _, deps := range []map[string]string{
+		projectPkg.Dependencies,
+		projectPkg.DevDependencies,
+		projectPkg.PeerDependencies,
+	} {
+		for name := range deps {
+			if !seen[name] {
+				seen[name] = true
+				depNames = append(depNames, name)
+			}
+		}
+	}
+	slices.Sort(depNames)
 
 	var result []*specifier.ResolvedFile
 
 	for _, depName := range depNames {
-		resolved, err := discoverResolverInDep(filesystem, rootDir, depName)
+		resolved, err := discoverDesignTokensInDep(filesystem, rootDir, depName)
 		if err != nil {
 			continue
 		}
@@ -65,8 +101,8 @@ func DiscoverResolvers(filesystem asimfs.FileSystem, rootDir string) ([]*specifi
 	return result, nil
 }
 
-// discoverResolverInDep checks a single dependency for a resolver file.
-func discoverResolverInDep(filesystem asimfs.FileSystem, rootDir, depName string) (*specifier.ResolvedFile, error) {
+// discoverDesignTokensInDep checks a single dependency for a token or resolver file.
+func discoverDesignTokensInDep(filesystem asimfs.FileSystem, rootDir, depName string) (*specifier.ResolvedFile, error) {
 	depDir := findDepDir(filesystem, rootDir, depName)
 	if depDir == "" {
 		return nil, nil
@@ -78,35 +114,54 @@ func discoverResolverInDep(filesystem asimfs.FileSystem, rootDir, depName string
 		return nil, nil
 	}
 
-	// Check "designTokens" field first (higher priority — explicit)
-	if depPkg.DesignTokens != nil && depPkg.DesignTokens.Resolver != "" {
-		resolverPath, err := safeDependencyPath(depDir, depPkg.DesignTokens.Resolver)
-		if err != nil {
-			// Explicit resolver is invalid — don't fall through to exports
+	if depPkg.DesignTokens != nil {
+		// String shorthand: "designTokens": "./tokens.json"
+		if depPkg.DesignTokens.Path != "" {
+			filePath, err := safeDependencyPath(depDir, depPkg.DesignTokens.Path)
+			if err != nil {
+				return nil, nil
+			}
+			if filesystem.Exists(filePath) {
+				return &specifier.ResolvedFile{
+					Specifier: "npm:" + depName + "/" + depPkg.DesignTokens.Path,
+					Path:      filePath,
+					Kind:      specifier.KindNPM,
+				}, nil
+			}
 			return nil, nil
 		}
-		if filesystem.Exists(resolverPath) {
-			return &specifier.ResolvedFile{
-				Specifier: "npm:" + depName + "/" + depPkg.DesignTokens.Resolver,
-				Path:      resolverPath,
-				Kind:      specifier.KindNPM,
-			}, nil
+
+		// Object form: "designTokens": {"resolver": "..."}
+		if depPkg.DesignTokens.Resolver != "" {
+			resolverPath, err := safeDependencyPath(depDir, depPkg.DesignTokens.Resolver)
+			if err != nil {
+				return nil, nil
+			}
+			if filesystem.Exists(resolverPath) {
+				return &specifier.ResolvedFile{
+					Specifier: "npm:" + depName + "/" + depPkg.DesignTokens.Resolver,
+					Path:      resolverPath,
+					Kind:      specifier.KindNPM,
+				}, nil
+			}
+			return nil, nil
 		}
-		// Explicit resolver declared but file missing — don't fall through
+
+		// Explicit designTokens field present but empty -- don't fall through
 		return nil, nil
 	}
 
-	// Check "designTokens" export condition (fallback when no explicit resolver)
-	resolverFile := resolveExportCondition(depPkg.Exports, "designTokens")
-	if resolverFile != "" {
-		resolverPath, err := safeDependencyPath(depDir, resolverFile)
+	// Fallback: check "designTokens" export condition
+	tokenFile := resolveExportCondition(depPkg.Exports, "designTokens")
+	if tokenFile != "" {
+		filePath, err := safeDependencyPath(depDir, tokenFile)
 		if err != nil {
 			return nil, nil
 		}
-		if filesystem.Exists(resolverPath) {
+		if filesystem.Exists(filePath) {
 			return &specifier.ResolvedFile{
-				Specifier: "npm:" + depName + "/" + resolverFile,
-				Path:      resolverPath,
+				Specifier: "npm:" + depName + "/" + tokenFile,
+				Path:      filePath,
 				Kind:      specifier.KindNPM,
 			}, nil
 		}

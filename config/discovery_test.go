@@ -15,10 +15,10 @@ import (
 	"bennypowers.dev/asimonim/testutil"
 )
 
-func TestDiscoverResolvers_DesignTokensField(t *testing.T) {
+func TestDiscoverDesignTokens_DesignTokensField(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/config/discovery", "/project")
 
-	results, err := DiscoverResolvers(mfs, "/project")
+	results, err := DiscoverDesignTokens(mfs, "/project")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -43,10 +43,10 @@ func TestDiscoverResolvers_DesignTokensField(t *testing.T) {
 	}
 }
 
-func TestDiscoverResolvers_ExportCondition(t *testing.T) {
+func TestDiscoverDesignTokens_ExportCondition(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/config/discovery", "/project")
 
-	results, err := DiscoverResolvers(mfs, "/project")
+	results, err := DiscoverDesignTokens(mfs, "/project")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -66,10 +66,10 @@ func TestDiscoverResolvers_ExportCondition(t *testing.T) {
 	}
 }
 
-func TestDiscoverResolvers_TopLevelExportCondition(t *testing.T) {
+func TestDiscoverDesignTokens_TopLevelExportCondition(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/config/discovery-toplevel-export", "/project")
 
-	results, err := DiscoverResolvers(mfs, "/project")
+	results, err := DiscoverDesignTokens(mfs, "/project")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -83,10 +83,10 @@ func TestDiscoverResolvers_TopLevelExportCondition(t *testing.T) {
 	}
 }
 
-func TestDiscoverResolvers_SkipsNonTokenDeps(t *testing.T) {
+func TestDiscoverDesignTokens_SkipsNonTokenDeps(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/config/discovery", "/project")
 
-	results, err := DiscoverResolvers(mfs, "/project")
+	results, err := DiscoverDesignTokens(mfs, "/project")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -98,10 +98,10 @@ func TestDiscoverResolvers_SkipsNonTokenDeps(t *testing.T) {
 	}
 }
 
-func TestDiscoverResolvers_NoPackageJSON(t *testing.T) {
+func TestDiscoverDesignTokens_NoPackageJSON(t *testing.T) {
 	mfs := mapfs.New()
 
-	results, err := DiscoverResolvers(mfs, "/project")
+	results, err := DiscoverDesignTokens(mfs, "/project")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -111,12 +111,12 @@ func TestDiscoverResolvers_NoPackageJSON(t *testing.T) {
 	}
 }
 
-func TestDiscoverResolvers_DesignTokensFieldPriority(t *testing.T) {
+func TestDiscoverDesignTokens_DesignTokensFieldPriority(t *testing.T) {
 	// When a package has both designTokens field and export condition,
 	// the designTokens field should be preferred
 	mfs := testutil.NewFixtureFS(t, "fixtures/config/discovery-priority", "/project")
 
-	results, err := DiscoverResolvers(mfs, "/project")
+	results, err := DiscoverDesignTokens(mfs, "/project")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestSafeDependencyPath(t *testing.T) {
 	}
 }
 
-func TestDiscoverResolvers_InvalidResolverNoFallthrough(t *testing.T) {
+func TestDiscoverDesignTokens_InvalidResolverNoFallthrough(t *testing.T) {
 	// When designTokens.resolver is declared but invalid (path traversal),
 	// it should NOT fall through to the export condition
 	mfs := mapfs.New()
@@ -176,7 +176,7 @@ func TestDiscoverResolvers_InvalidResolverNoFallthrough(t *testing.T) {
 	mfs.AddFile("/project/node_modules/@evil/pkg/legit.resolver.json", `{"version":"2025.10"}`, 0644)
 	mfs.AddFile("/project/escape.json", `{"version":"2025.10"}`, 0644)
 
-	results, err := DiscoverResolvers(mfs, "/project")
+	results, err := DiscoverDesignTokens(mfs, "/project")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestDiscoverResolvers_InvalidResolverNoFallthrough(t *testing.T) {
 	}
 }
 
-func TestDiscoverResolvers_MissingResolverNoFallthrough(t *testing.T) {
+func TestDiscoverDesignTokens_MissingResolverNoFallthrough(t *testing.T) {
 	// When designTokens.resolver is declared but the file doesn't exist,
 	// it should NOT fall through to the export condition
 	mfs := mapfs.New()
@@ -201,7 +201,7 @@ func TestDiscoverResolvers_MissingResolverNoFallthrough(t *testing.T) {
 	}`, 0644)
 	mfs.AddFile("/project/node_modules/@missing/pkg/fallback.resolver.json", `{"version":"2025.10"}`, 0644)
 
-	results, err := DiscoverResolvers(mfs, "/project")
+	results, err := DiscoverDesignTokens(mfs, "/project")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -211,11 +211,11 @@ func TestDiscoverResolvers_MissingResolverNoFallthrough(t *testing.T) {
 	}
 }
 
-func TestDiscoverResolvers_CorruptPackageJSON(t *testing.T) {
+func TestDiscoverDesignTokens_CorruptPackageJSON(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddFile("/project/package.json", `{not valid json`, 0644)
 
-	results, err := DiscoverResolvers(mfs, "/project")
+	results, err := DiscoverDesignTokens(mfs, "/project")
 	if err == nil {
 		t.Fatal("expected error for corrupt package.json")
 	}
@@ -322,6 +322,209 @@ func TestUnquoteExportValue(t *testing.T) {
 				t.Errorf("expected %q, got %q", tt.expected, result)
 			}
 		})
+	}
+}
+
+func TestDiscoverDesignTokens_StringShorthand(t *testing.T) {
+	mfs := testutil.NewFixtureFS(t, "fixtures/config/discovery-string-shorthand", "/project")
+
+	results, err := DiscoverDesignTokens(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	// String shorthand: "designTokens": "./tokens.json"
+	if results[0].Specifier != "npm:@simple/tokens/tokens.json" {
+		t.Errorf("expected specifier npm:@simple/tokens/tokens.json, got %s", results[0].Specifier)
+	}
+	expectedPath := "/project/node_modules/@simple/tokens/tokens.json"
+	if results[0].Path != expectedPath {
+		t.Errorf("expected path %q, got %q", expectedPath, results[0].Path)
+	}
+}
+
+func TestDiscoverDesignTokens_DevDependencies(t *testing.T) {
+	mfs := testutil.NewFixtureFS(t, "fixtures/config/discovery-devdeps", "/project")
+
+	results, err := DiscoverDesignTokens(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	if results[0].Specifier != "npm:@dev/tokens/tokens.resolver.json" {
+		t.Errorf("expected specifier npm:@dev/tokens/tokens.resolver.json, got %s", results[0].Specifier)
+	}
+}
+
+func TestDiscoverDesignTokens_PeerDependencies(t *testing.T) {
+	mfs := testutil.NewFixtureFS(t, "fixtures/config/discovery-peerdeps", "/project")
+
+	results, err := DiscoverDesignTokens(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	if results[0].Specifier != "npm:@peer/tokens/theme.resolver.json" {
+		t.Errorf("expected specifier npm:@peer/tokens/theme.resolver.json, got %s", results[0].Specifier)
+	}
+}
+
+func TestDiscoverDesignTokens_DeduplicateAcrossDepTypes(t *testing.T) {
+	// Same package in dependencies and devDependencies should only appear once
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"name": "test",
+		"dependencies": { "@dup/tokens": "^1.0.0" },
+		"devDependencies": { "@dup/tokens": "^1.0.0" }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@dup/tokens/package.json", `{
+		"name": "@dup/tokens",
+		"designTokens": { "resolver": "tokens.resolver.json" }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@dup/tokens/tokens.resolver.json", `{"version":"2025.10"}`, 0644)
+
+	results, err := DiscoverDesignTokens(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Errorf("expected 1 result (deduped), got %d", len(results))
+	}
+}
+
+func TestDiscoverDesignTokens_ResolverDotSlashNormalized(t *testing.T) {
+	// "resolver": "./tokens.resolver.json" should produce the same specifier
+	// as the string shorthand "./tokens.resolver.json" (no leading ./)
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"name": "test",
+		"dependencies": { "@dotslash/pkg": "^1.0.0" }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@dotslash/pkg/package.json", `{
+		"name": "@dotslash/pkg",
+		"designTokens": { "resolver": "./tokens.resolver.json" }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@dotslash/pkg/tokens.resolver.json", `{"version":"2025.10"}`, 0644)
+
+	results, err := DiscoverDesignTokens(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	// Specifier should not contain "./"
+	expected := "npm:@dotslash/pkg/tokens.resolver.json"
+	if results[0].Specifier != expected {
+		t.Errorf("expected specifier %q, got %q", expected, results[0].Specifier)
+	}
+}
+
+func TestDiscoverDesignTokens_EmptyStringNoFallthrough(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"name": "test",
+		"dependencies": { "@empty/pkg": "^1.0.0" }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@empty/pkg/package.json", `{
+		"name": "@empty/pkg",
+		"designTokens": "",
+		"exports": { ".": { "designTokens": "./fallback.json" } }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@empty/pkg/fallback.json", `{}`, 0644)
+
+	results, err := DiscoverDesignTokens(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("expected no results (empty string designTokens should block fallthrough), got %d", len(results))
+	}
+}
+
+func TestDiscoverDesignTokens_EmptyObjectNoFallthrough(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"name": "test",
+		"dependencies": { "@empty/pkg": "^1.0.0" }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@empty/pkg/package.json", `{
+		"name": "@empty/pkg",
+		"designTokens": {},
+		"exports": { ".": { "designTokens": "./fallback.json" } }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@empty/pkg/fallback.json", `{}`, 0644)
+
+	results, err := DiscoverDesignTokens(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("expected no results (empty object designTokens should block fallthrough), got %d", len(results))
+	}
+}
+
+func TestDiscoverDesignTokens_StringShorthandPathTraversalNoFallthrough(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"name": "test",
+		"dependencies": { "@evil/pkg": "^1.0.0" }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@evil/pkg/package.json", `{
+		"name": "@evil/pkg",
+		"designTokens": "../../escape.json",
+		"exports": { ".": { "designTokens": "./legit.json" } }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@evil/pkg/legit.json", `{}`, 0644)
+	mfs.AddFile("/project/escape.json", `{}`, 0644)
+
+	results, err := DiscoverDesignTokens(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("expected no results (string shorthand path traversal should block fallthrough), got %d", len(results))
+	}
+}
+
+func TestDiscoverDesignTokens_StringShorthandMissingFileNoFallthrough(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{
+		"name": "test",
+		"dependencies": { "@missing/pkg": "^1.0.0" }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@missing/pkg/package.json", `{
+		"name": "@missing/pkg",
+		"designTokens": "./gone.json",
+		"exports": { ".": { "designTokens": "./fallback.json" } }
+	}`, 0644)
+	mfs.AddFile("/project/node_modules/@missing/pkg/fallback.json", `{}`, 0644)
+
+	results, err := DiscoverDesignTokens(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("expected no results (string shorthand missing file should block fallthrough), got %d", len(results))
 	}
 }
 
