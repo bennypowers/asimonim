@@ -9,9 +9,12 @@ package load
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"bennypowers.dev/asimonim/config"
@@ -65,6 +68,25 @@ type Options struct {
 	// FetchTimeout is the maximum time to wait for a network fetch.
 	// Defaults to DefaultTimeout when zero. Has no effect if Fetcher is nil.
 	FetchTimeout time.Duration
+}
+
+// resolvedContent holds content bytes along with provenance for resolving
+// relative paths in resolver documents.
+type resolvedContent struct {
+	Data    []byte
+	BaseDir string // local filesystem directory, or ""
+	BaseURL string // CDN base URL, or ""
+}
+
+// isResolverDocument checks if JSON data represents a DTCG resolver document
+// by looking for the "resolutionOrder" field at the root.
+func isResolverDocument(data []byte) bool {
+	var doc map[string]json.RawMessage
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return false
+	}
+	_, hasResolutionOrder := doc["resolutionOrder"]
+	return hasResolutionOrder
 }
 
 // Load loads design tokens from a specifier with full resolution.
@@ -146,26 +168,25 @@ func Load(ctx context.Context, spec string, opts Options) (*token.Map, error) {
 	if fetchTimeout == 0 {
 		fetchTimeout = DefaultTimeout
 	}
-	content, err := resolveContent(ctx, spec, root, filesystem, opts.Fetcher, fetchTimeout, cdn)
+	rc, err := resolveContent(ctx, spec, root, filesystem, opts.Fetcher, fetchTimeout, cdn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve specifier %q: %w", spec, err)
 	}
 
-	// Parse tokens
-	p := parser.NewJSONParser()
-	tokens, err := p.Parse(content, parser.Options{
+	parseOpts := parser.Options{
 		Prefix:        prefix,
 		GroupMarkers:  groupMarkers,
 		SchemaVersion: schemaVersion,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse tokens: %w", err)
 	}
 
-	// Resolve $extends (for v2025.10)
-	tokens, err = resolver.ResolveGroupExtensions(tokens, content)
+	var tokens []*token.Token
+	if isResolverDocument(rc.Data) {
+		tokens, err = loadResolver(ctx, rc, filesystem, opts.Fetcher, fetchTimeout, cdn, parseOpts)
+	} else {
+		tokens, err = loadTokenFile(rc.Data, parseOpts)
+	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve $extends: %w", err)
+		return nil, err
 	}
 
 	// Determine schema version for alias resolution
@@ -185,39 +206,146 @@ func Load(ctx context.Context, spec string, opts Options) (*token.Map, error) {
 	return token.NewMap(tokens, prefix), nil
 }
 
-// resolveContent resolves a specifier to file content.
-// Tries local resolution first. If that fails and a Fetcher is provided,
-// falls back to CDN for package specifiers.
-func resolveContent(ctx context.Context, spec, root string, filesystem fs.FileSystem, fetcher Fetcher, fetchTimeout time.Duration, cdn specifier.CDN) ([]byte, error) {
-	// Create resolver chain
+// loadTokenFile parses a single token file.
+func loadTokenFile(data []byte, opts parser.Options) ([]*token.Token, error) {
+	p := parser.NewJSONParser()
+	tokens, err := p.Parse(data, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse tokens: %w", err)
+	}
+	tokens, err = resolver.ResolveGroupExtensions(tokens, data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve $extends: %w", err)
+	}
+	return tokens, nil
+}
+
+// loadResolver expands a resolver document by loading all its source files.
+func loadResolver(
+	ctx context.Context,
+	rc resolvedContent,
+	filesystem fs.FileSystem,
+	fetcher Fetcher,
+	fetchTimeout time.Duration,
+	cdn specifier.CDN,
+	parseOpts parser.Options,
+) ([]*token.Token, error) {
+	baseDir := rc.BaseDir
+	sourcePaths, err := config.ExtractSourcePaths(rc.Data, baseDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract sources from resolver: %w", err)
+	}
+
+	var allTokens []*token.Token
+	for _, srcPath := range sourcePaths {
+		data, err := resolveSourceContent(ctx, srcPath, baseDir, rc.BaseURL, filesystem, fetcher, fetchTimeout, cdn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load resolver source %s: %w", srcPath, err)
+		}
+		tokens, err := loadTokenFile(data, parseOpts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse resolver source %s: %w", srcPath, err)
+		}
+		allTokens = append(allTokens, tokens...)
+	}
+
+	return allTokens, nil
+}
+
+// resolveSourceContent reads a resolver source file from local filesystem or CDN.
+func resolveSourceContent(
+	ctx context.Context,
+	srcPath, baseDir, baseURL string,
+	filesystem fs.FileSystem,
+	fetcher Fetcher,
+	fetchTimeout time.Duration,
+	cdn specifier.CDN,
+) ([]byte, error) {
+	// Package specifiers resolve via the specifier chain / CDN
+	if specifier.IsPackageSpecifier(srcPath) {
+		rc, err := resolveContent(ctx, srcPath, baseDir, filesystem, fetcher, fetchTimeout, cdn)
+		if err != nil {
+			return nil, err
+		}
+		return rc.Data, nil
+	}
+
+	// Local path: read from filesystem
+	if baseDir != "" {
+		absPath := srcPath
+		if !filepath.IsAbs(srcPath) {
+			absPath = filepath.Clean(filepath.Join(baseDir, srcPath))
+		}
+		// Reject paths that escape the base directory
+		rel, relErr := filepath.Rel(baseDir, absPath)
+		if relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return nil, fmt.Errorf("source path escapes base directory: %s", srcPath)
+		}
+		data, err := filesystem.ReadFile(absPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read source %s: %w", srcPath, err)
+		}
+		return data, nil
+	}
+
+	// CDN fallback: resolve $ref path against base URL
+	if baseURL != "" && fetcher != nil {
+		base, err := url.Parse(baseURL)
+		if err == nil {
+			ref, err := url.Parse(srcPath)
+			if err == nil {
+				resolved := base.ResolveReference(ref).String()
+				ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+				defer cancel()
+				return fetcher.Fetch(ctx, resolved)
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("cannot resolve source %s (no baseDir or baseURL)", srcPath)
+}
+
+// resolveContent resolves a specifier to file content with provenance.
+func resolveContent(ctx context.Context, spec, root string, filesystem fs.FileSystem, fetcher Fetcher, fetchTimeout time.Duration, cdn specifier.CDN) (resolvedContent, error) {
 	res, err := specifier.NewDefaultResolver(filesystem, root)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create resolver: %w", err)
+		return resolvedContent{}, fmt.Errorf("failed to create resolver: %w", err)
 	}
 
-	// Resolve specifier to path
 	resolved, err := res.Resolve(spec)
 	if err != nil {
-		// Local resolution failed — try CDN fallback
-		return fetchFromCDN(ctx, spec, fetcher, fetchTimeout, cdn, err)
+		data, cdnErr := fetchFromCDN(ctx, spec, fetcher, fetchTimeout, cdn, err)
+		if cdnErr != nil {
+			return resolvedContent{}, cdnErr
+		}
+		return resolvedContent{Data: data, BaseURL: cdnBaseURL(spec, cdn)}, nil
 	}
 
-	// Make local paths absolute relative to root
 	path := resolved.Path
 	if resolved.Kind == specifier.KindLocal && !filepath.IsAbs(path) {
 		path = filepath.Join(root, path)
 	}
 
-	// Read file content
 	content, readErr := filesystem.ReadFile(path)
 	if readErr != nil {
-		// File read failed — try CDN fallback (package specifiers only;
-		// local specifiers return localErr unchanged via CDNURL check)
 		localErr := fmt.Errorf("failed to read %s: %w", path, readErr)
-		return fetchFromCDN(ctx, spec, fetcher, fetchTimeout, cdn, localErr)
+		data, cdnErr := fetchFromCDN(ctx, spec, fetcher, fetchTimeout, cdn, localErr)
+		if cdnErr != nil {
+			return resolvedContent{}, cdnErr
+		}
+		return resolvedContent{Data: data, BaseURL: cdnBaseURL(spec, cdn)}, nil
 	}
 
-	return content, nil
+	return resolvedContent{Data: content, BaseDir: filepath.Dir(path)}, nil
+}
+
+// cdnBaseURL computes the base URL directory for a CDN-fetched specifier.
+func cdnBaseURL(spec string, cdn specifier.CDN) string {
+	cdnURL, _ := specifier.CDNURL(spec, cdn)
+	if idx := strings.LastIndexByte(cdnURL, '/'); idx >= 0 {
+		return cdnURL[:idx+1]
+	}
+	return cdnURL
 }
 
 // fetchFromCDN attempts to fetch content from CDN as a fallback.

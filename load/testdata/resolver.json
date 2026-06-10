@@ -1,0 +1,14 @@
+{
+  "version": "2025.10",
+  "sets": {
+    "base": {
+      "sources": [
+        {"$ref": "./colors.json"},
+        {"$ref": "./spacing.json"}
+      ]
+    }
+  },
+  "resolutionOrder": [
+    {"$ref": "#/sets/base"}
+  ]
+}

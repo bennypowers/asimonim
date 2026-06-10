@@ -255,3 +255,36 @@ func TestLoad_NetworkFallbackError(t *testing.T) {
 		t.Errorf("expected ErrNetworkFallback in error chain, got: %v", err)
 	}
 }
+
+func TestLoad_ResolverDocument(t *testing.T) {
+	root := testdataDir()
+	tokenMap, err := load.Load(t.Context(), "resolver.json", load.Options{
+		Root: root,
+	})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Resolver doc has 2 sources: colors.json (2 tokens) + spacing.json (1 token)
+	if tokenMap.Len() != 3 {
+		t.Errorf("expected 3 tokens from resolver document, got %d", tokenMap.Len())
+	}
+
+	// Check color token from colors.json
+	red, ok := tokenMap.Get("color-red")
+	if !ok {
+		t.Fatal("expected to find color-red")
+	}
+	if red.Value != "#ff0000" {
+		t.Errorf("red.Value = %q, want %q", red.Value, "#ff0000")
+	}
+
+	// Check spacing token from spacing.json
+	small, ok := tokenMap.Get("spacing-small")
+	if !ok {
+		t.Fatal("expected to find spacing-small")
+	}
+	if small.Value != "4px" {
+		t.Errorf("small.Value = %q, want %q", small.Value, "4px")
+	}
+}
