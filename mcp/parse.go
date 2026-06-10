@@ -40,12 +40,13 @@ type parseResult struct {
 // parseWorkspaceTokens discovers and parses all token files from config or explicit paths.
 // Delegates to load.LoadAll for orchestration.
 func parseWorkspaceTokens(
+	ctx context.Context,
 	filesystem fs.FileSystem,
 	cfg *config.Config,
 	files []string,
 	cwd string,
 ) (*parseResult, error) {
-	lr, err := load.LoadAll(context.Background(), cfg, files, load.Options{
+	lr, err := load.LoadAll(ctx, cfg, files, load.Options{
 		Root: cwd,
 		FS:   filesystem,
 	})

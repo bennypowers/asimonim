@@ -103,7 +103,7 @@ func (s *Server) handleTokenSources(
 	}
 
 	cfg, cwd := s.configForRequest(ctx, sessionFromResourceReq(req))
-	parsed, err := parseWorkspaceTokens(s.fs, cfg, nil, cwd)
+	parsed, err := parseWorkspaceTokens(ctx, s.fs, cfg, nil, cwd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse tokens: %w", err)
 	}
@@ -175,7 +175,7 @@ func (s *Server) handleTokensBySource(
 	}
 
 	cfg, cwd := s.configForRequest(ctx, sessionFromResourceReq(req))
-	parsed, err := parseWorkspaceTokens(s.fs, cfg, nil, cwd)
+	parsed, err := parseWorkspaceTokens(ctx, s.fs, cfg, nil, cwd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse tokens: %w", err)
 	}
@@ -220,7 +220,7 @@ func (s *Server) handleTokenDetail(
 	}
 
 	cfg, cwd := s.configForRequest(ctx, sessionFromResourceReq(req))
-	parsed, err := parseWorkspaceTokens(s.fs, cfg, nil, cwd)
+	parsed, err := parseWorkspaceTokens(ctx, s.fs, cfg, nil, cwd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse tokens: %w", err)
 	}

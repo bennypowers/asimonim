@@ -24,7 +24,7 @@ func TestParseWorkspaceTokens(t *testing.T) {
 	}
 
 	t.Run("parses all tokens", func(t *testing.T) {
-		result, err := parseWorkspaceTokens(mfs, cfg, nil, "/test")
+		result, err := parseWorkspaceTokens(t.Context(), mfs, cfg, nil, "/test")
 		require.NoError(t, err)
 		// color.primary, color.secondary, spacing.small, spacing.medium, spacing.large
 		assert.Len(t, result.AllTokens, 5)
@@ -32,7 +32,7 @@ func TestParseWorkspaceTokens(t *testing.T) {
 	})
 
 	t.Run("groups by source", func(t *testing.T) {
-		result, err := parseWorkspaceTokens(mfs, cfg, nil, "/test")
+		result, err := parseWorkspaceTokens(t.Context(), mfs, cfg, nil, "/test")
 		require.NoError(t, err)
 		assert.Len(t, result.Sources, 1)
 		assert.Equal(t, "/test/tokens.json", result.Sources[0].Source)
@@ -40,13 +40,13 @@ func TestParseWorkspaceTokens(t *testing.T) {
 	})
 
 	t.Run("explicit files", func(t *testing.T) {
-		result, err := parseWorkspaceTokens(mfs, cfg, []string{"/test/tokens.json"}, "/test")
+		result, err := parseWorkspaceTokens(t.Context(), mfs, cfg, []string{"/test/tokens.json"}, "/test")
 		require.NoError(t, err)
 		assert.Len(t, result.AllTokens, 5)
 	})
 
 	t.Run("resolves aliases", func(t *testing.T) {
-		result, err := parseWorkspaceTokens(mfs, cfg, nil, "/test")
+		result, err := parseWorkspaceTokens(t.Context(), mfs, cfg, nil, "/test")
 		require.NoError(t, err)
 		// color.secondary references color.primary
 		for _, tok := range result.AllTokens {
@@ -61,7 +61,7 @@ func TestParseWorkspaceTokens(t *testing.T) {
 
 	t.Run("no files error", func(t *testing.T) {
 		emptyCfg := &config.Config{}
-		_, err := parseWorkspaceTokens(mfs, emptyCfg, nil, "/test")
+		_, err := parseWorkspaceTokens(t.Context(), mfs, emptyCfg, nil, "/test")
 		assert.Error(t, err)
 	})
 }
@@ -93,7 +93,7 @@ func TestParseWorkspaceTokens_WithSchema(t *testing.T) {
 		Schema: "draft",
 	}
 
-	result, err := parseWorkspaceTokens(mfs, cfg, nil, "/test")
+	result, err := parseWorkspaceTokens(t.Context(), mfs, cfg, nil, "/test")
 	require.NoError(t, err)
 	assert.Equal(t, schema.Draft, result.Version)
 	assert.Len(t, result.AllTokens, 5)
@@ -106,7 +106,7 @@ func TestParseWorkspaceTokens_ExplicitFilesOverrideConfig(t *testing.T) {
 		Files: []config.FileSpec{{Path: "/test/nonexistent.json"}},
 	}
 
-	result, err := parseWorkspaceTokens(mfs, cfg, []string{"/test/tokens.json"}, "/test")
+	result, err := parseWorkspaceTokens(t.Context(), mfs, cfg, []string{"/test/tokens.json"}, "/test")
 	require.NoError(t, err)
 	assert.Len(t, result.AllTokens, 5)
 }
@@ -118,7 +118,7 @@ func TestParseWorkspaceTokens_BadFile(t *testing.T) {
 		Files: []config.FileSpec{{Path: "/test/bad.json"}},
 	}
 
-	_, err := parseWorkspaceTokens(mfs, cfg, nil, "/test")
+	_, err := parseWorkspaceTokens(t.Context(), mfs, cfg, nil, "/test")
 	assert.Error(t, err)
 }
 
@@ -126,7 +126,7 @@ func TestParseWorkspaceTokens_ExplicitFileNotFound(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
 	cfg := &config.Config{}
 
-	_, err := parseWorkspaceTokens(mfs, cfg, []string{"/test/nonexistent.json"}, "/test")
+	_, err := parseWorkspaceTokens(t.Context(), mfs, cfg, []string{"/test/nonexistent.json"}, "/test")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "error reading")
 }
@@ -145,7 +145,7 @@ func TestParseWorkspaceTokens_MultipleSourceLabels(t *testing.T) {
 		},
 	}
 
-	result, err := parseWorkspaceTokens(mfs, cfg, nil, "/test")
+	result, err := parseWorkspaceTokens(t.Context(), mfs, cfg, nil, "/test")
 	require.NoError(t, err)
 	assert.Len(t, result.Sources, 2)
 	assert.Equal(t, "/test/tokens.json", result.Sources[0].Source)
