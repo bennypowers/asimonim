@@ -209,6 +209,7 @@ func Load(ctx context.Context, spec string, opts Options) (*token.Map, error) {
 // SourceTokens holds tokens grouped by their originating source.
 type SourceTokens struct {
 	Source string
+	Path   string
 	Tokens []*token.Token
 }
 
@@ -321,6 +322,7 @@ func LoadAll(ctx context.Context, cfg *config.Config, files []string, opts Optio
 
 		result.Sources = append(result.Sources, SourceTokens{
 			Source: rf.Specifier,
+			Path:   path,
 			Tokens: tokens,
 		})
 		allTokens = append(allTokens, tokens...)

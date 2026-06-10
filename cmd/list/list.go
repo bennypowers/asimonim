@@ -8,6 +8,7 @@ license that can be found in the LICENSE file.
 package list
 
 import (
+	"context"
 	"fmt"
 	"maps"
 	"os"
@@ -19,10 +20,8 @@ import (
 	"bennypowers.dev/asimonim/cmd/render"
 	"bennypowers.dev/asimonim/config"
 	"bennypowers.dev/asimonim/fs"
-	"bennypowers.dev/asimonim/parser"
-	"bennypowers.dev/asimonim/resolver"
+	"bennypowers.dev/asimonim/load"
 	"bennypowers.dev/asimonim/schema"
-	"bennypowers.dev/asimonim/specifier"
 	"bennypowers.dev/asimonim/token"
 )
 
@@ -77,124 +76,52 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	filesystem := fs.NewOSFileSystem()
-	jsonParser := parser.NewJSONParser()
 
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get working directory: %w", err)
 	}
-	specResolver, err := specifier.NewDefaultResolver(filesystem, cwd)
-	if err != nil {
-		return fmt.Errorf("failed to create resolver: %w", err)
-	}
 
-	// Load config from .config/design-tokens.{yaml,json}
 	cfg := config.LoadOrDefault(filesystem, ".")
-
-	// Use config files if no args provided
-	var resolvedFiles []*specifier.ResolvedFile
-	if len(args) == 0 {
-		var err error
-		resolvedFiles, err = cfg.ResolveFiles(specResolver, filesystem, ".")
-		if err != nil {
-			return fmt.Errorf("error resolving config files: %w", err)
-		}
-
-		// Also resolve sources from resolver documents
-		if len(cfg.Resolvers) > 0 {
-			resolverSources, err := cfg.ResolveResolverSources(specResolver, filesystem, cwd)
-			if err != nil {
-				return fmt.Errorf("error resolving resolver sources: %w", err)
-			}
-			resolvedFiles = specifier.DedupResolvedFiles(append(resolvedFiles, resolverSources...))
-		}
-	} else {
-		for _, arg := range args {
-			rf, err := specResolver.Resolve(arg)
-			if err != nil {
-				return fmt.Errorf("error resolving %s: %w", arg, err)
-			}
-			resolvedFiles = append(resolvedFiles, rf)
-		}
-	}
-
-	if len(resolvedFiles) == 0 {
-		return fmt.Errorf("no files specified and no files found in config")
-	}
 
 	var schemaVersion schema.Version
 	if schemaFlag != "" {
-		var err error
 		schemaVersion, err = schema.FromString(schemaFlag)
 		if err != nil {
 			return fmt.Errorf("invalid schema version: %s", schemaFlag)
 		}
-	} else if cfg.SchemaVersion() != schema.Unknown {
-		schemaVersion = cfg.SchemaVersion()
 	}
 
-	var allTokens []*token.Token
-	var detectedVersion schema.Version
+	result, err := load.LoadAll(context.Background(), cfg, args, load.Options{
+		Root:          cwd,
+		SchemaVersion: schemaVersion,
+	})
+	if err != nil {
+		return err
+	}
+
+	allTokens := result.All
+
+	// Extract group metadata for markdown rendering
 	var allGroupMeta = make(map[string]render.GroupMeta)
-
-	// Phase 1: Parse all files
-	for _, rf := range resolvedFiles {
-		data, err := filesystem.ReadFile(rf.Path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", rf.Specifier, err)
-			continue
-		}
-
-		// Extract group metadata for markdown rendering
-		if format == "markdown" || format == "md" {
-			if groupMeta, err := render.ExtractGroupMeta(data); err == nil {
+	if format == "markdown" || format == "md" {
+		for _, src := range result.Sources {
+			data, readErr := filesystem.ReadFile(src.Path)
+			if readErr != nil {
+				continue
+			}
+			if groupMeta, metaErr := render.ExtractGroupMeta(data); metaErr == nil {
 				maps.Copy(allGroupMeta, groupMeta)
 			}
 		}
-
-		version := schemaVersion
-		if version == schema.Unknown {
-			version, err = schema.DetectVersion(data, nil)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error detecting schema for %s: %v\n", rf.Specifier, err)
-				continue
-			}
-		}
-		if detectedVersion == schema.Unknown {
-			detectedVersion = version
-		}
-
-		// Get per-file options from config (use original specifier for matching)
-		opts := cfg.OptionsForFile(rf.Specifier)
-		opts.SkipPositions = true // CLI doesn't need LSP position tracking
-		if version != schema.Unknown {
-			opts.SchemaVersion = version
-		}
-		tokens, err := jsonParser.ParseFile(filesystem, rf.Path, opts)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", rf.Specifier, err)
-			continue
-		}
-
-		allTokens = append(allTokens, tokens...)
 	}
 
-	// Phase 2: Resolve aliases across all tokens (enables cross-file references)
-	if detectedVersion == schema.Unknown {
-		detectedVersion = schema.Draft
-	}
-	if err := resolver.ResolveAliases(allTokens, detectedVersion); err != nil {
-		return fmt.Errorf("error resolving aliases: %w", err)
-	}
-
-	// Apply filters
 	allTokens = filterTokens(allTokens, typeFilter, groupFilter, onlyDeprecated, hideDeprecated)
 
 	sort.Slice(allTokens, func(i, j int) bool {
 		return allTokens[i].Name < allTokens[j].Name
 	})
 
-	// Compute display rows once
 	rows := render.ComputeRows(allTokens, resolved)
 
 	switch format {
