@@ -120,7 +120,7 @@ func (s *Server) handleValidate(
 	input validateInput,
 ) (*mcp.CallToolResult, any, error) {
 	cfg, cwd := s.configForRequest(ctx, sessionFromToolReq(req))
-	parsed, err := parseWorkspaceTokens(s.fs, cfg, input.Files, cwd)
+	parsed, err := parseWorkspaceTokens(ctx, s.fs, cfg, input.Files, cwd)
 	if err != nil {
 		return errorResult(fmt.Sprintf("Validation error: %v", err)), nil, nil
 	}
@@ -184,7 +184,7 @@ func (s *Server) handleSearch(
 	}
 
 	cfg, cwd := s.configForRequest(ctx, sessionFromToolReq(req))
-	parsed, err := parseWorkspaceTokens(s.fs, cfg, nil, cwd)
+	parsed, err := parseWorkspaceTokens(ctx, s.fs, cfg, nil, cwd)
 	if err != nil {
 		return errorResult(fmt.Sprintf("Error: %v", err)), nil, nil
 	}
@@ -250,7 +250,7 @@ func (s *Server) handleConvert(
 	}
 
 	cfg, cwd := s.configForRequest(ctx, sessionFromToolReq(req))
-	parsed, err := parseWorkspaceTokens(s.fs, cfg, input.Files, cwd)
+	parsed, err := parseWorkspaceTokens(ctx, s.fs, cfg, input.Files, cwd)
 	if err != nil {
 		return errorResult(fmt.Sprintf("Error: %v", err)), nil, nil
 	}

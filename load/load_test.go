@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"testing"
 
+	"bennypowers.dev/asimonim/config"
 	"bennypowers.dev/asimonim/load"
 	"bennypowers.dev/asimonim/schema"
 )
@@ -253,5 +254,88 @@ func TestLoad_NetworkFallbackError(t *testing.T) {
 	}
 	if !errors.Is(err, load.ErrNetworkFallback) {
 		t.Errorf("expected ErrNetworkFallback in error chain, got: %v", err)
+	}
+}
+
+func TestLoadAll_MultipleFiles(t *testing.T) {
+	root := testdataDir()
+	cfg := &config.Config{}
+
+	result, err := load.LoadAll(t.Context(), cfg, []string{"colors.json", "spacing.json"}, load.Options{
+		Root: root,
+	})
+	if err != nil {
+		t.Fatalf("LoadAll() error = %v", err)
+	}
+
+	// 2 sources: colors.json (2 tokens) + spacing.json (1 token)
+	if len(result.Sources) != 2 {
+		t.Errorf("expected 2 sources, got %d", len(result.Sources))
+	}
+	if len(result.All) != 3 {
+		t.Errorf("expected 3 total tokens, got %d", len(result.All))
+	}
+}
+
+func TestLoadAll_CrossFileAliases(t *testing.T) {
+	root := testdataDir()
+	cfg := &config.Config{}
+
+	// simple.json has {color.secondary: "{color.primary}"} -- cross-reference within same file
+	result, err := load.LoadAll(t.Context(), cfg, []string{"simple.json"}, load.Options{
+		Root: root,
+	})
+	if err != nil {
+		t.Fatalf("LoadAll() error = %v", err)
+	}
+
+	for _, tok := range result.All {
+		if tok.Name == "color-secondary" && !tok.IsResolved {
+			t.Error("expected color-secondary to be resolved")
+		}
+	}
+}
+
+func TestLoadAll_NoFiles(t *testing.T) {
+	cfg := &config.Config{}
+
+	_, err := load.LoadAll(t.Context(), cfg, nil, load.Options{
+		Root: testdataDir(),
+	})
+	if err == nil {
+		t.Fatal("expected error when no files specified and no config")
+	}
+}
+
+func TestLoad_ResolverDocument(t *testing.T) {
+	root := testdataDir()
+	tokenMap, err := load.Load(t.Context(), "resolver.json", load.Options{
+		Root: root,
+	})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Resolver doc has 2 sources: colors.json (2 tokens) + spacing.json (1 token)
+	if tokenMap.Len() != 3 {
+		t.Errorf("expected 3 tokens from resolver document, got %d", tokenMap.Len())
+	}
+
+	// Check color token from colors.json
+	red, ok := tokenMap.Get("color-red")
+	if !ok {
+		t.Fatal("expected to find color-red")
+	}
+	if red.Value != "#ff0000" {
+		t.Errorf("red.Value = %q, want %q", red.Value, "#ff0000")
+	}
+
+	// Check spacing token from spacing.json
+	small, ok := tokenMap.Get("spacing-small")
+	if !ok {
+		t.Fatal("expected to find spacing-small")
+	}
+	if small.Value != "4px" {
+		t.Errorf("small.Value = %q, want %q", small.Value, "4px")
 	}
 }

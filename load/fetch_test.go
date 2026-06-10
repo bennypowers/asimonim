@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -68,6 +69,41 @@ func TestHTTPFetcher_MaxSizeExceeded(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "exceeds maximum size") {
 		t.Errorf("expected max size error, got: %v", err)
+	}
+}
+
+func TestHTTPFetcher_CachesResponses(t *testing.T) {
+	var requestCount atomic.Int32
+	body := `{"color": {"$value": "#fff", "$type": "color"}}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "max-age=300")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	f := NewHTTPFetcher(DefaultMaxSize)
+	url := srv.URL + "/tokens.json"
+
+	// First fetch hits the server
+	content1, err := f.Fetch(context.Background(), url)
+	if err != nil {
+		t.Fatalf("first Fetch() error = %v", err)
+	}
+
+	// Second fetch should use cache
+	content2, err := f.Fetch(context.Background(), url)
+	if err != nil {
+		t.Fatalf("second Fetch() error = %v", err)
+	}
+
+	if string(content1) != string(content2) {
+		t.Error("cached response differs from original")
+	}
+
+	if requestCount.Load() != 1 {
+		t.Errorf("expected 1 server request (cached), got %d", requestCount.Load())
 	}
 }
 
