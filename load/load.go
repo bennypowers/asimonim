@@ -206,6 +206,131 @@ func Load(ctx context.Context, spec string, opts Options) (*token.Map, error) {
 	return token.NewMap(tokens, prefix), nil
 }
 
+// SourceTokens holds tokens grouped by their originating source.
+type SourceTokens struct {
+	Source string
+	Tokens []*token.Token
+}
+
+// Result holds the result of loading multiple token sources.
+type Result struct {
+	Sources []SourceTokens
+	All     []*token.Token
+	Version schema.Version
+}
+
+// LoadAll loads tokens from multiple sources with cross-file alias resolution.
+// If files is non-empty, each entry is resolved as a specifier. Otherwise,
+// files and resolver sources are discovered from cfg.
+func LoadAll(ctx context.Context, cfg *config.Config, files []string, opts Options) (*Result, error) {
+	filesystem := opts.FS
+	if filesystem == nil {
+		filesystem = fs.NewOSFileSystem()
+	}
+
+	root := opts.Root
+	if root == "" {
+		root = "."
+	}
+	if !filepath.IsAbs(root) {
+		absRoot, err := filepath.Abs(root)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve root path: %w", err)
+		}
+		root = absRoot
+	}
+
+	specResolver, err := specifier.NewDefaultResolver(filesystem, root)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resolver: %w", err)
+	}
+
+	var resolvedFiles []*specifier.ResolvedFile
+	if len(files) > 0 {
+		for _, file := range files {
+			rf, err := specResolver.Resolve(file)
+			if err != nil {
+				return nil, fmt.Errorf("error resolving %s: %w", file, err)
+			}
+			resolvedFiles = append(resolvedFiles, rf)
+		}
+	} else {
+		resolvedFiles, err = cfg.ResolveFiles(specResolver, filesystem, root)
+		if err != nil {
+			return nil, fmt.Errorf("error resolving config files: %w", err)
+		}
+		if len(cfg.Resolvers) > 0 {
+			resolverSources, err := cfg.ResolveResolverSources(specResolver, filesystem, root)
+			if err != nil {
+				return nil, fmt.Errorf("error resolving resolver sources: %w", err)
+			}
+			resolvedFiles = specifier.DedupResolvedFiles(append(resolvedFiles, resolverSources...))
+		}
+	}
+
+	if len(resolvedFiles) == 0 {
+		return nil, fmt.Errorf("no files specified and no files found in config")
+	}
+
+	schemaVersion := opts.SchemaVersion
+	if schemaVersion == schema.Unknown {
+		schemaVersion = cfg.SchemaVersion()
+	}
+
+	jsonParser := parser.NewJSONParser()
+	result := &Result{}
+	var allTokens []*token.Token
+
+	for _, rf := range resolvedFiles {
+		path := rf.Path
+		if rf.Kind == specifier.KindLocal && !filepath.IsAbs(path) {
+			path = filepath.Join(root, path)
+		}
+		data, err := filesystem.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("error reading %s: %w", rf.Specifier, err)
+		}
+
+		version := schemaVersion
+		if version == schema.Unknown {
+			version, err = schema.DetectVersion(data, nil)
+			if err != nil {
+				return nil, fmt.Errorf("error detecting schema for %s: %w", rf.Specifier, err)
+			}
+		}
+		if result.Version == schema.Unknown {
+			result.Version = version
+		}
+
+		parseOpts := cfg.OptionsForFile(rf.Specifier)
+		parseOpts.SkipPositions = true
+		if version != schema.Unknown {
+			parseOpts.SchemaVersion = version
+		}
+
+		tokens, err := jsonParser.ParseFile(filesystem, path, parseOpts)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing %s: %w", rf.Specifier, err)
+		}
+
+		result.Sources = append(result.Sources, SourceTokens{
+			Source: rf.Specifier,
+			Tokens: tokens,
+		})
+		allTokens = append(allTokens, tokens...)
+	}
+
+	if result.Version == schema.Unknown {
+		result.Version = schema.Draft
+	}
+	if err := resolver.ResolveAliases(allTokens, result.Version); err != nil {
+		return nil, fmt.Errorf("error resolving aliases: %w", err)
+	}
+
+	result.All = allTokens
+	return result, nil
+}
+
 // loadTokenFile parses a single token file.
 func loadTokenFile(data []byte, opts parser.Options) ([]*token.Token, error) {
 	p := parser.NewJSONParser()

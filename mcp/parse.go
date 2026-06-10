@@ -8,13 +8,12 @@ license that can be found in the LICENSE file.
 package mcp
 
 import (
-	"fmt"
+	"context"
 	"strings"
 
 	"bennypowers.dev/asimonim/config"
 	"bennypowers.dev/asimonim/fs"
-	"bennypowers.dev/asimonim/parser"
-	"bennypowers.dev/asimonim/resolver"
+	"bennypowers.dev/asimonim/load"
 	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/specifier"
 	"bennypowers.dev/asimonim/token"
@@ -39,100 +38,31 @@ type parseResult struct {
 }
 
 // parseWorkspaceTokens discovers and parses all token files from config or explicit paths.
-// It resolves aliases across all parsed tokens.
+// Delegates to load.LoadAll for orchestration.
 func parseWorkspaceTokens(
 	filesystem fs.FileSystem,
 	cfg *config.Config,
 	files []string,
 	cwd string,
 ) (*parseResult, error) {
-	specResolver, err := specifier.NewDefaultResolver(filesystem, cwd)
+	lr, err := load.LoadAll(context.Background(), cfg, files, load.Options{
+		Root: cwd,
+		FS:   filesystem,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create resolver: %w", err)
+		return nil, err
 	}
 
-	jsonParser := parser.NewJSONParser()
-
-	var resolvedFiles []*specifier.ResolvedFile
-	if len(files) == 0 {
-		resolvedFiles, err = cfg.ResolveFiles(specResolver, filesystem, cwd)
-		if err != nil {
-			return nil, fmt.Errorf("error resolving config files: %w", err)
-		}
-
-		if len(cfg.Resolvers) > 0 {
-			resolverSources, err := cfg.ResolveResolverSources(specResolver, filesystem, cwd)
-			if err != nil {
-				return nil, fmt.Errorf("error resolving resolver sources: %w", err)
-			}
-			resolvedFiles = specifier.DedupResolvedFiles(append(resolvedFiles, resolverSources...))
-		}
-	} else {
-		for _, file := range files {
-			rf, err := specResolver.Resolve(file)
-			if err != nil {
-				return nil, fmt.Errorf("error resolving %s: %w", file, err)
-			}
-			resolvedFiles = append(resolvedFiles, rf)
-		}
+	result := &parseResult{
+		AllTokens: lr.All,
+		Version:   lr.Version,
 	}
-
-	if len(resolvedFiles) == 0 {
-		return nil, fmt.Errorf("no files specified and no files found in config")
-	}
-
-	var schemaVersion schema.Version
-	if cfg.SchemaVersion() != schema.Unknown {
-		schemaVersion = cfg.SchemaVersion()
-	}
-
-	result := &parseResult{}
-	var allTokens []*token.Token
-
-	for _, rf := range resolvedFiles {
-		data, err := filesystem.ReadFile(rf.Path)
-		if err != nil {
-			return nil, fmt.Errorf("error reading %s: %w", rf.Specifier, err)
-		}
-
-		version := schemaVersion
-		if version == schema.Unknown {
-			version, err = schema.DetectVersion(data, nil)
-			if err != nil {
-				return nil, fmt.Errorf("error detecting schema for %s: %w", rf.Specifier, err)
-			}
-		}
-		if result.Version == schema.Unknown {
-			result.Version = version
-		}
-
-		opts := cfg.OptionsForFile(rf.Specifier)
-		opts.SkipPositions = true
-		if version != schema.Unknown {
-			opts.SchemaVersion = version
-		}
-
-		tokens, err := jsonParser.ParseFile(filesystem, rf.Path, opts)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing %s: %w", rf.Specifier, err)
-		}
-
-		source := sourceLabel(rf)
+	for _, src := range lr.Sources {
 		result.Sources = append(result.Sources, sourceTokens{
-			Source: source,
-			Tokens: tokens,
+			Source: sourceLabel(&specifier.ResolvedFile{Specifier: src.Source}),
+			Tokens: src.Tokens,
 		})
-		allTokens = append(allTokens, tokens...)
 	}
-
-	if result.Version == schema.Unknown {
-		result.Version = schema.Draft
-	}
-	if err := resolver.ResolveAliases(allTokens, result.Version); err != nil {
-		return nil, fmt.Errorf("error resolving aliases: %w", err)
-	}
-
-	result.AllTokens = allTokens
 	return result, nil
 }
 
