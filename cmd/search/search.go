@@ -8,6 +8,7 @@ license that can be found in the LICENSE file.
 package search
 
 import (
+	"context"
 	"fmt"
 	"maps"
 	"os"
@@ -20,9 +21,8 @@ import (
 	"bennypowers.dev/asimonim/cmd/render"
 	"bennypowers.dev/asimonim/config"
 	"bennypowers.dev/asimonim/fs"
-	"bennypowers.dev/asimonim/parser"
+	"bennypowers.dev/asimonim/load"
 	"bennypowers.dev/asimonim/schema"
-	"bennypowers.dev/asimonim/specifier"
 	"bennypowers.dev/asimonim/token"
 )
 
@@ -87,50 +87,13 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	filesystem := fs.NewOSFileSystem()
-	jsonParser := parser.NewJSONParser()
 
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get working directory: %w", err)
 	}
-	specResolver, err := specifier.NewDefaultResolver(filesystem, cwd)
-	if err != nil {
-		return fmt.Errorf("failed to create resolver: %w", err)
-	}
 
-	// Load config from .config/design-tokens.{yaml,json}
 	cfg := config.LoadOrDefault(filesystem, ".")
-
-	// Use config files if no files provided
-	var resolvedFiles []*specifier.ResolvedFile
-	if len(files) == 0 {
-		var err error
-		resolvedFiles, err = cfg.ResolveFiles(specResolver, filesystem, ".")
-		if err != nil {
-			return fmt.Errorf("error resolving config files: %w", err)
-		}
-
-		// Also resolve sources from resolver documents
-		if len(cfg.Resolvers) > 0 {
-			resolverSources, err := cfg.ResolveResolverSources(specResolver, filesystem, cwd)
-			if err != nil {
-				return fmt.Errorf("error resolving resolver sources: %w", err)
-			}
-			resolvedFiles = specifier.DedupResolvedFiles(append(resolvedFiles, resolverSources...))
-		}
-	} else {
-		for _, file := range files {
-			rf, err := specResolver.Resolve(file)
-			if err != nil {
-				return fmt.Errorf("error resolving %s: %w", file, err)
-			}
-			resolvedFiles = append(resolvedFiles, rf)
-		}
-	}
-
-	if len(resolvedFiles) == 0 {
-		return fmt.Errorf("no files specified and no files found in config")
-	}
 
 	var schemaVersion schema.Version
 	if schemaFlag != "" {
@@ -138,75 +101,56 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("invalid schema version: %s", schemaFlag)
 		}
-	} else if cfg.SchemaVersion() != schema.Unknown {
-		schemaVersion = cfg.SchemaVersion()
 	}
 
-	var matches []*token.Token
+	result, err := load.LoadAll(context.Background(), cfg, files, load.Options{
+		Root:          cwd,
+		SchemaVersion: schemaVersion,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Extract group metadata for markdown rendering
 	var allGroupMeta = make(map[string]render.GroupMeta)
-
-	for _, rf := range resolvedFiles {
-		data, err := filesystem.ReadFile(rf.Path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", rf.Specifier, err)
-			continue
-		}
-
-		// Extract group metadata for markdown rendering
-		if format == "markdown" || format == "md" {
-			if groupMeta, err := render.ExtractGroupMeta(data); err == nil {
+	if format == "markdown" || format == "md" {
+		for _, src := range result.Sources {
+			data, readErr := filesystem.ReadFile(src.Path)
+			if readErr != nil {
+				continue
+			}
+			if groupMeta, metaErr := render.ExtractGroupMeta(data); metaErr == nil {
 				maps.Copy(allGroupMeta, groupMeta)
 			}
 		}
+	}
 
-		version := schemaVersion
-		if version == schema.Unknown {
-			version, err = schema.DetectVersion(data, nil)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error detecting schema for %s: %v\n", rf.Specifier, err)
-				continue
-			}
+	// Search across all loaded tokens
+	var matches []*token.Token
+	for _, tok := range result.All {
+		matched := false
+		if nameOnly {
+			matched = matchString(tok.Name, query, pattern)
+		} else if valueOnly {
+			matched = matchString(tok.Value, query, pattern)
+		} else {
+			matched = matchString(tok.Name, query, pattern) ||
+				matchString(tok.Value, query, pattern) ||
+				matchString(tok.Type, query, pattern) ||
+				matchString(tok.Description, query, pattern)
 		}
 
-		// Get per-file options from config (use original specifier for matching)
-		opts := cfg.OptionsForFile(rf.Specifier)
-		opts.SkipPositions = true // CLI doesn't need LSP position tracking
-		if version != schema.Unknown {
-			opts.SchemaVersion = version
-		}
-		tokens, err := jsonParser.ParseFile(filesystem, rf.Path, opts)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", rf.Specifier, err)
-			continue
-		}
-
-		for _, tok := range tokens {
-			matched := false
-			if nameOnly {
-				matched = matchString(tok.Name, query, pattern)
-			} else if valueOnly {
-				matched = matchString(tok.Value, query, pattern)
-			} else {
-				matched = matchString(tok.Name, query, pattern) ||
-					matchString(tok.Value, query, pattern) ||
-					matchString(tok.Type, query, pattern) ||
-					matchString(tok.Description, query, pattern)
-			}
-
-			if matched {
-				matches = append(matches, tok)
-			}
+		if matched {
+			matches = append(matches, tok)
 		}
 	}
 
-	// Apply filters
 	matches = filterTokens(matches, typeFilter, groupFilter, onlyDeprecated, hideDeprecated)
 
 	sort.Slice(matches, func(i, j int) bool {
 		return matches[i].Name < matches[j].Name
 	})
 
-	// Compute display rows
 	rows := render.ComputeRows(matches, false)
 
 	switch format {

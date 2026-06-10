@@ -8,6 +8,7 @@ license that can be found in the LICENSE file.
 package convert
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -23,6 +24,7 @@ import (
 	convertlib "bennypowers.dev/asimonim/convert"
 	"bennypowers.dev/asimonim/convert/formatter"
 	"bennypowers.dev/asimonim/fs"
+	"bennypowers.dev/asimonim/load"
 	"bennypowers.dev/asimonim/parser"
 	"bennypowers.dev/asimonim/resolver"
 	"bennypowers.dev/asimonim/schema"
@@ -183,55 +185,16 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	filesystem := fs.NewOSFileSystem()
-	jsonParser := parser.NewJSONParser()
 
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get working directory: %w", err)
 	}
-	specResolver, err := specifier.NewDefaultResolver(filesystem, cwd)
-	if err != nil {
-		return fmt.Errorf("failed to create resolver: %w", err)
-	}
 
-	// Load config from .config/design-tokens.{yaml,json}
 	cfg := config.LoadOrDefault(filesystem, ".")
-
-	// Use config files if no args provided
-	var resolvedFiles []*specifier.ResolvedFile
-	if len(args) == 0 {
-		var err error
-		resolvedFiles, err = cfg.ResolveFiles(specResolver, filesystem, ".")
-		if err != nil {
-			return fmt.Errorf("error resolving config files: %w", err)
-		}
-
-		// Also resolve sources from resolver documents (not for in-place mode,
-		// which should only rewrite files explicitly listed in config)
-		if !inPlace && len(cfg.Resolvers) > 0 {
-			resolverSources, err := cfg.ResolveResolverSources(specResolver, filesystem, cwd)
-			if err != nil {
-				return fmt.Errorf("error resolving resolver sources: %w", err)
-			}
-			resolvedFiles = specifier.DedupResolvedFiles(append(resolvedFiles, resolverSources...))
-		}
-	} else {
-		for _, arg := range args {
-			rf, err := specResolver.Resolve(arg)
-			if err != nil {
-				return fmt.Errorf("error resolving %s: %w", arg, err)
-			}
-			resolvedFiles = append(resolvedFiles, rf)
-		}
-	}
-
-	if len(resolvedFiles) == 0 {
-		return fmt.Errorf("no files specified and no files found in config")
-	}
 
 	var targetSchema schema.Version
 	if schemaFlag != "" {
-		var err error
 		targetSchema, err = schema.FromString(schemaFlag)
 		if err != nil {
 			return fmt.Errorf("invalid schema version: %s", schemaFlag)
@@ -241,10 +204,41 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if inPlace {
+		jsonParser := parser.NewJSONParser()
+		specResolver, err := specifier.NewDefaultResolver(filesystem, cwd)
+		if err != nil {
+			return fmt.Errorf("failed to create resolver: %w", err)
+		}
+
+		var resolvedFiles []*specifier.ResolvedFile
+		if len(args) == 0 {
+			resolvedFiles, err = cfg.ResolveFiles(specResolver, filesystem, ".")
+			if err != nil {
+				return fmt.Errorf("error resolving config files: %w", err)
+			}
+		} else {
+			for _, arg := range args {
+				rf, err := specResolver.Resolve(arg)
+				if err != nil {
+					return fmt.Errorf("error resolving %s: %w", arg, err)
+				}
+				resolvedFiles = append(resolvedFiles, rf)
+			}
+		}
+		if len(resolvedFiles) == 0 {
+			return fmt.Errorf("no files specified and no files found in config")
+		}
 		return runInPlace(filesystem, jsonParser, cfg, resolvedFiles, targetSchema)
 	}
 
-	// Resolve header content
+	result, err := load.LoadAll(context.Background(), cfg, args, load.Options{
+		Root:          cwd,
+		SchemaVersion: targetSchema,
+	})
+	if err != nil {
+		return err
+	}
+
 	header, err := resolveHeader(filesystem, headerFlag, cfg.Header)
 	if err != nil {
 		return fmt.Errorf("error resolving header: %w", err)
@@ -252,16 +246,14 @@ func run(cmd *cobra.Command, args []string) error {
 
 	outputs := cliOutputs
 	if len(outputs) == 0 && len(cfg.Outputs) > 0 && output == "" {
-		// Use config outputs only if no single output is specified
 		outputs = cfg.Outputs
 	}
 
-	// Multi-output mode
 	if len(outputs) > 0 {
-		return runMultiOutput(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, outputs, header, cssSelector, cssModule, snippetType, jsModule, jsTypes, jsExport)
+		return runMultiOutput(filesystem, cfg, result.All, result.Version, targetSchema, outputs, header, cssSelector, cssModule, snippetType, jsModule, jsTypes, jsExport)
 	}
 
-	return runCombined(filesystem, jsonParser, cfg, resolvedFiles, targetSchema, output, format, flatten, delimiter, header, cssSelector, cssModule, snippetType, jsModule, jsTypes, jsExport)
+	return runCombined(filesystem, cfg, result.All, result.Version, targetSchema, output, format, flatten, delimiter, header, cssSelector, cssModule, snippetType, jsModule, jsTypes, jsExport)
 }
 
 // resolveHeader resolves the header content from a flag value or config.
@@ -363,9 +355,9 @@ func runInPlace(
 
 func runCombined(
 	filesystem fs.FileSystem,
-	jsonParser *parser.JSONParser,
 	cfg *config.Config,
-	resolvedFiles []*specifier.ResolvedFile,
+	allTokens []*token.Token,
+	detectedVersion schema.Version,
 	targetSchema schema.Version,
 	output string,
 	format convertlib.Format,
@@ -379,13 +371,6 @@ func runCombined(
 	jsTypes string,
 	jsExport string,
 ) error {
-	// Parse all files and resolve aliases
-	allTokens, detectedVersion, err := parseAndResolveTokens(filesystem, jsonParser, cfg, resolvedFiles)
-	if err != nil {
-		return err
-	}
-
-	// Determine output schema
 	outputSchema := targetSchema
 	if outputSchema == schema.Unknown {
 		outputSchema = detectedVersion
@@ -442,9 +427,9 @@ var pathIndexPattern = regexp.MustCompile(`^path\[(\d+)\]$`)
 
 func runMultiOutput(
 	filesystem fs.FileSystem,
-	jsonParser *parser.JSONParser,
 	cfg *config.Config,
-	resolvedFiles []*specifier.ResolvedFile,
+	allTokens []*token.Token,
+	detectedVersion schema.Version,
 	targetSchema schema.Version,
 	outputs []config.OutputSpec,
 	header string,
@@ -455,13 +440,6 @@ func runMultiOutput(
 	jsTypes string,
 	jsExport string,
 ) error {
-	// Parse all files and resolve aliases
-	allTokens, detectedVersion, err := parseAndResolveTokens(filesystem, jsonParser, cfg, resolvedFiles)
-	if err != nil {
-		return err
-	}
-
-	// Determine output schema
 	outputSchema := targetSchema
 	if outputSchema == schema.Unknown {
 		outputSchema = detectedVersion
@@ -804,61 +782,3 @@ func ensureDir(filesystem fs.FileSystem, path string) error {
 	return filesystem.MkdirAll(dir, 0755)
 }
 
-// parseAndResolveTokens parses all files and resolves aliases.
-func parseAndResolveTokens(
-	filesystem fs.FileSystem,
-	jsonParser *parser.JSONParser,
-	cfg *config.Config,
-	resolvedFiles []*specifier.ResolvedFile,
-) ([]*token.Token, schema.Version, error) {
-	var allTokens []*token.Token
-	var detectedVersion schema.Version
-	var failures int
-
-	for _, rf := range resolvedFiles {
-		data, err := filesystem.ReadFile(rf.Path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", rf.Specifier, err)
-			failures++
-			continue
-		}
-
-		version, err := schema.DetectVersion(data, nil)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error detecting schema for %s: %v\n", rf.Specifier, err)
-			failures++
-			continue
-		}
-		if detectedVersion == schema.Unknown {
-			detectedVersion = version
-		}
-
-		opts := cfg.OptionsForFile(rf.Specifier)
-		opts.SkipPositions = true
-		if version != schema.Unknown {
-			opts.SchemaVersion = version
-		}
-
-		tokens, err := jsonParser.ParseFile(filesystem, rf.Path, opts)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", rf.Specifier, err)
-			failures++
-			continue
-		}
-
-		allTokens = append(allTokens, tokens...)
-	}
-
-	if len(allTokens) == 0 && failures > 0 {
-		return nil, schema.Unknown, fmt.Errorf("failed to parse %d file(s), no tokens generated", failures)
-	}
-
-	if detectedVersion == schema.Unknown {
-		detectedVersion = schema.Draft
-	}
-	if err := resolver.ResolveAliases(allTokens, detectedVersion); err != nil {
-		return nil, schema.Unknown, fmt.Errorf("error resolving aliases: %w", err)
-	}
-
-	return allTokens, detectedVersion, nil
-}
