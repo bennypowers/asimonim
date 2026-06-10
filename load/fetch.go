@@ -14,6 +14,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gregjones/httpcache"
+
 	"bennypowers.dev/asimonim/internal/version"
 )
 
@@ -37,10 +39,14 @@ type HTTPFetcher struct {
 }
 
 // NewHTTPFetcher creates an HTTPFetcher with the given maximum response size.
+// Responses are cached in memory using RFC-compliant HTTP caching,
+// reducing redundant network requests when loading resolver documents
+// that reference multiple sources from the same CDN.
 func NewHTTPFetcher(maxSize int64) *HTTPFetcher {
+	transport := httpcache.NewMemoryCacheTransport()
 	return &HTTPFetcher{
 		maxSize: maxSize,
-		client:  &http.Client{},
+		client:  transport.Client(),
 	}
 }
 

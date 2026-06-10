@@ -304,6 +304,12 @@ func LoadAll(ctx context.Context, cfg *config.Config, files []string, opts Optio
 
 		parseOpts := cfg.OptionsForFile(rf.Specifier)
 		parseOpts.SkipPositions = true
+		if opts.Prefix != "" {
+			parseOpts.Prefix = opts.Prefix
+		}
+		if len(opts.GroupMarkers) > 0 {
+			parseOpts.GroupMarkers = opts.GroupMarkers
+		}
 		if version != schema.Unknown {
 			parseOpts.SchemaVersion = version
 		}
