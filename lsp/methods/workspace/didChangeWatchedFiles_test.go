@@ -1,11 +1,11 @@
 package workspace
 
 import (
+	"context"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
-	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -187,23 +187,12 @@ func TestHandleDidChangeWatchedFiles_NewlyCreatedFile(t *testing.T) {
 func TestHandleDidChangeWatchedFiles_SkipsDiagnosticsWithPullModel(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetRootPath("/workspace")
-
-	// Enable pull diagnostics
 	ctx.SetUsePullDiagnostics(true)
 
-	// Track refresh notification
-	var refreshMethod string
-	glspCtx := &glsp.Context{
-		Notify: func(method string, params any) {
-			refreshMethod = method
-		},
-	}
-	req := types.NewRequestContext(ctx, glspCtx)
-	ctx.SetGLSPContext(glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
-	// Track PublishDiagnostics calls - should NOT be called
 	publishCalled := false
-	ctx.PublishDiagnosticsFunc = func(context *glsp.Context, uri string) error {
+	ctx.PublishDiagnosticsFunc = func(_ context.Context, uri string) error {
 		publishCalled = true
 		return nil
 	}
@@ -216,7 +205,6 @@ func TestHandleDidChangeWatchedFiles_SkipsDiagnosticsWithPullModel(t *testing.T)
 	config.TokensFiles = []any{"/workspace/tokens.json"}
 	ctx.SetConfig(config)
 
-	// Open a document
 	_ = ctx.DocumentManager().DidOpen("file:///workspace/test.css", "css", 1, ".test { color: red; }")
 
 	params := &protocol.DidChangeWatchedFilesParams{
@@ -231,10 +219,8 @@ func TestHandleDidChangeWatchedFiles_SkipsDiagnosticsWithPullModel(t *testing.T)
 	err := DidChangeWatchedFiles(req, params)
 	require.NoError(t, err)
 
-	// Should NOT have published diagnostics because pull model is active
 	assert.False(t, publishCalled, "Should not publish diagnostics with pull model")
-	// Should have sent workspace/diagnostic/refresh
-	assert.Equal(t, protocol.MethodWorkspaceDiagnosticRefresh, refreshMethod)
+	assert.True(t, ctx.NotifyDiagnosticRefreshCalled, "Should have sent diagnostic refresh")
 }
 
 func TestHandleDidChangeWatchedFiles_EmptyChanges(t *testing.T) {
@@ -295,12 +281,11 @@ func TestHandleDidChangeWatchedFiles_PublishesDiagnostics(t *testing.T) {
 	ctx.SetRootPath("/workspace")
 
 	// Set up GLSP context
-	glspCtx := &glsp.Context{}
-	ctx.SetGLSPContext(glspCtx)
+	ctx.SetGLSPContext(context.Background())
 
 	// Track PublishDiagnostics calls
 	publishedURIs := []string{}
-	ctx.PublishDiagnosticsFunc = func(context *glsp.Context, uri string) error {
+	ctx.PublishDiagnosticsFunc = func(_ context.Context, uri string) error {
 		publishedURIs = append(publishedURIs, uri)
 		return nil
 	}

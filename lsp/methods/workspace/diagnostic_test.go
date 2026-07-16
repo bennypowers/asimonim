@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -14,7 +15,6 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"bennypowers.dev/asimonim/schema"
 	rootutil "bennypowers.dev/asimonim/testutil"
-	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,8 +47,7 @@ type goldenReport struct {
 
 func TestWorkspaceDiagnostic_Golden(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Load tokens from fixture (color.old: deprecated, color.primary: #0000ff)
 	fixtureTokens := rootutil.ParseFixtureTokens(t, "workspace-diagnostic", schema.Draft)
@@ -113,8 +112,7 @@ func TestWorkspaceDiagnostic_Golden(t *testing.T) {
 
 func TestWorkspaceDiagnostic_NoDocuments(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	result, err := WorkspaceDiagnostic(req, &protocol.WorkspaceDiagnosticParams{})
 	require.NoError(t, err)
@@ -124,8 +122,7 @@ func TestWorkspaceDiagnostic_NoDocuments(t *testing.T) {
 
 func TestWorkspaceDiagnostic_NonCSSDocumentsIncludedEmpty(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:       "color.old",

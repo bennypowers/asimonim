@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,7 +11,6 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
@@ -27,7 +27,6 @@ func TestServerInitialization(t *testing.T) {
 		workspacePath := tmpDir
 
 		// Initialize server
-		ctx := &glsp.Context{}
 		initParams := &protocol.InitializeParams{}
 		initParams.RootURI = &workspaceURI
 		initParams.RootPath = &workspacePath
@@ -39,7 +38,7 @@ func TestServerInitialization(t *testing.T) {
 			Version: strPtr("1.0.0"),
 		}
 
-		req := types.NewRequestContext(server, ctx)
+		req := types.NewRequestContext(server, context.Background())
 		result, err := lifecycle.Initialize(req, initParams)
 		require.NoError(t, err)
 		require.NotNil(t, result)
@@ -56,7 +55,6 @@ func TestServerInitialization(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = server.Close() }()
 
-		ctx := &glsp.Context{}
 		initParams := &protocol.InitializeParams{}
 		initParams.ClientInfo = &struct {
 			Name    string  `json:"name"`
@@ -65,7 +63,7 @@ func TestServerInitialization(t *testing.T) {
 			Name: "test-client",
 		}
 
-		req := types.NewRequestContext(server, ctx)
+		req := types.NewRequestContext(server, context.Background())
 		result, err := lifecycle.Initialize(req, initParams)
 		require.NoError(t, err)
 		require.NotNil(t, result)
@@ -104,15 +102,13 @@ func TestServerShutdown(t *testing.T) {
 	server, err := lsp.NewServer()
 	require.NoError(t, err)
 
-	ctx := &glsp.Context{}
-
 	// Shutdown should not error
-	req := types.NewRequestContext(server, ctx)
+	req := types.NewRequestContext(server, context.Background())
 	err = lifecycle.Shutdown(req)
 	assert.NoError(t, err)
 
 	// Multiple shutdowns should be safe
-	req = types.NewRequestContext(server, ctx)
+	req = types.NewRequestContext(server, context.Background())
 	err = lifecycle.Shutdown(req)
 	assert.NoError(t, err)
 }
@@ -123,8 +119,6 @@ func TestSetTrace(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = server.Close() }()
 
-	ctx := &glsp.Context{}
-
 	traces := []protocol.TraceValue{
 		protocol.TraceValueOff,
 		protocol.TraceValueMessage,
@@ -132,7 +126,7 @@ func TestSetTrace(t *testing.T) {
 	}
 	for _, trace := range traces {
 		t.Run(string(trace), func(t *testing.T) {
-			req := types.NewRequestContext(server, ctx)
+			req := types.NewRequestContext(server, context.Background())
 			err := lifecycle.SetTrace(req, &protocol.SetTraceParams{
 				Value: trace,
 			})

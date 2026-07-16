@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,7 +12,6 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
@@ -65,12 +65,11 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		workspaceURI := "file://" + tmpDir
 		workspacePath := tmpDir
 
-		ctx := &glsp.Context{}
 		initParams := &protocol.InitializeParams{}
 		initParams.RootURI = &workspaceURI
 		initParams.RootPath = &workspacePath
 
-		req := types.NewRequestContext(server, ctx)
+		req := types.NewRequestContext(server, context.Background())
 		_, err = lifecycle.Initialize(req, initParams)
 		require.NoError(t, err)
 
@@ -130,12 +129,11 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		workspaceURI := "file://" + tmpDir
 		workspacePath := tmpDir
 
-		ctx := &glsp.Context{}
 		initParams := &protocol.InitializeParams{}
 		initParams.RootURI = &workspaceURI
 		initParams.RootPath = &workspacePath
 
-		req := types.NewRequestContext(server, ctx)
+		req := types.NewRequestContext(server, context.Background())
 		_, err = lifecycle.Initialize(req, initParams)
 		require.NoError(t, err)
 
@@ -161,12 +159,11 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		workspaceURI := "file://" + tmpDir
 		workspacePath := tmpDir
 
-		ctx := &glsp.Context{}
 		initParams := &protocol.InitializeParams{}
 		initParams.RootURI = &workspaceURI
 		initParams.RootPath = &workspacePath
 
-		req := types.NewRequestContext(server, ctx)
+		req := types.NewRequestContext(server, context.Background())
 		_, err = lifecycle.Initialize(req, initParams)
 		require.NoError(t, err)
 
@@ -210,12 +207,11 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		workspaceURI := "file://" + tmpDir
 		workspacePath := tmpDir
 
-		ctx := &glsp.Context{}
 		initParams := &protocol.InitializeParams{}
 		initParams.RootURI = &workspaceURI
 		initParams.RootPath = &workspacePath
 
-		req := types.NewRequestContext(server, ctx)
+		req := types.NewRequestContext(server, context.Background())
 		_, err = lifecycle.Initialize(req, initParams)
 		require.NoError(t, err)
 
@@ -277,12 +273,11 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		workspaceURI := "file://" + tmpDir
 		workspacePath := tmpDir
 
-		ctx := &glsp.Context{}
 		initParams := &protocol.InitializeParams{}
 		initParams.RootURI = &workspaceURI
 		initParams.RootPath = &workspacePath
 
-		req := types.NewRequestContext(server, ctx)
+		req := types.NewRequestContext(server, context.Background())
 		_, err = lifecycle.Initialize(req, initParams)
 		require.NoError(t, err)
 
@@ -332,12 +327,11 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		workspaceURI := "file://" + tmpDir
 		workspacePath := tmpDir
 
-		ctx := &glsp.Context{}
 		initParams := &protocol.InitializeParams{}
 		initParams.RootURI = &workspaceURI
 		initParams.RootPath = &workspacePath
 
-		req := types.NewRequestContext(server, ctx)
+		req := types.NewRequestContext(server, context.Background())
 		_, err = lifecycle.Initialize(req, initParams)
 		require.NoError(t, err)
 

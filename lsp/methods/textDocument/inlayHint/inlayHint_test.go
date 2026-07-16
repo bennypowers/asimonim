@@ -3,12 +3,13 @@ package inlayhint
 import (
 	"testing"
 
+	"context"
+
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
 	"bennypowers.dev/asimonim/schema"
 	fixtureutil "bennypowers.dev/asimonim/testutil"
-	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,8 +21,7 @@ func TestInlayHint_VarCallShowsResolvedValue(t *testing.T) {
 	spacingSmall := fixtureutil.TokenByPath(t, allTokens, "spacing.small")
 
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 	require.NoError(t, ctx.TokenManager().Add(spacingSmall))
 
 	uri := "file:///test.css"
@@ -51,8 +51,7 @@ func TestInlayHint_VarCallShowsResolvedValue(t *testing.T) {
 
 func TestInlayHint_UnknownTokenSkipped(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.css"
 	cssContent := `.box { padding: var(--unknown-token); }`
@@ -72,8 +71,7 @@ func TestInlayHint_UnknownTokenSkipped(t *testing.T) {
 
 func TestInlayHint_EmptyDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.css"
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, ""))
@@ -100,8 +98,7 @@ func TestInlayHint_DisabledBySetting(t *testing.T) {
 	cfg.InlayHints = &disabled
 	ctx.SetConfig(cfg)
 
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 	require.NoError(t, ctx.TokenManager().Add(spacingSmall))
 
 	uri := "file:///test.css"
@@ -125,8 +122,7 @@ func TestInlayHint_VarCallWithExistingFallback(t *testing.T) {
 	spacingSmall := fixtureutil.TokenByPath(t, allTokens, "spacing.small")
 
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 	require.NoError(t, ctx.TokenManager().Add(spacingSmall))
 
 	uri := "file:///test.css"
@@ -153,8 +149,7 @@ func TestInlayHint_MultipleVarCalls(t *testing.T) {
 	spacingMedium := fixtureutil.TokenByPath(t, allTokens, "spacing.medium")
 
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 	require.NoError(t, ctx.TokenManager().Add(spacingSmall))
 	require.NoError(t, ctx.TokenManager().Add(spacingMedium))
 
@@ -190,8 +185,7 @@ func TestInlayHint_ColorToken(t *testing.T) {
 	colorHex := fixtureutil.TokenByPath(t, allTokens, "color.srgb-hex")
 
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 	require.NoError(t, ctx.TokenManager().Add(colorHex))
 
 	uri := "file:///test.css"
@@ -218,8 +212,7 @@ func TestInlayHint_HTMLDocument(t *testing.T) {
 	spacingSmall := fixtureutil.TokenByPath(t, allTokens, "spacing.small")
 
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 	require.NoError(t, ctx.TokenManager().Add(spacingSmall))
 
 	uri := "file:///test.html"
@@ -242,8 +235,7 @@ func TestInlayHint_HTMLDocument(t *testing.T) {
 
 func TestInlayHint_MissingDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	result, err := InlayHint(req, &protocol.InlayHintParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///nonexistent.css"},
@@ -259,8 +251,7 @@ func TestInlayHint_MissingDocument(t *testing.T) {
 
 func TestInlayHint_VarCallOutsideRange(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.sm",
@@ -296,8 +287,7 @@ func TestInlayHint_VarCallOutsideRange(t *testing.T) {
 
 func TestInlayHint_RangeExcludesBothLines(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.sm",
@@ -324,8 +314,7 @@ func TestInlayHint_RangeExcludesBothLines(t *testing.T) {
 
 func TestInlayHint_UnsupportedLanguage(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.json"
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "json", 1, `{"foo": "bar"}`))

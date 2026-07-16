@@ -1,9 +1,10 @@
 package types
 
 import (
+	"context"
+
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
-	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
@@ -40,7 +41,7 @@ type ServerContext interface {
 
 	// Workspace initialization (called by Initialize handler)
 	LoadTokensFromConfig() error
-	RegisterFileWatchers(ctx *glsp.Context) error
+	RegisterFileWatchers(ctx context.Context) error
 
 	// Load tokens from an open document (for files with Design Tokens schema)
 	LoadTokensFromDocumentContent(uri, languageID, content string) error
@@ -49,8 +50,8 @@ type ServerContext interface {
 	RemoveLoadedFile(path string)
 
 	// LSP context (for publishing diagnostics, etc.)
-	GLSPContext() *glsp.Context
-	SetGLSPContext(ctx *glsp.Context)
+	GLSPContext() context.Context
+	SetGLSPContext(ctx context.Context)
 
 	// Client capability detection (for LSP 3.17 features)
 	ClientDiagnosticCapability() *bool
@@ -75,7 +76,8 @@ type ServerContext interface {
 	SetUsePullDiagnostics(use bool)
 
 	// Diagnostics publishing
-	PublishDiagnostics(context *glsp.Context, uri string) error
+	PublishDiagnostics(ctx context.Context, uri string) error
+	NotifyDiagnosticRefresh()
 
 	// Semantic tokens delta support
 	SemanticTokenCache() SemanticTokenCacher

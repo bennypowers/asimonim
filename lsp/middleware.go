@@ -1,14 +1,24 @@
 package lsp
 
 import (
-	"bennypowers.dev/asimonim/lsp/internal/log"
+	"context"
 	"fmt"
 	"runtime/debug"
 
+	"bennypowers.dev/asimonim/lsp/internal/log"
 	"bennypowers.dev/asimonim/lsp/methods/workspace"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/bennypowers/glsp"
 )
+
+// glspToCtx extracts a context.Context from a glsp.Context.
+// Migration shim: will be removed when glsp is fully replaced.
+func glspToCtx(g *glsp.Context) context.Context {
+	if g != nil && g.Context != nil {
+		return g.Context
+	}
+	return context.Background()
+}
 
 // method wraps an LSP handler that returns (result, error) with middleware
 // Returns the underlying function type so it's compatible with protocol.Handler field types
@@ -35,28 +45,22 @@ func method[P, R any](
 		// Request logging
 		log.Debug("%s started", methodName)
 
-		// Create request context
-		req := types.NewRequestContext(s, glspCtx)
+		req := types.NewRequestContext(s, glspToCtx(glspCtx))
 
-		// Execute handler with request context
 		result, err = handler(req, params)
 
-		// Log warnings if operation succeeded
 		if err == nil && req.HasWarnings() {
 			for _, w := range req.Warnings() {
 				workspace.LogWarning(glspCtx, "%s warning: %v", methodName, w)
 			}
 		}
 
-		// Error context wrapping
 		if err != nil {
 			log.Error("%s error: %v", methodName, err)
-			// Log error to LSP client via window/logMessage
 			workspace.LogError(glspCtx, "%s: %v", methodName, err)
 			return result, fmt.Errorf("%s: %w", methodName, err)
 		}
 
-		// Success logging
 		log.Debug("%s completed successfully", methodName)
 		return result, nil
 	}
@@ -74,7 +78,6 @@ func notify[P any](
 				stackTrace := string(debug.Stack())
 				log.Error("PANIC in %s: %v\nStack trace:\n%s",
 					methodName, r, stackTrace)
-				// Log panic to LSP client
 				workspace.LogError(glspCtx, "Internal error in %s: %v", methodName, r)
 				err = fmt.Errorf("internal error in %s", methodName)
 			}
@@ -82,13 +85,10 @@ func notify[P any](
 
 		log.Debug("%s started", methodName)
 
-		// Create request context
-		req := types.NewRequestContext(s, glspCtx)
+		req := types.NewRequestContext(s, glspToCtx(glspCtx))
 
-		// Execute handler
 		err = handler(req, params)
 
-		// Log warnings if operation succeeded
 		if err == nil && req.HasWarnings() {
 			for _, w := range req.Warnings() {
 				workspace.LogWarning(glspCtx, "%s warning: %v", methodName, w)
@@ -97,7 +97,6 @@ func notify[P any](
 
 		if err != nil {
 			log.Error("%s error: %v", methodName, err)
-			// Log error to LSP client via window/logMessage
 			workspace.LogError(glspCtx, "%s: %v", methodName, err)
 			return fmt.Errorf("%s: %w", methodName, err)
 		}
@@ -119,7 +118,6 @@ func noParam(
 				stackTrace := string(debug.Stack())
 				log.Error("PANIC in %s: %v\nStack trace:\n%s",
 					methodName, r, stackTrace)
-				// Log panic to LSP client
 				workspace.LogError(glspCtx, "Internal error in %s: %v", methodName, r)
 				err = fmt.Errorf("internal error in %s", methodName)
 			}
@@ -127,13 +125,10 @@ func noParam(
 
 		log.Debug("%s started", methodName)
 
-		// Create request context
-		req := types.NewRequestContext(s, glspCtx)
+		req := types.NewRequestContext(s, glspToCtx(glspCtx))
 
-		// Execute handler
 		err = handler(req)
 
-		// Log warnings if operation succeeded
 		if err == nil && req.HasWarnings() {
 			for _, w := range req.Warnings() {
 				workspace.LogWarning(glspCtx, "%s warning: %v", methodName, w)
@@ -142,7 +137,6 @@ func noParam(
 
 		if err != nil {
 			log.Error("%s error: %v", methodName, err)
-			// Log error to LSP client via window/logMessage
 			workspace.LogError(glspCtx, "%s: %v", methodName, err)
 			return fmt.Errorf("%s: %w", methodName, err)
 		}

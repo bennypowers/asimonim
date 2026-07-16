@@ -1,23 +1,23 @@
 package types
 
 import (
-	"github.com/bennypowers/glsp"
+	"context"
 )
 
 // RequestContext contains all request-scoped data for an LSP method call.
-// It wraps both the server-wide context and the GLSP protocol context,
+// It wraps both the server-wide context and the request's context.Context,
 // and provides storage for request-scoped warnings.
 type RequestContext struct {
-	Server   ServerContext // Server-wide context (documents, tokens, config)
-	GLSP     *glsp.Context // GLSP protocol context (Notify, Call methods)
-	warnings []error       // Request-scoped warnings (collected during handler execution)
+	Server   ServerContext  // Server-wide context (documents, tokens, config)
+	Ctx      context.Context // Request-scoped context
+	warnings []error         // Request-scoped warnings (collected during handler execution)
 }
 
 // NewRequestContext creates a new request context
-func NewRequestContext(server ServerContext, glspContext *glsp.Context) *RequestContext {
+func NewRequestContext(server ServerContext, ctx context.Context) *RequestContext {
 	return &RequestContext{
 		Server: server,
-		GLSP:   glspContext,
+		Ctx:    ctx,
 	}
 }
 

@@ -1,6 +1,7 @@
 package hover
 
 import (
+	"context"
 	"testing"
 
 	asimonim "bennypowers.dev/asimonim/parser"
@@ -11,7 +12,6 @@ import (
 	fixtureutil "bennypowers.dev/asimonim/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
@@ -62,8 +62,7 @@ func TestIsPositionInRange(t *testing.T) {
 
 func TestHover_CSSVariableReference(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -105,8 +104,7 @@ func TestHover_CSSVariableReference(t *testing.T) {
 
 func TestHover_DeprecatedToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add deprecated token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -140,8 +138,7 @@ func TestHover_DeprecatedToken(t *testing.T) {
 
 func TestHover_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.css"
 	cssContent := `.button { color: var(--unknown-token); }`
@@ -169,8 +166,7 @@ func TestHover_UnknownToken(t *testing.T) {
 
 func TestHover_VarCallWithFallback(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.large",
@@ -201,8 +197,7 @@ func TestHover_VarCallWithFallback(t *testing.T) {
 
 func TestHover_NestedVarCalls(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -232,8 +227,7 @@ func TestHover_NestedVarCalls(t *testing.T) {
 
 func TestHover_VarCallOutsideCursorRange(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -258,8 +252,7 @@ func TestHover_VarCallOutsideCursorRange(t *testing.T) {
 
 func TestHover_VariableDeclaration(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -301,8 +294,7 @@ func TestHover_VariableDeclaration(t *testing.T) {
 
 func TestHover_VariableDeclaration_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.css"
 	// --local-var is not a known design token, just a local CSS custom property
@@ -323,8 +315,7 @@ func TestHover_VariableDeclaration_UnknownToken(t *testing.T) {
 
 func TestHover_VariableDeclaration_OnValue(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -352,8 +343,7 @@ func TestHover_VariableDeclaration_OnValue(t *testing.T) {
 
 func TestHover_VariableDeclaration_Boundaries(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -398,8 +388,7 @@ func TestHover_VariableDeclaration_Boundaries(t *testing.T) {
 
 func TestHover_VariableDeclaration_WithPrefix(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token with prefix
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -434,8 +423,7 @@ func TestHover_VariableDeclaration_WithPrefix(t *testing.T) {
 
 func TestHover_VariableDeclaration_MultipleInSameBlock(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -484,8 +472,7 @@ func TestHover_VariableDeclaration_MultipleInSameBlock(t *testing.T) {
 
 func TestHover_InvalidPosition(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -510,8 +497,7 @@ func TestHover_InvalidPosition(t *testing.T) {
 
 func TestHover_NonCSSDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.json"
 	jsonContent := `{"color": {"$value": "#ff0000"}}`
@@ -530,8 +516,7 @@ func TestHover_NonCSSDocument(t *testing.T) {
 
 func TestHover_DocumentNotFound(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
@@ -548,8 +533,7 @@ func TestHover_DocumentNotFound(t *testing.T) {
 // This is the RHDS pattern: var(--local, var(--design-token, fallback))
 func TestHover_NestedVarInFallback(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add design tokens (not the local variables)
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -648,8 +632,7 @@ func TestHover_ContentFormat(t *testing.T) {
 	t.Run("returns markdown when client prefers it", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetPreferredHoverFormat(protocol.MarkupKindMarkdown)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 			Name:        "color.primary",
@@ -681,8 +664,7 @@ func TestHover_ContentFormat(t *testing.T) {
 	t.Run("returns plaintext when client only supports plaintext", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetPreferredHoverFormat(protocol.MarkupKindPlainText)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 			Name:        "color.primary",
@@ -715,8 +697,7 @@ func TestHover_ContentFormat(t *testing.T) {
 	t.Run("defaults to markdown when no preference", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		// Don't set format preference - test default behavior
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 			Name:  "color.primary",
@@ -749,8 +730,7 @@ func TestHover_ContentFormat(t *testing.T) {
 
 func TestHover_HTMLStyleTag(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -785,8 +765,7 @@ func TestHover_HTMLStyleTag(t *testing.T) {
 
 func TestHover_PHPStyleTag(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.md",
@@ -827,8 +806,7 @@ func TestHover_PHPStyleTag(t *testing.T) {
 
 func TestHover_PHPStyleAttribute(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.sm",
@@ -861,8 +839,7 @@ func TestHover_PHPStyleAttribute(t *testing.T) {
 
 func TestHover_TwigStyleTag(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.md",
@@ -898,8 +875,7 @@ func TestHover_TwigStyleTag(t *testing.T) {
 
 func TestHover_TwigStyleAttribute(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.sm",
@@ -931,8 +907,7 @@ func TestHover_TwigStyleAttribute(t *testing.T) {
 
 func TestHover_JSCSSTemplate(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.small",
@@ -964,8 +939,7 @@ func TestHover_JSCSSTemplate(t *testing.T) {
 
 func TestHover_TSXCSSTemplate(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.small",
@@ -1001,8 +975,7 @@ func TestHover_TSXCSSTemplate(t *testing.T) {
 
 func TestHover_CurlyBraceReference_JSON(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add tokens
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -1050,8 +1023,7 @@ func TestHover_CurlyBraceReference_JSON(t *testing.T) {
 
 func TestHover_CurlyBraceReference_YAML(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add tokens
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -1092,8 +1064,7 @@ func TestHover_CurlyBraceReference_YAML(t *testing.T) {
 
 func TestHover_JSONPointerReference(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add tokens
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -1137,8 +1108,7 @@ func TestHover_JSONPointerReference(t *testing.T) {
 
 func TestHover_TokenReference_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Open a JSON document with reference to unknown token
 	uri := "file:///tokens.json"
@@ -1170,8 +1140,7 @@ func TestHover_TokenReference_UnknownToken(t *testing.T) {
 
 func TestHover_TokenReference_NoReferenceAtPosition(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Open a JSON document
 	uri := "file:///tokens.json"
@@ -1200,8 +1169,7 @@ func TestHover_TokenReference_NoReferenceAtPosition(t *testing.T) {
 
 func TestHover_TokenReference_DeprecatedToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add deprecated token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -1267,8 +1235,7 @@ func parseTokensFile(t *testing.T, path string) map[string]*tokens.Token {
 func TestHover_PlaintextUnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetPreferredHoverFormat(protocol.MarkupKindPlainText)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.css"
 	cssContent := `.button { color: var(--unknown-token); }`
@@ -1508,8 +1475,7 @@ func TestFindInnermostVariable(t *testing.T) {
 func TestHover_TokenFileHover_PlaintextFormat(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetPreferredHoverFormat(protocol.MarkupKindPlainText)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:        "color-primary",
@@ -1549,8 +1515,7 @@ func TestHover_TokenFileHover_PlaintextFormat(t *testing.T) {
 func TestHover_PlaintextUnknownTokenRef(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetPreferredHoverFormat(protocol.MarkupKindPlainText)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///tokens.json"
 	jsonContent := `{
@@ -1582,8 +1547,7 @@ func TestHover_PlaintextUnknownTokenRef(t *testing.T) {
 // TestHover_UnsupportedLanguage tests that hover returns nil for unsupported languages
 func TestHover_UnsupportedLanguage(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.py"
 	content := `print("hello")`

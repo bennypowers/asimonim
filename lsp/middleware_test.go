@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"testing"
 
@@ -11,7 +12,6 @@ import (
 	semantictokens "bennypowers.dev/asimonim/lsp/methods/textDocument/semanticTokens"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
@@ -41,10 +41,10 @@ func (m *mockServerContext) SetConfig(config types.ServerConfig)          {}
 func (m *mockServerContext) LoadPackageJsonConfig() error                 { return nil }
 func (m *mockServerContext) IsTokenFile(path string) bool                 { return false }
 func (m *mockServerContext) LoadTokensFromConfig() error                  { return nil }
-func (m *mockServerContext) RegisterFileWatchers(ctx *glsp.Context) error { return nil }
-func (m *mockServerContext) RemoveLoadedFile(path string)                 {}
-func (m *mockServerContext) GLSPContext() *glsp.Context                   { return nil }
-func (m *mockServerContext) SetGLSPContext(ctx *glsp.Context)             {}
+func (m *mockServerContext) RegisterFileWatchers(ctx context.Context) error { return nil }
+func (m *mockServerContext) RemoveLoadedFile(path string)                   {}
+func (m *mockServerContext) GLSPContext() context.Context                   { return nil }
+func (m *mockServerContext) SetGLSPContext(ctx context.Context)             {}
 func (m *mockServerContext) ClientDiagnosticCapability() *bool            { return nil }
 func (m *mockServerContext) SetClientDiagnosticCapability(hasCapability bool) {}
 func (m *mockServerContext) ClientCapabilities() *protocol.ClientCapabilities { return nil }
@@ -54,9 +54,10 @@ func (m *mockServerContext) PreferredHoverFormat() protocol.MarkupKind { return 
 func (m *mockServerContext) SupportsDefinitionLinks() bool { return false }
 func (m *mockServerContext) SupportsDiagnosticRelatedInfo() bool { return false }
 func (m *mockServerContext) SupportsCodeActionLiterals() bool   { return true }
-func (m *mockServerContext) PublishDiagnostics(context *glsp.Context, uri string) error {
+func (m *mockServerContext) PublishDiagnostics(ctx context.Context, uri string) error {
 	return nil
 }
+func (m *mockServerContext) NotifyDiagnosticRefresh() {}
 func (m *mockServerContext) UsePullDiagnostics() bool         { return false }
 func (m *mockServerContext) SetUsePullDiagnostics(use bool)   {}
 func (m *mockServerContext) AddWarning(err error)             {}

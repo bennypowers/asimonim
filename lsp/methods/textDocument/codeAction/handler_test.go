@@ -3,21 +3,21 @@ package codeaction
 import (
 	"testing"
 
+	"context"
+
 	cssparser "bennypowers.dev/asimonim/lsp/internal/parser/css"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 func TestCodeAction_IncorrectFallback(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a color token
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -72,8 +72,7 @@ func TestCodeAction_IncorrectFallback(t *testing.T) {
 func TestCodeAction_AddFallback(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a color token
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -123,8 +122,7 @@ func TestCodeAction_AddFallback(t *testing.T) {
 
 func TestCodeAction_NonCSSDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.json"
 	jsonContent := `{"color": {"$value": "#ff0000"}}`
@@ -147,8 +145,7 @@ func TestCodeAction_NonCSSDocument(t *testing.T) {
 
 func TestCodeAction_DocumentNotFound(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	result, err := CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///nonexistent.css"},
@@ -168,8 +165,7 @@ func TestCodeAction_DocumentNotFound(t *testing.T) {
 func TestCodeAction_OutsideRange(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -201,8 +197,7 @@ func TestCodeAction_OutsideRange(t *testing.T) {
 
 func TestCodeActionResolve_ReturnsActionUnchanged(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	action := &protocol.CodeAction{
 		Title: "Test action",
@@ -280,8 +275,7 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 	t.Run("deprecated token with recommended replacement", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsCodeActionLiterals(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		// Add deprecated token and its replacement
 		_ = ctx.TokenManager().Add(&tokens.Token{
@@ -367,8 +361,7 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 	t.Run("deprecated token without recommended replacement", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsCodeActionLiterals(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		// Deprecated token with no recommendation
 		_ = ctx.TokenManager().Add(&tokens.Token{
@@ -417,8 +410,7 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 	t.Run("deprecated token with replacement but no fallback in var()", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsCodeActionLiterals(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:               "spacing.old",
@@ -472,8 +464,7 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 func TestCreateReplacementAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Deprecated token pointing to a replacement with unsupported type
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -519,8 +510,7 @@ func TestCreateReplacementAction_UnformattableToken(t *testing.T) {
 func TestCreateLiteralValueAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Deprecated token with composite type that can't be formatted
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -560,8 +550,7 @@ func TestCreateLiteralValueAction_UnformattableToken(t *testing.T) {
 func TestFixFallbackAction_WithMatchingDiagnostic(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -618,8 +607,7 @@ func TestFixFallbackAction_WithMatchingDiagnostic(t *testing.T) {
 func TestFixFallbackAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Token with composite type that can't be formatted for CSS fallback
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -656,8 +644,7 @@ func TestFixFallbackAction_UnformattableToken(t *testing.T) {
 
 func TestCreateAddFallbackAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Token with composite type that FormatTokenValueForCSS rejects
 	token := &tokens.Token{
@@ -720,8 +707,7 @@ func TestCreateFixAllActionIfNeeded(t *testing.T) {
 func TestResolveFixAllFallbacks(t *testing.T) {
 	t.Run("returns action unchanged when data is not map", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		action := &protocol.CodeAction{
 			Title: "Fix all token fallback values",
@@ -735,8 +721,7 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 
 	t.Run("returns action unchanged when uri key missing", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		action := &protocol.CodeAction{
 			Title: "Fix all token fallback values",
@@ -750,8 +735,7 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 
 	t.Run("returns action unchanged when document not found", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		action := &protocol.CodeAction{
 			Title: "Fix all token fallback values",
@@ -766,8 +750,7 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 	t.Run("resolves edits for all incorrect fallbacks", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsCodeActionLiterals(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:  "color.primary",
@@ -811,8 +794,7 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 	t.Run("skips var calls with correct fallbacks", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsCodeActionLiterals(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:  "color.correct",
@@ -842,8 +824,7 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 	t.Run("skips unformattable tokens", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsCodeActionLiterals(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:  "border.main",
@@ -872,8 +853,7 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 
 func TestCreateToggleFallbackAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Token with composite type
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -897,8 +877,7 @@ func TestCreateToggleFallbackAction_UnformattableToken(t *testing.T) {
 
 func TestCreateToggleFallbackAction_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Don't add any tokens
 
@@ -917,8 +896,7 @@ func TestCreateToggleFallbackAction_UnknownToken(t *testing.T) {
 func TestToggleFallbackAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Token with composite type that can't be formatted
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -960,8 +938,7 @@ func TestToggleFallbackAction_UnformattableToken(t *testing.T) {
 func TestToggleRangeFallbacksAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Only add an unformattable token
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -1002,8 +979,7 @@ func TestToggleRangeFallbacksAction_UnformattableToken(t *testing.T) {
 func TestProcessVarCalls_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Don't add any tokens -- var() references an unknown token
 
@@ -1032,8 +1008,7 @@ func TestProcessVarCalls_UnknownToken(t *testing.T) {
 func TestCodeAction_NoAddFallbackForNonColorDimension(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Token with type "number" -- add-fallback only for color/dimension
 	_ = ctx.TokenManager().Add(&tokens.Token{

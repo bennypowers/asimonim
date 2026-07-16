@@ -54,12 +54,12 @@ func DidChangeWatchedFiles(req *types.RequestContext, params *protocol.DidChange
 
 		// Refresh diagnostics for all open documents
 		if req.Server.UsePullDiagnostics() {
-			NotifyDiagnosticRefresh(req.GLSP)
+			req.Server.NotifyDiagnosticRefresh()
 		} else {
-			glspCtx := req.Server.GLSPContext()
-			if glspCtx != nil {
+			ctx := req.Server.GLSPContext()
+			if ctx != nil {
 				for _, doc := range req.Server.AllDocuments() {
-					if err := req.Server.PublishDiagnostics(glspCtx, doc.URI()); err != nil {
+					if err := req.Server.PublishDiagnostics(ctx, doc.URI()); err != nil {
 						log.Info("Warning: failed to publish diagnostics for %s: %v", doc.URI(), err)
 					}
 				}

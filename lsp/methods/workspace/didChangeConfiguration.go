@@ -32,10 +32,10 @@ func DidChangeConfiguration(req *types.RequestContext, params *protocol.DidChang
 
 	// Refresh diagnostics for all open documents
 	if req.Server.UsePullDiagnostics() {
-		NotifyDiagnosticRefresh(req.GLSP)
-	} else if req.GLSP != nil {
+		req.Server.NotifyDiagnosticRefresh()
+	} else if req.Ctx != nil {
 		for _, doc := range req.Server.AllDocuments() {
-			if err := req.Server.PublishDiagnostics(req.GLSP, doc.URI()); err != nil {
+			if err := req.Server.PublishDiagnostics(req.Ctx, doc.URI()); err != nil {
 				log.Info("Warning: failed to publish diagnostics for %s: %v", doc.URI(), err)
 			}
 		}

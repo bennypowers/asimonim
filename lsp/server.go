@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -47,7 +48,8 @@ type Server struct {
 	documents          *documents.Manager
 	tokens             *tokens.Manager
 	glspServer         *server.Server
-	context            *glsp.Context
+	ctx                context.Context
+	glspCtxInternal    *glsp.Context
 	version                     string                                // Server version string
 	rootURI                     string                                // Workspace root URI
 	rootPath                    string                                // Workspace root path (file system)
@@ -193,20 +195,39 @@ func (s *Server) SetRootPath(path string) {
 	s.rootPath = path
 }
 
-// GLSPContext returns the GLSP context.
+// GLSPContext returns the stored context.
 // Access is protected by configMu to prevent concurrent races.
-func (s *Server) GLSPContext() *glsp.Context {
+func (s *Server) GLSPContext() context.Context {
 	s.configMu.RLock()
 	defer s.configMu.RUnlock()
-	return s.context
+	return s.ctx
 }
 
-// SetGLSPContext sets the GLSP context.
+// SetGLSPContext stores a context for out-of-band notifications.
 // Access is protected by configMu to prevent concurrent races.
-func (s *Server) SetGLSPContext(ctx *glsp.Context) {
+func (s *Server) SetGLSPContext(ctx context.Context) {
 	s.configMu.Lock()
 	defer s.configMu.Unlock()
-	s.context = ctx
+	s.ctx = ctx
+}
+
+// setGLSPInternal stores the raw glsp.Context for server-to-client notifications.
+// Migration shim: will be replaced by protocol.Client.
+func (s *Server) setGLSPInternal(ctx *glsp.Context) {
+	s.configMu.Lock()
+	defer s.configMu.Unlock()
+	s.glspCtxInternal = ctx
+	if ctx != nil && ctx.Context != nil {
+		s.ctx = ctx.Context
+	}
+}
+
+// glspContext returns the internal glsp.Context for server-to-client notifications.
+// Migration shim: will be replaced by protocol.Client.
+func (s *Server) glspContext() *glsp.Context {
+	s.configMu.RLock()
+	defer s.configMu.RUnlock()
+	return s.glspCtxInternal
 }
 
 // ClientDiagnosticCapability returns the detected client diagnostic capability.
@@ -390,22 +411,16 @@ func (s *Server) Version() string {
 	return s.version
 }
 
-// PublishDiagnostics publishes diagnostics for a document
-func (s *Server) PublishDiagnostics(context *glsp.Context, uri string) error {
+// PublishDiagnostics publishes diagnostics for a document.
+// During migration, this still uses the stored glsp.Context internally.
+func (s *Server) PublishDiagnostics(_ context.Context, uri string) error {
 	log.Info("Publishing diagnostics for: %s", uri)
 
-	// Select a working context: use passed-in context if non-nil, otherwise fall back to server's context
-	workingContext := context
-	if workingContext == nil {
-		workingContext = s.GLSPContext()
-	}
-
-	// If we still don't have a context, fail fast
-	if workingContext == nil {
+	glspCtx := s.glspContext()
+	if glspCtx == nil {
 		return fmt.Errorf("cannot publish diagnostics: no client context available")
 	}
 
-	// If server is configured to use pull diagnostics, don't publish (client will request)
 	if s.UsePullDiagnostics() {
 		return nil
 	}
@@ -415,13 +430,23 @@ func (s *Server) PublishDiagnostics(context *glsp.Context, uri string) error {
 		return err
 	}
 
-	// Publish diagnostics to the client using the selected context
-	workingContext.Notify(protocol.ServerTextDocumentPublishDiagnostics, protocol.PublishDiagnosticsParams{
+	glspCtx.Notify(protocol.ServerTextDocumentPublishDiagnostics, protocol.PublishDiagnosticsParams{
 		URI:         uri,
 		Diagnostics: diagnostics,
 	})
 
 	return nil
+}
+
+// NotifyDiagnosticRefresh sends workspace/diagnostic/refresh to the client.
+// Migration shim: uses stored glsp.Context internally.
+func (s *Server) NotifyDiagnosticRefresh() {
+	glspCtx := s.glspContext()
+	if glspCtx == nil || glspCtx.Notify == nil {
+		return
+	}
+	log.Info("Sending workspace/diagnostic/refresh")
+	glspCtx.Notify(protocol.MethodWorkspaceDiagnosticRefresh, nil)
 }
 
 // IsTokenFile checks if a file path is one of our token files
@@ -571,16 +596,15 @@ func (s *Server) buildFileWatchers() []protocol.FileSystemWatcher {
 	return watchers
 }
 
-// RegisterFileWatchers registers file watchers with the client
-func (s *Server) RegisterFileWatchers(context *glsp.Context) error {
-	// Guard against nil or empty context (can happen in tests without real LSP connection)
-	// An empty context (created with &glsp.Context{}) won't have Call initialized
-	if context == nil || context.Call == nil {
+// RegisterFileWatchers registers file watchers with the client.
+// During migration, uses stored glsp.Context internally for the Call RPC.
+func (s *Server) RegisterFileWatchers(_ context.Context) error {
+	glspCtx := s.glspContext()
+	if glspCtx == nil || glspCtx.Call == nil {
 		log.Info("Skipping file watcher registration (no client context)")
 		return nil
 	}
 
-	// Build file watchers for configured token files
 	watchers := s.buildFileWatchers()
 
 	if len(watchers) == 0 {
@@ -588,7 +612,6 @@ func (s *Server) RegisterFileWatchers(context *glsp.Context) error {
 		return nil
 	}
 
-	// Register the watchers with the client
 	params := protocol.RegistrationParams{
 		Registrations: []protocol.Registration{
 			{
@@ -601,26 +624,11 @@ func (s *Server) RegisterFileWatchers(context *glsp.Context) error {
 		},
 	}
 
-	// Send registration request to client
-	// Note: client/registerCapability is a request (not notification) per LSP spec.
-	// We use context.Call instead of context.Notify to properly send a request.
-	//
-	// IMPORTANT: We must call this in a goroutine to avoid blocking the main message
-	// handler loop. If we call context.Call synchronously, the server cannot read the
-	// client's response because the message handler is blocked waiting for it (deadlock).
-	//
-	// Error handling note: glsp.Context.Call doesn't return errors - the underlying
-	// jsonrpc2.Conn.Call errors are caught and logged by the glsp wrapper
-	// (see github.com/tliron/glsp@v0.2.2/server/handle.go:24-28).
-	// If the client rejects the registration, the error response will be logged
-	// to stderr by the glsp library. Since client capability registration failures
-	// are not fatal (the client continues working, just without file watching),
-	// this fire-and-forget approach with logging is acceptable.
 	go func(ctx *glsp.Context) {
 		var result any
 		ctx.Call("client/registerCapability", params, &result)
 		log.Info("File watcher registration completed")
-	}(context)
+	}(glspCtx)
 
 	log.Info("Sent file watcher registration request (%d watchers)", len(watchers))
 	return nil

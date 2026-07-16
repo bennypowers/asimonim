@@ -1,6 +1,7 @@
 package definition
 
 import (
+	"context"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/parser/css"
@@ -9,14 +10,12 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 func TestDefinition_CSSVariableReference(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token with definition URI
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -50,8 +49,7 @@ func TestDefinition_CSSVariableReference(t *testing.T) {
 
 func TestDefinition_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.css"
 	cssContent := `.button { color: var(--unknown-token); }`
@@ -70,8 +68,7 @@ func TestDefinition_UnknownToken(t *testing.T) {
 
 func TestDefinition_TokenWithoutDefinitionURI(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add token without DefinitionURI
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -96,8 +93,7 @@ func TestDefinition_TokenWithoutDefinitionURI(t *testing.T) {
 
 func TestDefinition_OutsideVarCall(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:          "color.primary",
@@ -124,8 +120,7 @@ func TestDefinition_OutsideVarCall(t *testing.T) {
 
 func TestDefinition_NonCSSDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.json"
 	jsonContent := `{"color": {"$value": "#ff0000"}}`
@@ -144,8 +139,7 @@ func TestDefinition_NonCSSDocument(t *testing.T) {
 
 func TestDefinition_DocumentNotFound(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	result, err := Definition(req, &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
@@ -160,8 +154,7 @@ func TestDefinition_DocumentNotFound(t *testing.T) {
 
 func TestDefinition_PreciseTokenPosition(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token with definition URI and precise position
 	// Simulates a token at line 2, character 4 in the source file
@@ -281,8 +274,7 @@ func TestDefinition_LinkSupport(t *testing.T) {
 	t.Run("returns LocationLink when client supports linkSupport", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsDefinitionLinks(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:          "color.primary",
@@ -321,8 +313,7 @@ func TestDefinition_LinkSupport(t *testing.T) {
 	t.Run("returns Location when client does not support linkSupport", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsDefinitionLinks(false)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:          "color.primary",
@@ -359,8 +350,7 @@ func TestDefinition_LinkSupport(t *testing.T) {
 	t.Run("defaults to Location when capability is unknown", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		// Don't set link support - test default behavior
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:          "color.primary",
@@ -394,8 +384,7 @@ func TestDefinition_LinkSupport(t *testing.T) {
 
 func TestDefinition_HTMLDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:          "color.primary",
@@ -428,8 +417,7 @@ func TestDefinition_HTMLDocument(t *testing.T) {
 
 func TestDefinition_TokenWithDefinitionURIButNoPath(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Token has DefinitionURI but empty Path
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -456,8 +444,7 @@ func TestDefinition_TokenWithDefinitionURIButNoPath(t *testing.T) {
 
 func TestDefinition_UnsupportedLanguage(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.py"
 	_ = ctx.DocumentManager().DidOpen(uri, "python", 1, `print("hello")`)
@@ -511,8 +498,7 @@ func TestDefinition_JSONTokenFile_NotTokenFile(t *testing.T) {
 	ctx.ShouldProcessAsTokenFileFunc = func(uri string) bool {
 		return false
 	}
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///package.json"
 	jsonContent := `{"name": "my-package"}`
@@ -531,8 +517,7 @@ func TestDefinition_JSONTokenFile_NotTokenFile(t *testing.T) {
 
 func TestDefinition_HTMLNoCSS(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.html"
 	content := `<p>Hello</p>`

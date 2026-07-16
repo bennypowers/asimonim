@@ -1,6 +1,7 @@
 package completion
 
 import (
+	"context"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
@@ -9,15 +10,13 @@ import (
 	fixtureutil "bennypowers.dev/asimonim/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 func TestCompletion_CSSVariableCompletion(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsSnippets(true) // Enable snippets for this test
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add some tokens
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -70,8 +69,7 @@ func TestCompletion_CSSVariableCompletion(t *testing.T) {
 
 func TestCompletion_AllTokens(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -119,8 +117,7 @@ func TestCompletion_FilterText(t *testing.T) {
 
 	t.Run("typing prefix without dashes strips -- from FilterText", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 		addPrefixedTokens(ctx)
 
 		uri := "file:///test.css"
@@ -154,8 +151,7 @@ func TestCompletion_FilterText(t *testing.T) {
 
 	t.Run("typing with -- keeps full CSS var name as FilterText", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 		addPrefixedTokens(ctx)
 
 		uri := "file:///test.css"
@@ -190,8 +186,7 @@ func TestCompletion_FilterText(t *testing.T) {
 
 func TestCompletion_NonCSSDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.json"
 	jsonContent := `{"color": {"$value": "#ff0000"}}`
@@ -210,8 +205,7 @@ func TestCompletion_NonCSSDocument(t *testing.T) {
 
 func TestCompletion_DocumentNotFound(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	result, err := Completion(req, &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
@@ -226,8 +220,7 @@ func TestCompletion_DocumentNotFound(t *testing.T) {
 
 func TestCompletion_NoWordAtPosition(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -251,8 +244,7 @@ func TestCompletion_NoWordAtPosition(t *testing.T) {
 
 func TestCompletionResolve_AddsDocumentation(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:        "color.primary",
@@ -291,8 +283,7 @@ func TestCompletionResolve_AddsDocumentation(t *testing.T) {
 
 func TestCompletionResolve_DeprecatedToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:               "color.old-primary",
@@ -322,8 +313,7 @@ func TestCompletionResolve_DeprecatedToken(t *testing.T) {
 
 func TestCompletionResolve_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	item := &protocol.CompletionItem{
 		Label: "--unknown-token",
@@ -340,8 +330,7 @@ func TestCompletionResolve_UnknownToken(t *testing.T) {
 
 func TestCompletionResolve_NoData(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -554,8 +543,7 @@ func TestIsInCompletionContext(t *testing.T) {
 func TestCompletion_HTMLDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsSnippets(false)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -584,8 +572,7 @@ func TestCompletion_HTMLDocument(t *testing.T) {
 func TestCompletion_PHPDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsSnippets(false)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:  "bg.surface",
@@ -638,8 +625,7 @@ func TestIsInCompletionContext_PHP(t *testing.T) {
 func TestCompletion_TwigDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsSnippets(false)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:  "bg.surface",
@@ -685,8 +671,7 @@ func TestIsInCompletionContext_Twig(t *testing.T) {
 
 func TestCompletion_UnsupportedLanguage(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.go"
 	_ = ctx.DocumentManager().DidOpen(uri, "go", 1, "package main")
@@ -729,8 +714,7 @@ func TestCompletion_SnippetSupport(t *testing.T) {
 	t.Run("uses snippet format when client supports snippets", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsSnippets(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:  "color.primary",
@@ -763,8 +747,7 @@ func TestCompletion_SnippetSupport(t *testing.T) {
 	t.Run("uses plain text format when client does not support snippets", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsSnippets(false)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:  "color.primary",
@@ -798,8 +781,7 @@ func TestCompletion_SnippetSupport(t *testing.T) {
 	t.Run("defaults to plain text when capability is unknown", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		// Don't set snippet support - test default behavior
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:  "color.primary",

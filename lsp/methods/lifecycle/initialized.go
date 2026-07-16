@@ -12,7 +12,7 @@ func Initialized(req *types.RequestContext, params *protocol.InitializedParams) 
 	log.Info("Server initialized")
 
 	// Store context for later use (diagnostics)
-	req.Server.SetGLSPContext(req.GLSP)
+	req.Server.SetGLSPContext(req.Ctx)
 
 	// Read configuration from package.json if it exists
 	// This provides the "zero-config" experience for projects with package.json config
@@ -28,7 +28,7 @@ func Initialized(req *types.RequestContext, params *protocol.InitializedParams) 
 	}
 
 	// Register file watchers for token files
-	if err := req.Server.RegisterFileWatchers(req.GLSP); err != nil {
+	if err := req.Server.RegisterFileWatchers(req.Ctx); err != nil {
 		log.Info("Warning: failed to register file watchers: %v", err)
 		// Don't fail initialization, just log the error
 	}

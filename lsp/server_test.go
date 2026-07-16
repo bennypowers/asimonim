@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"context"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/types"
@@ -37,8 +38,8 @@ func TestHandlers_WrappersSmokeTest(t *testing.T) {
 		semanticTokenCache: semantictokens.NewTokenCache(),
 	}
 
-	// Dummy context (nil is fine for these simple wrappers)
-	var ctx *glsp.Context
+	// Background context (nil is fine for these simple wrappers)
+	ctx := context.Background()
 
 	t.Run("Hover", func(t *testing.T) {
 		params := &protocol.HoverParams{
@@ -270,15 +271,15 @@ func TestPublishDiagnostics_NilContext(t *testing.T) {
 			tokens:      tokens.NewManager(),
 			config:      types.ServerConfig{},
 			loadedFiles: make(map[string]*TokenFileOptions),
-			context:     nil, // No server context
+			ctx:         nil, // No server context
 		}
 
 		// Open a document
 		err := server.documents.DidOpen("file:///test.css", "css", 1, `.test { color: red; }`)
 		require.NoError(t, err)
 
-		// Attempt to publish diagnostics with nil context
-		err = server.PublishDiagnostics(nil, "file:///test.css")
+		// Attempt to publish diagnostics with no stored client context
+		err = server.PublishDiagnostics(context.Background(), "file:///test.css")
 
 		// Should return an error, not panic
 		assert.Error(t, err)
@@ -302,8 +303,8 @@ func TestPublishDiagnostics_NilContext(t *testing.T) {
 		err := server.documents.DidOpen("file:///test.css", "css", 1, `.test { color: red; }`)
 		require.NoError(t, err)
 
-		// With both contexts nil, it should error (already tested above)
-		err = server.PublishDiagnostics(nil, "file:///test.css")
+		// With no stored client context, it should error
+		err = server.PublishDiagnostics(context.Background(), "file:///test.css")
 		assert.Error(t, err)
 
 		// Note: We can't easily test the success case without a real GLSP context
@@ -757,7 +758,7 @@ func TestServer_SetGLSPContext(t *testing.T) {
 	assert.Nil(t, s.GLSPContext())
 
 	// Set and retrieve
-	ctx := &glsp.Context{}
+	ctx := context.Background()
 	s.SetGLSPContext(ctx)
 	assert.Equal(t, ctx, s.GLSPContext())
 }
@@ -845,11 +846,11 @@ func TestPublishDiagnostics_PullDiagnosticsSkips(t *testing.T) {
 	// Enable pull diagnostics
 	s.SetUsePullDiagnostics(true)
 
-	// Even with a valid context, PublishDiagnostics should be a no-op
-	ctx := &glsp.Context{}
-	s.SetGLSPContext(ctx)
+	// Set internal glsp context so the nil-check passes
+	s.setGLSPInternal(&glsp.Context{})
+	s.SetGLSPContext(context.Background())
 
-	err = s.PublishDiagnostics(ctx, "file:///test.css")
+	err = s.PublishDiagnostics(context.Background(), "file:///test.css")
 	// Should return nil (skipped, not error)
 	assert.NoError(t, err)
 }
@@ -858,8 +859,8 @@ func TestServer_RegisterFileWatchers_NilContext(t *testing.T) {
 	s, err := NewServer()
 	require.NoError(t, err)
 
-	// Should return nil without panicking when context is nil
-	err = s.RegisterFileWatchers(nil)
+	// Should return nil without panicking when no internal glsp context is stored
+	err = s.RegisterFileWatchers(context.Background())
 	assert.NoError(t, err)
 }
 
@@ -867,9 +868,8 @@ func TestServer_RegisterFileWatchers_EmptyContext(t *testing.T) {
 	s, err := NewServer()
 	require.NoError(t, err)
 
-	// An empty context (Call is nil) should also skip registration
-	ctx := &glsp.Context{}
-	err = s.RegisterFileWatchers(ctx)
+	// No internal glsp context set (Call is nil) should also skip registration
+	err = s.RegisterFileWatchers(context.Background())
 	assert.NoError(t, err)
 }
 
@@ -880,11 +880,12 @@ func TestServer_RegisterFileWatchers_WithCallContext(t *testing.T) {
 	// Configure some token files so watchers are generated
 	s.config.TokensFiles = []any{"tokens.json"}
 
-	ctx := &glsp.Context{
+	// Set the internal glsp context with Call so watchers can be registered
+	s.setGLSPInternal(&glsp.Context{
 		Call: func(_ string, _ any, _ any) {},
-	}
+	})
 
-	err = s.RegisterFileWatchers(ctx)
+	err = s.RegisterFileWatchers(context.Background())
 	assert.NoError(t, err)
 }
 
@@ -996,9 +997,11 @@ func TestPublishDiagnostics_UsesPassedContext(t *testing.T) {
 
 		s.SetUsePullDiagnostics(true)
 
-		// Even with a passed context, should skip
-		ctx := &glsp.Context{}
-		err = s.PublishDiagnostics(ctx, "file:///test.json")
+		// Set internal glsp context so the nil-check passes
+		s.setGLSPInternal(&glsp.Context{})
+
+		// Even with pull diagnostics enabled, should skip (no-op)
+		err = s.PublishDiagnostics(context.Background(), "file:///test.json")
 		assert.NoError(t, err)
 	})
 
@@ -1006,8 +1009,8 @@ func TestPublishDiagnostics_UsesPassedContext(t *testing.T) {
 		s, err := NewServer()
 		require.NoError(t, err)
 
-		// No server context set either -- should error
-		err = s.PublishDiagnostics(nil, "file:///test.json")
+		// No internal glsp context stored -- should error
+		err = s.PublishDiagnostics(context.Background(), "file:///test.json")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no client context available")
 	})
@@ -1025,15 +1028,15 @@ func TestPublishDiagnostics_NotifiesClient(t *testing.T) {
 	tok := &tokens.Token{Name: "c", Value: "#ff0000", Type: "color"}
 	_ = s.TokenManager().Add(tok)
 
-	// Non-nil context with no-op Notify exercises the notification branch
+	// Set the internal glsp context with Notify to exercise the notification branch
 	notified := false
-	ctx := &glsp.Context{
+	s.setGLSPInternal(&glsp.Context{
 		Notify: func(_ string, _ any) {
 			notified = true
 		},
-	}
+	})
 
-	err = s.PublishDiagnostics(ctx, "file:///test.css")
+	err = s.PublishDiagnostics(context.Background(), "file:///test.css")
 	assert.NoError(t, err)
 	assert.True(t, notified, "expected Notify to be called")
 }

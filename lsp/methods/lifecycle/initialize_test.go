@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -9,15 +10,13 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 func TestInitialize(t *testing.T) {
 	t.Run("sets root URI from params.RootURI", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 		rootURI := "file:///workspace"
 
 		params := &protocol.InitializeParams{}
@@ -34,8 +33,7 @@ func TestInitialize(t *testing.T) {
 
 	t.Run("sets root path from params.RootPath", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 		rootPath := "/workspace"
 
 		params := &protocol.InitializeParams{}
@@ -52,8 +50,7 @@ func TestInitialize(t *testing.T) {
 
 	t.Run("returns server capabilities", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		params := &protocol.InitializeParams{}
 
@@ -77,8 +74,7 @@ func TestInitialize(t *testing.T) {
 
 	t.Run("capabilities include all LSP features", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		// Simulate LSP 3.17 client with diagnostic capability
 		// (In practice, CustomHandler detects this from raw JSON during initialize)
@@ -127,8 +123,7 @@ func TestInitialize(t *testing.T) {
 
 	t.Run("diagnostic identifier serializes as string not null", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 		ctx.SetClientDiagnosticCapability(true)
 
 		params := &protocol.InitializeParams{
@@ -151,8 +146,7 @@ func TestInitialize(t *testing.T) {
 
 	t.Run("handles client info", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		clientVersion := "1.85.0"
 		params := &protocol.InitializeParams{}
@@ -171,8 +165,7 @@ func TestInitialize(t *testing.T) {
 
 	t.Run("handles nil params gracefully", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		params := &protocol.InitializeParams{}
 
@@ -189,8 +182,7 @@ func TestInitialize(t *testing.T) {
 func TestInitialize_StoresClientCapabilities(t *testing.T) {
 	t.Run("stores client capabilities during initialization", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		textDoc := &protocol.TextDocumentClientCapabilities{}
 		textDoc.Completion = &protocol.CompletionClientCapabilities{
@@ -235,8 +227,7 @@ func TestInitialize_StoresClientCapabilities(t *testing.T) {
 
 	t.Run("stores empty capabilities when none provided", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		params := &protocol.InitializeParams{}
 

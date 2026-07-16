@@ -1,6 +1,7 @@
 package references
 
 import (
+	"context"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
@@ -8,15 +9,13 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 // TestReferences_CSSFile_ReturnsTokenDefinition tests that references from CSS returns the token definition
 func TestReferences_CSSFile_ReturnsTokenDefinition(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add token with definition location
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -50,8 +49,7 @@ func TestReferences_CSSFile_ReturnsTokenDefinition(t *testing.T) {
 // TestReferences_CSSFile_UnknownToken tests that references returns nil when token is not found
 func TestReferences_CSSFile_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.css"
 	cssContent := `.button { color: var(--unknown-token); }`
@@ -72,8 +70,7 @@ func TestReferences_CSSFile_UnknownToken(t *testing.T) {
 // TestReferences_CSSFile_OutsideVarCall tests that references returns nil when cursor is not on var()
 func TestReferences_CSSFile_OutsideVarCall(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -104,8 +101,7 @@ func TestReferences_CSSFile_OutsideVarCall(t *testing.T) {
 // TestReferences_CSSFile_TokenWithoutDefinitionURI tests that references returns nil when token has no DefinitionURI
 func TestReferences_CSSFile_TokenWithoutDefinitionURI(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add token without definition location
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -133,8 +129,7 @@ func TestReferences_CSSFile_TokenWithoutDefinitionURI(t *testing.T) {
 // TestReferences_CSSFile_PositionOnDifferentLine tests cursor on a different line than the var() call
 func TestReferences_CSSFile_PositionOnDifferentLine(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -168,8 +163,7 @@ func TestReferences_CSSFile_PositionOnDifferentLine(t *testing.T) {
 // TestReferences_CSSFile_PositionPastVarCall tests cursor position after the var() call ends
 func TestReferences_CSSFile_PositionPastVarCall(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -202,8 +196,7 @@ func TestReferences_CSSFile_PositionPastVarCall(t *testing.T) {
 // TestReferences_JSONFile_FindsReferencesInCSS tests finding CSS var() references from JSON token file
 func TestReferences_JSONFile_FindsReferencesInCSS(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token with extension data
 	token := &tokens.Token{
@@ -271,8 +264,7 @@ func TestReferences_JSONFile_FindsReferencesInCSS(t *testing.T) {
 // TestReferences_JSONFile_FindsReferencesInJSON tests finding token references in other JSON files
 func TestReferences_JSONFile_FindsReferencesInJSON(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add tokens
 	primaryToken := &tokens.Token{
@@ -328,8 +320,7 @@ func TestReferences_JSONFile_FindsReferencesInJSON(t *testing.T) {
 // TestReferences_WithIncludeDeclaration tests including the token definition
 func TestReferences_WithIncludeDeclaration(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	token := &tokens.Token{
 		Name:          "color-primary",
@@ -382,8 +373,7 @@ func TestReferences_WithIncludeDeclaration(t *testing.T) {
 // TestReferences_UnknownToken tests when cursor is not on a token
 func TestReferences_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	jsonURI := "file:///tokens.json"
 	jsonContent := `{
@@ -414,8 +404,7 @@ func TestReferences_UnknownToken(t *testing.T) {
 // TestReferences_DocumentNotFound tests when document doesn't exist
 func TestReferences_DocumentNotFound(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
@@ -434,8 +423,7 @@ func TestReferences_DocumentNotFound(t *testing.T) {
 // TestReferences_YAMLFile tests references from YAML token files
 func TestReferences_YAMLFile(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	token := &tokens.Token{
 		Name:          "color-primary",
@@ -707,8 +695,7 @@ func TestFindTokenDefinitionRange_KeyNotFound(t *testing.T) {
 func TestReferences_NonTokenFile(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.ShouldProcessAsTokenFileFunc = func(uri string) bool { return false }
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	jsonURI := "file:///package.json"
 	_ = ctx.DocumentManager().DidOpen(jsonURI, "json", 1, `{"name": "my-package"}`)
@@ -728,8 +715,7 @@ func TestReferences_NonTokenFile(t *testing.T) {
 // TestReferences_WithIncludeDeclaration_NoDefinitionURI tests that declaration is not added when token has no DefinitionURI
 func TestReferences_WithIncludeDeclaration_NoDefinitionURI(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	token := &tokens.Token{
 		Name:      "color-primary",
@@ -775,8 +761,7 @@ func TestReferences_WithIncludeDeclaration_NoDefinitionURI(t *testing.T) {
 // TestReferences_WithIncludeDeclaration_DefinitionDocNotFound tests when definition document is not open
 func TestReferences_WithIncludeDeclaration_DefinitionDocNotFound(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	token := &tokens.Token{
 		Name:          "color-primary",

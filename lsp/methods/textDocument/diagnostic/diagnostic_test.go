@@ -9,7 +9,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
+	"context"
+
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
@@ -163,8 +164,7 @@ func TestGetDiagnostics_MultipleIssues(t *testing.T) {
 
 func TestDocumentDiagnostic(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a deprecated token
 	_ = ctx.TokenManager().Add(&tokens.Token{

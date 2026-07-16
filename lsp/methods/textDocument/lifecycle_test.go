@@ -7,15 +7,15 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
+	"context"
+
 	protocol "github.com/bennypowers/glsp/protocol_3_17"
 )
 
 func TestDidOpen(t *testing.T) {
 	t.Run("opens document successfully", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		params := &protocol.DidOpenTextDocumentParams{
 			TextDocument: protocol.TextDocumentItem{
@@ -40,9 +40,8 @@ func TestDidOpen(t *testing.T) {
 
 	t.Run("publishes diagnostics after opening", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
-		ctx.SetGLSPContext(glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
+		ctx.SetGLSPContext(context.Background())
 
 		params := &protocol.DidOpenTextDocumentParams{
 			TextDocument: protocol.TextDocumentItem{
@@ -61,8 +60,7 @@ func TestDidOpen(t *testing.T) {
 
 	t.Run("handles JSON document", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		params := &protocol.DidOpenTextDocumentParams{
 			TextDocument: protocol.TextDocumentItem{
@@ -83,8 +81,7 @@ func TestDidOpen(t *testing.T) {
 
 	t.Run("handles YAML document", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		params := &protocol.DidOpenTextDocumentParams{
 			TextDocument: protocol.TextDocumentItem{
@@ -107,8 +104,7 @@ func TestDidOpen(t *testing.T) {
 func TestDidChange(t *testing.T) {
 	t.Run("updates document content", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		// First open a document
 		_ = ctx.DocumentManager().DidOpen("file:///test.css", "css", 1, "body { color: red; }")
@@ -137,9 +133,8 @@ func TestDidChange(t *testing.T) {
 
 	t.Run("publishes diagnostics after change", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
-		ctx.SetGLSPContext(glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
+		ctx.SetGLSPContext(context.Background())
 
 		// First open a document
 		_ = ctx.DocumentManager().DidOpen("file:///test.css", "css", 1, "body { color: red; }")
@@ -163,8 +158,7 @@ func TestDidChange(t *testing.T) {
 
 	t.Run("handles incremental changes", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		// First open a document
 		_ = ctx.DocumentManager().DidOpen("file:///test.css", "css", 1, "body { color: red; }")
@@ -196,8 +190,7 @@ func TestDidChange(t *testing.T) {
 
 	t.Run("handles multiple changes", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		// First open a document
 		_ = ctx.DocumentManager().DidOpen("file:///test.css", "css", 1, "body { color: red; }")
@@ -226,8 +219,7 @@ func TestDidChange(t *testing.T) {
 
 	t.Run("filters invalid change events", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		// First open a document
 		_ = ctx.DocumentManager().DidOpen("file:///test.css", "css", 1, "body { color: red; }")
@@ -256,8 +248,7 @@ func TestDidChange(t *testing.T) {
 func TestDidClose(t *testing.T) {
 	t.Run("closes document successfully", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		// First open a document
 		_ = ctx.DocumentManager().DidOpen("file:///test.css", "css", 1, "body { color: red; }")
@@ -276,8 +267,7 @@ func TestDidClose(t *testing.T) {
 
 	t.Run("returns error when closing non-existent document", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		params := &protocol.DidCloseTextDocumentParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: "file:///nonexistent.css"},
@@ -290,8 +280,7 @@ func TestDidClose(t *testing.T) {
 
 	t.Run("closes multiple documents independently", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		// Open two documents
 		_ = ctx.DocumentManager().DidOpen("file:///test1.css", "css", 1, "body { color: red; }")
