@@ -29,8 +29,7 @@ type handler struct {
 }
 
 // wrap provides panic recovery and logging for notification handler methods.
-func (h *handler) wrap(ctx context.Context, methodName string, fn func(req *types.RequestContext) error) error {
-	var err error
+func (h *handler) wrap(ctx context.Context, methodName string, fn func(req *types.RequestContext) error) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error("PANIC in %s: %v\nStack trace:\n%s", methodName, r, string(debug.Stack()))
@@ -43,10 +42,12 @@ func (h *handler) wrap(ctx context.Context, methodName string, fn func(req *type
 	if err == nil && req.HasWarnings() {
 		for _, w := range req.Warnings() {
 			log.Warn("%s warning: %v", methodName, w)
+			h.logToClient(ctx, protocol.MessageTypeWarning, fmt.Sprintf("%s warning: %v", methodName, w))
 		}
 	}
 	if err != nil {
 		log.Error("%s error: %v", methodName, err)
+		h.logToClient(ctx, protocol.MessageTypeError, fmt.Sprintf("%s: %v", methodName, err))
 		return fmt.Errorf("%s: %w", methodName, err)
 	}
 	log.Debug("%s completed successfully", methodName)
@@ -69,14 +70,29 @@ func wrapResult[R any](h *handler, ctx context.Context, methodName string, fn fu
 	if err == nil && req.HasWarnings() {
 		for _, w := range req.Warnings() {
 			log.Warn("%s warning: %v", methodName, w)
+			h.logToClient(ctx, protocol.MessageTypeWarning, fmt.Sprintf("%s warning: %v", methodName, w))
 		}
 	}
 	if err != nil {
 		log.Error("%s error: %v", methodName, err)
+		h.logToClient(ctx, protocol.MessageTypeError, fmt.Sprintf("%s: %v", methodName, err))
 		return result, fmt.Errorf("%s: %w", methodName, err)
 	}
 	log.Debug("%s completed successfully", methodName)
 	return result, nil
+}
+
+// logToClient sends a window/logMessage notification to the LSP client.
+func (h *handler) logToClient(ctx context.Context, msgType protocol.MessageType, message string) {
+	if h.s.client == nil {
+		return
+	}
+	go func() {
+		_ = h.s.client.LogMessage(ctx, &protocol.LogMessageParams{
+			Type:    msgType,
+			Message: message,
+		})
+	}()
 }
 
 func (h *handler) Initialize(ctx context.Context, params *protocol.InitializeParams) (*protocol.InitializeResult, error) {

@@ -50,8 +50,8 @@ type ServerContext interface {
 	RemoveLoadedFile(path string)
 
 	// LSP context (for publishing diagnostics, etc.)
-	GLSPContext() context.Context
-	SetGLSPContext(ctx context.Context)
+	ServerCtx() context.Context
+	SetServerCtx(ctx context.Context)
 
 	// Client capability detection (for LSP 3.17 features)
 	ClientDiagnosticCapability() *bool

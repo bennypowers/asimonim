@@ -37,7 +37,7 @@ func mustMarshal(t *testing.T, v any) protocol.LSPAny {
 func TestDidChangeConfiguration_WithValidConfig(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	req := types.NewRequestContext(ctx, context.Background())
-	ctx.SetGLSPContext(context.Background())
+	ctx.SetServerCtx(context.Background())
 
 	// Prepare configuration with tokens files
 	settings := map[string]any{
@@ -137,7 +137,7 @@ func TestDidChangeConfiguration_WithoutGLSPContext(t *testing.T) {
 func TestDidChangeConfiguration_PublishesDiagnosticsForOpenDocs(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	req := types.NewRequestContext(ctx, context.Background())
-	ctx.SetGLSPContext(context.Background())
+	ctx.SetServerCtx(context.Background())
 
 	// Open a document
 	_ = ctx.DocumentManager().DidOpen("file:///workspace/test.css", "css", 1, ".test { color: red; }")
@@ -364,7 +364,7 @@ func TestParseConfiguration_AsimonimTakesPrecedenceOverLegacy(t *testing.T) {
 func TestDidChangeConfiguration_WithAsimonimNamespace(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	req := types.NewRequestContext(ctx, context.Background())
-	ctx.SetGLSPContext(context.Background())
+	ctx.SetServerCtx(context.Background())
 
 	settings := loadConfigFixture(t, "asimonim-namespace.json")
 

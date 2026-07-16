@@ -160,17 +160,17 @@ func (s *Server) SetRootPath(path string) {
 	s.rootPath = path
 }
 
-// GLSPContext returns the stored context.
+// ServerCtx returns the stored context.
 // Access is protected by configMu to prevent concurrent races.
-func (s *Server) GLSPContext() context.Context {
+func (s *Server) ServerCtx() context.Context {
 	s.configMu.RLock()
 	defer s.configMu.RUnlock()
 	return s.ctx
 }
 
-// SetGLSPContext stores a context for out-of-band notifications.
+// SetServerCtx stores a context for out-of-band notifications.
 // Access is protected by configMu to prevent concurrent races.
-func (s *Server) SetGLSPContext(ctx context.Context) {
+func (s *Server) SetServerCtx(ctx context.Context) {
 	s.configMu.Lock()
 	defer s.configMu.Unlock()
 	s.ctx = ctx

@@ -82,8 +82,8 @@ func (m *mockServerContextMinimal) IsTokenFile(path string) bool                
 func (m *mockServerContextMinimal) LoadTokensFromConfig() error                  { return nil }
 func (m *mockServerContextMinimal) RegisterFileWatchers(ctx context.Context) error { return nil }
 func (m *mockServerContextMinimal) RemoveLoadedFile(path string)                   {}
-func (m *mockServerContextMinimal) GLSPContext() context.Context                   { return nil }
-func (m *mockServerContextMinimal) SetGLSPContext(ctx context.Context)             {}
+func (m *mockServerContextMinimal) ServerCtx() context.Context                   { return nil }
+func (m *mockServerContextMinimal) SetServerCtx(ctx context.Context)             {}
 func (m *mockServerContextMinimal) ClientDiagnosticCapability() *bool            { return nil }
 func (m *mockServerContextMinimal) SetClientDiagnosticCapability(hasCapability bool) {}
 func (m *mockServerContextMinimal) ClientCapabilities() *protocol.ClientCapabilities { return nil }

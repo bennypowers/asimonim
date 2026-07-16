@@ -41,7 +41,7 @@ func TestDidOpen(t *testing.T) {
 	t.Run("publishes diagnostics after opening", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		req := types.NewRequestContext(ctx, context.Background())
-		ctx.SetGLSPContext(context.Background())
+		ctx.SetServerCtx(context.Background())
 
 		params := &protocol.DidOpenTextDocumentParams{
 			TextDocument: protocol.TextDocumentItem{
@@ -133,7 +133,7 @@ func TestDidChange(t *testing.T) {
 	t.Run("publishes diagnostics after change", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		req := types.NewRequestContext(ctx, context.Background())
-		ctx.SetGLSPContext(context.Background())
+		ctx.SetServerCtx(context.Background())
 
 		// First open a document
 		_ = ctx.DocumentManager().DidOpen("file:///test.css", "css", 1, "body { color: red; }")

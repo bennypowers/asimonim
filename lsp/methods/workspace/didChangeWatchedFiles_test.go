@@ -282,7 +282,7 @@ func TestHandleDidChangeWatchedFiles_PublishesDiagnostics(t *testing.T) {
 	ctx.SetRootPath("/workspace")
 
 	// Set up GLSP context
-	ctx.SetGLSPContext(context.Background())
+	ctx.SetServerCtx(context.Background())
 
 	// Track PublishDiagnostics calls
 	publishedURIs := []string{}

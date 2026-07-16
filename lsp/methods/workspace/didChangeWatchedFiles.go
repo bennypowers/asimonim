@@ -56,7 +56,7 @@ func DidChangeWatchedFiles(req *types.RequestContext, params *protocol.DidChange
 		if req.Server.UsePullDiagnostics() {
 			req.Server.NotifyDiagnosticRefresh()
 		} else {
-			ctx := req.Server.GLSPContext()
+			ctx := req.Server.ServerCtx()
 			if ctx != nil {
 				for _, doc := range req.Server.AllDocuments() {
 					if err := req.Server.PublishDiagnostics(ctx, doc.URI()); err != nil {

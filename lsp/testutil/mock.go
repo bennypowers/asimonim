@@ -208,13 +208,13 @@ func (m *MockServerContext) RemoveLoadedFile(path string) {
 	delete(m.loadedFiles, cleanPath)
 }
 
-// GLSPContext returns the stored context
-func (m *MockServerContext) GLSPContext() context.Context {
+// ServerCtx returns the stored context
+func (m *MockServerContext) ServerCtx() context.Context {
 	return m.glspContext
 }
 
-// SetGLSPContext sets the stored context
-func (m *MockServerContext) SetGLSPContext(ctx context.Context) {
+// SetServerCtx sets the stored context
+func (m *MockServerContext) SetServerCtx(ctx context.Context) {
 	m.glspContext = ctx
 }
 

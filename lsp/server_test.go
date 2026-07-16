@@ -715,17 +715,17 @@ func TestNewServer(t *testing.T) {
 	})
 }
 
-func TestServer_SetGLSPContext(t *testing.T) {
+func TestServer_SetServerCtx(t *testing.T) {
 	s, err := NewServer()
 	require.NoError(t, err)
 
 	// Initially nil
-	assert.Nil(t, s.GLSPContext())
+	assert.Nil(t, s.ServerCtx())
 
 	// Set and retrieve
 	ctx := context.Background()
-	s.SetGLSPContext(ctx)
-	assert.Equal(t, ctx, s.GLSPContext())
+	s.SetServerCtx(ctx)
+	assert.Equal(t, ctx, s.ServerCtx())
 }
 
 func TestServer_ClientDiagnosticCapability(t *testing.T) {

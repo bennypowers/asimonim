@@ -39,7 +39,7 @@ func DidOpen(req *types.RequestContext, params *protocol.DidOpenTextDocumentPara
 	// Publish diagnostics for the opened document (only if using push model)
 	// If client supports pull diagnostics (LSP 3.17), it will request them via textDocument/diagnostic
 	if !req.Server.UsePullDiagnostics() {
-		if ctx := req.Server.GLSPContext(); ctx != nil {
+		if ctx := req.Server.ServerCtx(); ctx != nil {
 			if err := req.Server.PublishDiagnostics(ctx, uri); err != nil {
 				log.Warn("Failed to publish diagnostics for %s: %v", uri, err)
 			}
@@ -62,7 +62,7 @@ func DidChange(req *types.RequestContext, params *protocol.DidChangeTextDocument
 	}
 
 	if !req.Server.UsePullDiagnostics() {
-		if ctx := req.Server.GLSPContext(); ctx != nil {
+		if ctx := req.Server.ServerCtx(); ctx != nil {
 			if err := req.Server.PublishDiagnostics(ctx, uri); err != nil {
 				log.Warn("Failed to publish diagnostics for %s: %v", uri, err)
 			}

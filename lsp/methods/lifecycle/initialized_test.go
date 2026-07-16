@@ -23,7 +23,7 @@ func TestInitialized(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Verify context was stored
-		assert.Equal(t, bgCtx, ctx.GLSPContext())
+		assert.Equal(t, bgCtx, ctx.ServerCtx())
 	})
 
 	t.Run("calls LoadTokensFromConfig", func(t *testing.T) {
