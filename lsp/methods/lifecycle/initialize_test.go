@@ -10,14 +10,15 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 func TestInitialize(t *testing.T) {
 	t.Run("sets root URI from params.RootURI", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		req := types.NewRequestContext(ctx, context.Background())
-		rootURI := "file:///workspace"
+		rootURI := uri.URI("file:///workspace")
 
 		params := &protocol.InitializeParams{}
 		params.RootURI = &rootURI
@@ -34,10 +35,9 @@ func TestInitialize(t *testing.T) {
 	t.Run("sets root path from params.RootPath", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		req := types.NewRequestContext(ctx, context.Background())
-		rootPath := "/workspace"
 
 		params := &protocol.InitializeParams{}
-		params.RootPath = &rootPath
+		params.RootPath = protocol.NewNullable("/workspace")
 
 		result, err := Initialize(req, params)
 		require.NoError(t, err)
@@ -59,16 +59,13 @@ func TestInitialize(t *testing.T) {
 		require.NotNil(t, result)
 
 		// Result should have Capabilities and ServerInfo fields
-		initResult := result.(protocol.InitializeResult)
-
-		assert.NotNil(t, initResult.Capabilities)
-		assert.NotNil(t, initResult.ServerInfo)
-		assert.Equal(t, "design-tokens-language-server", initResult.ServerInfo.Name)
-		assert.NotNil(t, initResult.ServerInfo.Version)
-		assert.NotEqual(t, "", *initResult.ServerInfo.Version, "Version should not be empty")
+		assert.Equal(t, "design-tokens-language-server", result.ServerInfo.Name)
+		version, ok := result.ServerInfo.Version.Get()
+		require.True(t, ok, "Version should be set")
+		assert.NotEqual(t, "", version, "Version should not be empty")
 
 		// Verify version matches the server context
-		assert.Equal(t, ctx.Version(), *initResult.ServerInfo.Version,
+		assert.Equal(t, ctx.Version(), version,
 			"ServerInfo version should match server Version()")
 	})
 
@@ -90,9 +87,7 @@ func TestInitialize(t *testing.T) {
 		result, err := Initialize(req, params)
 		require.NoError(t, err)
 
-		initResult := result.(protocol.InitializeResult)
-
-		caps := initResult.Capabilities
+		caps := result.Capabilities
 
 		// Verify all expected capabilities are present
 		assert.NotNil(t, caps.TextDocumentSync)
@@ -104,7 +99,7 @@ func TestInitialize(t *testing.T) {
 		assert.NotNil(t, caps.ColorProvider)
 		assert.NotNil(t, caps.SemanticTokensProvider)
 		assert.NotNil(t, caps.DiagnosticProvider)
-		diagOpts, ok := caps.DiagnosticProvider.(protocol.DiagnosticOptions)
+		diagOpts, ok := caps.DiagnosticProvider.(*protocol.DiagnosticOptions)
 		require.True(t, ok)
 		assert.True(t, diagOpts.WorkspaceDiagnostics)
 		require.NotNil(t, diagOpts.Identifier, "Identifier must be set to avoid Neovim null userdata crash")
@@ -115,7 +110,7 @@ func TestInitialize(t *testing.T) {
 		assert.True(t, *caps.CompletionProvider.ResolveProvider)
 		assert.Equal(t, []string{"-"}, caps.CompletionProvider.TriggerCharacters)
 
-		codeActionProvider, ok := caps.CodeActionProvider.(protocol.CodeActionOptions)
+		codeActionProvider, ok := caps.CodeActionProvider.(*protocol.CodeActionOptions)
 		assert.True(t, ok)
 		assert.NotNil(t, codeActionProvider.ResolveProvider)
 		assert.True(t, *codeActionProvider.ResolveProvider)
@@ -135,8 +130,7 @@ func TestInitialize(t *testing.T) {
 		result, err := Initialize(req, params)
 		require.NoError(t, err)
 
-		initResult := result.(protocol.InitializeResult)
-		data, err := json.Marshal(initResult.Capabilities)
+		data, err := json.Marshal(result.Capabilities)
 		require.NoError(t, err)
 
 		// Neovim crashes when identifier is null (Lua userdata vs string)
@@ -148,14 +142,10 @@ func TestInitialize(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		req := types.NewRequestContext(ctx, context.Background())
 
-		clientVersion := "1.85.0"
 		params := &protocol.InitializeParams{}
-		params.ClientInfo = &struct {
-			Name    string  `json:"name"`
-			Version *string `json:"version,omitempty"`
-		}{
+		params.ClientInfo = protocol.ClientInfo{
 			Name:    "vscode",
-			Version: &clientVersion,
+			Version: protocol.NewOptional("1.85.0"),
 		}
 
 		result, err := Initialize(req, params)
@@ -186,23 +176,7 @@ func TestInitialize_StoresClientCapabilities(t *testing.T) {
 
 		textDoc := &protocol.TextDocumentClientCapabilities{}
 		textDoc.Completion = &protocol.CompletionClientCapabilities{
-			CompletionItem: &struct {
-				SnippetSupport          *bool                   `json:"snippetSupport,omitempty"`
-				CommitCharactersSupport *bool                   `json:"commitCharactersSupport,omitempty"`
-				DocumentationFormat     []protocol.MarkupKind   `json:"documentationFormat,omitempty"`
-				DeprecatedSupport       *bool                   `json:"deprecatedSupport,omitempty"`
-				PreselectSupport        *bool                   `json:"preselectSupport,omitempty"`
-				TagSupport              *struct {
-					ValueSet []protocol.CompletionItemTag `json:"valueSet"`
-				} `json:"tagSupport,omitempty"`
-				InsertReplaceSupport *bool `json:"insertReplaceSupport,omitempty"`
-				ResolveSupport       *struct {
-					Properties []string `json:"properties"`
-				} `json:"resolveSupport,omitempty"`
-				InsertTextModeSupport *struct {
-					ValueSet []protocol.InsertTextMode `json:"valueSet"`
-				} `json:"insertTextModeSupport,omitempty"`
-			}{
+			CompletionItem: &protocol.ClientCompletionItemOptions{
 				SnippetSupport: boolPtr(true),
 			},
 		}

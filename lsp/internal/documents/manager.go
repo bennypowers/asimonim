@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"bennypowers.dev/asimonim/lsp/internal/position"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // Manager manages text documents for the language server
@@ -91,18 +91,16 @@ func (m *Manager) applyChanges(content string, changes []protocol.TextDocumentCo
 	result := content
 
 	for _, change := range changes {
-		// If no range is provided, this is a full document update
-		if change.Range == nil {
-			result = change.Text
-			continue
+		switch c := change.(type) {
+		case *protocol.TextDocumentContentChangeWholeDocument:
+			result = c.Text
+		case *protocol.TextDocumentContentChangePartial:
+			newContent, err := applyIncrementalChange(result, c.Range, c.Text)
+			if err != nil {
+				return "", err
+			}
+			result = newContent
 		}
-
-		// Incremental update
-		newContent, err := applyIncrementalChange(result, *change.Range, change.Text)
-		if err != nil {
-			return "", err
-		}
-		result = newContent
 	}
 
 	return result, nil

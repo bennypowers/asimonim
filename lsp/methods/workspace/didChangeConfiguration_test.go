@@ -12,7 +12,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // loadConfigFixture loads a JSON fixture file as a settings map for parseConfiguration.
@@ -25,6 +25,13 @@ func loadConfigFixture(t *testing.T, name string) map[string]any {
 	var settings map[string]any
 	require.NoError(t, json.Unmarshal(data, &settings), "failed to parse fixture %s", name)
 	return settings
+}
+
+func mustMarshal(t *testing.T, v any) protocol.LSPAny {
+	t.Helper()
+	b, err := json.Marshal(v)
+	require.NoError(t, err)
+	return protocol.LSPAny(b)
 }
 
 func TestDidChangeConfiguration_WithValidConfig(t *testing.T) {
@@ -43,7 +50,7 @@ func TestDidChangeConfiguration_WithValidConfig(t *testing.T) {
 	}
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
 	err := DidChangeConfiguration(req, params)
@@ -70,13 +77,14 @@ func TestDidChangeConfiguration_WithNilSettings(t *testing.T) {
 	assert.Equal(t, types.DefaultConfig().Prefix, config.Prefix)
 }
 
+
 func TestDidChangeConfiguration_WithInvalidSettings(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	req := types.NewRequestContext(ctx, context.Background())
 
 	// Settings that's not a map
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: "invalid",
+		Settings: mustMarshal(t, "invalid"),
 	}
 
 	err := DidChangeConfiguration(req, params)
@@ -96,7 +104,7 @@ func TestDidChangeConfiguration_WithAlternateKey(t *testing.T) {
 	}
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
 	err := DidChangeConfiguration(req, params)
@@ -118,7 +126,7 @@ func TestDidChangeConfiguration_WithoutGLSPContext(t *testing.T) {
 	}
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
 	// Should not panic when context is nil
@@ -148,7 +156,7 @@ func TestDidChangeConfiguration_PublishesDiagnosticsForOpenDocs(t *testing.T) {
 	}
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
 	err := DidChangeConfiguration(req, params)
@@ -180,7 +188,7 @@ func TestDidChangeConfiguration_SkipsDiagnosticsWithPullModel(t *testing.T) {
 	}
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
 	err := DidChangeConfiguration(req, params)
@@ -201,7 +209,7 @@ func TestDidChangeConfiguration_WithGroupMarkers(t *testing.T) {
 	}
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
 	err := DidChangeConfiguration(req, params)
@@ -361,7 +369,7 @@ func TestDidChangeConfiguration_WithAsimonimNamespace(t *testing.T) {
 	settings := loadConfigFixture(t, "asimonim-namespace.json")
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
 	err := DidChangeConfiguration(req, params)

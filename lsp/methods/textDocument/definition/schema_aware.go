@@ -10,7 +10,8 @@ import (
 	posutil "bennypowers.dev/asimonim/lsp/internal/position"
 	"bennypowers.dev/asimonim/lsp/internal/uriutil"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 // normalizeLineEndings normalizes line endings to LF for consistent processing
@@ -134,7 +135,7 @@ func getLineText(req *types.RequestContext, uri string, lineNum uint32) (string,
 }
 
 // DefinitionForTokenFile handles go-to-definition for references within token files
-func DefinitionForTokenFile(req *types.RequestContext, doc *documents.Document, position protocol.Position) (any, error) {
+func DefinitionForTokenFile(req *types.RequestContext, doc *documents.Document, position protocol.Position) (protocol.DefinitionResult, error) {
 	// Find reference at the cursor position
 	tokenName := findReferenceAtPosition(doc.Content(), position)
 	if tokenName == "" {
@@ -155,13 +156,13 @@ func DefinitionForTokenFile(req *types.RequestContext, doc *documents.Document, 
 		if err != nil || lineText == "" {
 			// If we can't get the line text, fall back to zero-width range
 			location := protocol.Location{
-				URI: token.DefinitionURI,
+				URI: uri.URI(token.DefinitionURI),
 				Range: protocol.Range{
 					Start: protocol.Position{Line: token.Line, Character: 0},
 					End:   protocol.Position{Line: token.Line, Character: 0},
 				},
 			}
-			return []protocol.Location{location}, nil
+			return protocol.LocationSlice([]protocol.Location{location}), nil
 		}
 
 		// Convert byte offset to UTF-16 position
@@ -172,14 +173,14 @@ func DefinitionForTokenFile(req *types.RequestContext, doc *documents.Document, 
 		endCharUTF16 := startCharUTF16 + tokenNameLenUTF16
 
 		location := protocol.Location{
-			URI: token.DefinitionURI,
+			URI: uri.URI(token.DefinitionURI),
 			Range: protocol.Range{
 				Start: protocol.Position{Line: token.Line, Character: startCharUTF16},
 				End:   protocol.Position{Line: token.Line, Character: endCharUTF16},
 			},
 		}
 
-		return []protocol.Location{location}, nil
+		return protocol.LocationSlice([]protocol.Location{location}), nil
 	}
 
 	return nil, nil

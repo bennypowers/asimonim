@@ -4,14 +4,14 @@ import (
 	"strings"
 	"testing"
 
-
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/methods/textDocument"
 	semantictokens "bennypowers.dev/asimonim/lsp/methods/textDocument/semanticTokens"
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 func TestGetSemanticTokensForDocument(t *testing.T) {
@@ -178,7 +178,7 @@ func TestSemanticTokensDeltaEncoding(t *testing.T) {
 
 	// Register the document
 	req := types.NewRequestContext(s, nil)
-	_ = textDocument.DidOpen(req, &protocol.DidOpenTextDocumentParams{TextDocument: protocol.TextDocumentItem{URI: doc.URI(), LanguageID: doc.LanguageID(), Version: protocol.Integer(doc.Version()), Text: doc.Content()}})
+	_ = textDocument.DidOpen(req, &protocol.DidOpenTextDocumentParams{TextDocument: protocol.TextDocumentItem{URI: uri.URI(doc.URI()), LanguageID: protocol.LanguageKind(doc.LanguageID()), Version: int32(doc.Version()), Text: doc.Content()}})
 
 	// Get intermediate tokens first
 	intermediateTokens := semantictokens.GetSemanticTokensForDocument(s, doc)
@@ -193,7 +193,7 @@ func TestSemanticTokensDeltaEncoding(t *testing.T) {
 	// Now test the full handler with delta encoding
 	params := &protocol.SemanticTokensParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: doc.URI(),
+			URI: uri.URI(doc.URI()),
 		},
 	}
 	req = types.NewRequestContext(s, nil)
@@ -245,13 +245,13 @@ func TestSemanticTokensFullDelta_ReturnsEmptyDeltaWhenUnchanged(t *testing.T) {
 
 	// Create and register document
 	content := `{"secondary": {"$value": "{color.brand.primary}"}}`
-	uri := "file:///test.json"
-	_ = s.DocumentManager().DidOpen(uri, "json", 1, content)
+	docURI := "file:///test.json"
+	_ = s.DocumentManager().DidOpen(docURI, "json", 1, content)
 
 	// First: get full tokens
 	req := types.NewRequestContext(s, nil)
 	fullResult, err := semantictokens.SemanticTokensFull(req, &protocol.SemanticTokensParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 	})
 	if err != nil {
 		t.Fatalf("SemanticTokensFull failed: %v", err)
@@ -262,7 +262,7 @@ func TestSemanticTokensFullDelta_ReturnsEmptyDeltaWhenUnchanged(t *testing.T) {
 
 	// Second: request delta with same result ID (no changes)
 	deltaResult, err := semantictokens.SemanticTokensFullDelta(req, &protocol.SemanticTokensDeltaParams{
-		TextDocument:     protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument:     protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		PreviousResultID: *fullResult.ResultID,
 	})
 	if err != nil {
@@ -297,13 +297,13 @@ func TestSemanticTokensFullDelta_ReturnsFullWhenPreviousResultIDNotFound(t *test
 		"$schema": "https://json.schemastore.org/design-tokens.json",
 		"secondary": {"$value": "{color.brand.primary}", "$type": "color"}
 	}`
-	uri := "file:///test.json"
-	_ = s.DocumentManager().DidOpen(uri, "json", 1, content)
+	docURI := "file:///test.json"
+	_ = s.DocumentManager().DidOpen(docURI, "json", 1, content)
 
 	// Request delta with non-existent result ID
 	req := types.NewRequestContext(s, nil)
 	result, err := semantictokens.SemanticTokensFullDelta(req, &protocol.SemanticTokensDeltaParams{
-		TextDocument:     protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument:     protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		PreviousResultID: "non-existent-result-id",
 	})
 	if err != nil {
@@ -327,7 +327,7 @@ func TestSemanticTokensFullDelta_DocumentNotFound(t *testing.T) {
 
 	req := types.NewRequestContext(s, nil)
 	_, err := semantictokens.SemanticTokensFullDelta(req, &protocol.SemanticTokensDeltaParams{
-		TextDocument:     protocol.TextDocumentIdentifier{URI: "file:///non-existent.json"},
+		TextDocument:     protocol.TextDocumentIdentifier{URI: uri.URI("file:///non-existent.json")},
 		PreviousResultID: "some-id",
 	})
 
@@ -339,15 +339,15 @@ func TestSemanticTokensFullDelta_DocumentNotFound(t *testing.T) {
 func TestSemanticTokensFullDelta_NonTokenFile(t *testing.T) {
 	s := testutil.NewMockServerContext()
 	// Configure to reject this file
-	s.ShouldProcessAsTokenFileFunc = func(uri string) bool { return false }
+	s.ShouldProcessAsTokenFileFunc = func(u string) bool { return false }
 
 	// Create and register a non-token file
-	uri := "file:///test.css"
-	_ = s.DocumentManager().DidOpen(uri, "css", 1, ".foo { color: red; }")
+	docURI := "file:///test.css"
+	_ = s.DocumentManager().DidOpen(docURI, "css", 1, ".foo { color: red; }")
 
 	req := types.NewRequestContext(s, nil)
 	result, err := semantictokens.SemanticTokensFullDelta(req, &protocol.SemanticTokensDeltaParams{
-		TextDocument:     protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument:     protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		PreviousResultID: "some-id",
 	})
 
@@ -379,14 +379,14 @@ func TestSemanticTokensRange_FiltersTokensByRange(t *testing.T) {
   "line2": "{color.brand.primary}",
   "line3": "{color.brand.primary}"
 }`
-	uri := "file:///test.json"
-	_ = s.DocumentManager().DidOpen(uri, "json", 1, content)
+	docURI := "file:///test.json"
+	_ = s.DocumentManager().DidOpen(docURI, "json", 1, content)
 
 	req := types.NewRequestContext(s, nil)
 
 	// Request only tokens for line 2 (0-indexed)
 	result, err := semantictokens.SemanticTokensRange(req, &protocol.SemanticTokensRangeParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 2, Character: 0},
 			End:   protocol.Position{Line: 2, Character: 100},
@@ -417,14 +417,14 @@ func TestSemanticTokensRange_EmptyRangeReturnsEmptyData(t *testing.T) {
     "$value": "{color.brand.primary}"
   }
 }`
-	uri := "file:///test.json"
-	_ = s.DocumentManager().DidOpen(uri, "json", 1, content)
+	docURI := "file:///test.json"
+	_ = s.DocumentManager().DidOpen(docURI, "json", 1, content)
 
 	req := types.NewRequestContext(s, nil)
 
 	// Request a range that has no tokens (line 0, the opening brace)
 	result, err := semantictokens.SemanticTokensRange(req, &protocol.SemanticTokensRangeParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 0},
 			End:   protocol.Position{Line: 0, Character: 10},
@@ -442,7 +442,7 @@ func TestSemanticTokensRange_DocumentNotFound(t *testing.T) {
 	req := types.NewRequestContext(s, nil)
 
 	_, err := semantictokens.SemanticTokensRange(req, &protocol.SemanticTokensRangeParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///nonexistent.json"},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI("file:///nonexistent.json")},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 0},
 			End:   protocol.Position{Line: 10, Character: 0},
@@ -470,15 +470,15 @@ func TestSemanticTokensRange_FiltersStartCharOnStartLine(t *testing.T) {
     "$value": "{color.brand.primary}"
   }
 }`
-	uri := "file:///test.json"
-	_ = s.DocumentManager().DidOpen(uri, "json", 1, content)
+	docURI := "file:///test.json"
+	_ = s.DocumentManager().DidOpen(docURI, "json", 1, content)
 
 	req := types.NewRequestContext(s, nil)
 
 	// Request range starting after the first token ("color" starts at char 16)
 	// so only "brand" and "primary" should be included
 	result, err := semantictokens.SemanticTokensRange(req, &protocol.SemanticTokensRangeParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 2, Character: 22}, // after "color" part
 			End:   protocol.Position{Line: 2, Character: 100},
@@ -508,14 +508,14 @@ func TestSemanticTokensRange_FiltersEndCharOnEndLine(t *testing.T) {
     "$value": "{color.brand.primary}"
   }
 }`
-	uri := "file:///test.json"
-	_ = s.DocumentManager().DidOpen(uri, "json", 1, content)
+	docURI := "file:///test.json"
+	_ = s.DocumentManager().DidOpen(docURI, "json", 1, content)
 
 	req := types.NewRequestContext(s, nil)
 
 	// Request range ending before "primary" (which starts at char 28)
 	result, err := semantictokens.SemanticTokensRange(req, &protocol.SemanticTokensRangeParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 2, Character: 0},
 			End:   protocol.Position{Line: 2, Character: 22}, // before "brand"
@@ -532,12 +532,12 @@ func TestSemanticTokensFull_NonJSONYAMLLanguage(t *testing.T) {
 	s := testutil.NewMockServerContext()
 
 	// Open a CSS document
-	uri := "file:///test.css"
-	_ = s.DocumentManager().DidOpen(uri, "css", 1, ".foo { color: red; }")
+	docURI := "file:///test.css"
+	_ = s.DocumentManager().DidOpen(docURI, "css", 1, ".foo { color: red; }")
 
 	req := types.NewRequestContext(s, nil)
 	result, err := semantictokens.SemanticTokensFull(req, &protocol.SemanticTokensParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 	})
 
 	if err != nil { t.Fatalf("unexpected error: %v", err) }
@@ -546,14 +546,14 @@ func TestSemanticTokensFull_NonJSONYAMLLanguage(t *testing.T) {
 
 func TestSemanticTokensFull_NonTokenFile(t *testing.T) {
 	s := testutil.NewMockServerContext()
-	s.ShouldProcessAsTokenFileFunc = func(uri string) bool { return false }
+	s.ShouldProcessAsTokenFileFunc = func(u string) bool { return false }
 
-	uri := "file:///package.json"
-	_ = s.DocumentManager().DidOpen(uri, "json", 1, `{"name": "test"}`)
+	docURI := "file:///package.json"
+	_ = s.DocumentManager().DidOpen(docURI, "json", 1, `{"name": "test"}`)
 
 	req := types.NewRequestContext(s, nil)
 	result, err := semantictokens.SemanticTokensFull(req, &protocol.SemanticTokensParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 	})
 
 	if err != nil { t.Fatalf("unexpected error: %v", err) }
@@ -565,7 +565,7 @@ func TestSemanticTokensFull_DocumentNotFound(t *testing.T) {
 
 	req := types.NewRequestContext(s, nil)
 	_, err := semantictokens.SemanticTokensFull(req, &protocol.SemanticTokensParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///nonexistent.json"},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI("file:///nonexistent.json")},
 	})
 
 	if err == nil { t.Fatal("expected error") }
@@ -635,12 +635,12 @@ func TestSemanticTokensFull_ReturnsResultID(t *testing.T) {
 
 	// Create and register document
 	content := `{"secondary": {"$value": "{color.brand.primary}"}}`
-	uri := "file:///test.json"
-	_ = s.DocumentManager().DidOpen(uri, "json", 1, content)
+	docURI := "file:///test.json"
+	_ = s.DocumentManager().DidOpen(docURI, "json", 1, content)
 
 	req := types.NewRequestContext(s, nil)
 	result, err := semantictokens.SemanticTokensFull(req, &protocol.SemanticTokensParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 	})
 
 	if err != nil {

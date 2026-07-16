@@ -8,7 +8,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	semantictokens "bennypowers.dev/asimonim/lsp/methods/textDocument/semanticTokens"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // MockServerContext implements types.ServerContext for testing.
@@ -334,7 +334,7 @@ func (m *MockServerContext) SupportsCodeActionLiterals() bool {
 	if m.clientCapabilities != nil &&
 		m.clientCapabilities.TextDocument != nil &&
 		m.clientCapabilities.TextDocument.CodeAction != nil &&
-		m.clientCapabilities.TextDocument.CodeAction.CodeActionLiteralSupport != nil {
+		len(m.clientCapabilities.TextDocument.CodeAction.CodeActionLiteralSupport.CodeActionKind.ValueSet) > 0 {
 		return true
 	}
 	return false

@@ -8,7 +8,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"github.com/stretchr/testify/assert"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 func TestRequestContext_AddWarning(t *testing.T) {

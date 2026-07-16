@@ -5,7 +5,7 @@ import (
 
 	"bennypowers.dev/asimonim/lsp/internal/uriutil"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // DidChangeWatchedFiles handles the workspace/didChangeWatchedFiles notification
@@ -17,7 +17,7 @@ func DidChangeWatchedFiles(req *types.RequestContext, params *protocol.DidChange
 	hasDeletedFile := false
 
 	for _, change := range params.Changes {
-		uri := change.URI
+		uri := string(change.URI)
 		path := uriutil.URIToPath(uri)
 		log.Info("File change: %s (type: %d)", path, change.Type)
 

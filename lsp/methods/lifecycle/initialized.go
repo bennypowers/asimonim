@@ -4,7 +4,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/log"
 
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // Initialized handles the LSP initialized notification

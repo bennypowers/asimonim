@@ -9,7 +9,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/test/integration/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 // TestDocumentColorBasic tests basic document color functionality
@@ -22,7 +23,7 @@ func TestDocumentColorBasic(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	colors, err := documentcolor.DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 	})
 
@@ -34,18 +35,18 @@ func TestDocumentColorBasic(t *testing.T) {
 
 	// Check first color (--color-primary: #0000ff - blue)
 	if len(colors) >= 1 {
-		assert.Equal(t, float32(0.0), colors[0].Color.Red)
-		assert.Equal(t, float32(0.0), colors[0].Color.Green)
-		assert.Equal(t, float32(1.0), colors[0].Color.Blue)
-		assert.Equal(t, float32(1.0), colors[0].Color.Alpha)
+		assert.Equal(t, float64(0.0), colors[0].Color.Red)
+		assert.Equal(t, float64(0.0), colors[0].Color.Green)
+		assert.Equal(t, float64(1.0), colors[0].Color.Blue)
+		assert.Equal(t, float64(1.0), colors[0].Color.Alpha)
 	}
 
 	// Check second color (--color-secondary: #00ff00 - green)
 	if len(colors) >= 2 {
-		assert.Equal(t, float32(0.0), colors[1].Color.Red)
-		assert.Equal(t, float32(1.0), colors[1].Color.Green)
-		assert.Equal(t, float32(0.0), colors[1].Color.Blue)
-		assert.Equal(t, float32(1.0), colors[1].Color.Alpha)
+		assert.Equal(t, float64(0.0), colors[1].Color.Red)
+		assert.Equal(t, float64(1.0), colors[1].Color.Green)
+		assert.Equal(t, float64(0.0), colors[1].Color.Blue)
+		assert.Equal(t, float64(1.0), colors[1].Color.Alpha)
 	}
 }
 
@@ -59,7 +60,7 @@ func TestDocumentColorMixed(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	colors, err := documentcolor.DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 	})
 
@@ -72,12 +73,12 @@ func TestDocumentColorMixed(t *testing.T) {
 	// Verify they are both color type
 	for _, colorInfo := range colors {
 		// Colors should have valid RGB values
-		assert.GreaterOrEqual(t, colorInfo.Color.Red, float32(0.0))
-		assert.LessOrEqual(t, colorInfo.Color.Red, float32(1.0))
-		assert.GreaterOrEqual(t, colorInfo.Color.Green, float32(0.0))
-		assert.LessOrEqual(t, colorInfo.Color.Green, float32(1.0))
-		assert.GreaterOrEqual(t, colorInfo.Color.Blue, float32(0.0))
-		assert.LessOrEqual(t, colorInfo.Color.Blue, float32(1.0))
+		assert.GreaterOrEqual(t, colorInfo.Color.Red, float64(0.0))
+		assert.LessOrEqual(t, colorInfo.Color.Red, float64(1.0))
+		assert.GreaterOrEqual(t, colorInfo.Color.Green, float64(0.0))
+		assert.LessOrEqual(t, colorInfo.Color.Green, float64(1.0))
+		assert.GreaterOrEqual(t, colorInfo.Color.Blue, float64(0.0))
+		assert.LessOrEqual(t, colorInfo.Color.Blue, float64(1.0))
 	}
 }
 
@@ -91,7 +92,7 @@ func TestDocumentColorEmpty(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	colors, err := documentcolor.DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 	})
 
@@ -112,7 +113,7 @@ func TestColorPresentation(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	presentations, err := documentcolor.ColorPresentation(req, &protocol.ColorPresentationParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Color: protocol.Color{
 			Red:   0.0,
@@ -161,7 +162,7 @@ func TestColorPresentationWithAlpha(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	presentations, err := documentcolor.ColorPresentation(req, &protocol.ColorPresentationParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Color: protocol.Color{
 			Red:   1.0,
@@ -198,7 +199,7 @@ func TestDocumentColorNonCSSFile(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	err := textDocument.DidOpen(req, &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
-			URI:        "file:///test.json",
+			URI:        uri.URI("file:///test.json"),
 			LanguageID: "json",
 			Version:    1,
 			Text:       `{"color": "red"}`,
@@ -210,7 +211,7 @@ func TestDocumentColorNonCSSFile(t *testing.T) {
 	req = types.NewRequestContext(server, nil)
 	colors, err := documentcolor.DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.json",
+			URI: uri.URI("file:///test.json"),
 		},
 	})
 
@@ -231,7 +232,7 @@ func TestDocumentColorVariables(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	err := textDocument.DidOpen(req, &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
-			URI:        "file:///test.css",
+			URI:        uri.URI("file:///test.css"),
 			LanguageID: "css",
 			Version:    1,
 			Text:       content,
@@ -243,7 +244,7 @@ func TestDocumentColorVariables(t *testing.T) {
 	req = types.NewRequestContext(server, nil)
 	colors, err := documentcolor.DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 	})
 
@@ -274,7 +275,7 @@ func TestDocumentColorInvalidColorValue(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	err = textDocument.DidOpen(req, &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
-			URI:        "file:///test.css",
+			URI:        uri.URI("file:///test.css"),
 			LanguageID: "css",
 			Version:    1,
 			Text:       content,
@@ -286,7 +287,7 @@ func TestDocumentColorInvalidColorValue(t *testing.T) {
 	req = types.NewRequestContext(server, nil)
 	colors, err := documentcolor.DocumentColor(req, &protocol.DocumentColorParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 	})
 

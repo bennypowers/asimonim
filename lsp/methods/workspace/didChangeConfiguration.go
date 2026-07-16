@@ -1,12 +1,13 @@
 package workspace
 
 import (
-	"bennypowers.dev/asimonim/lsp/internal/log"
 	"encoding/json"
 	"fmt"
 
+	"bennypowers.dev/asimonim/lsp/internal/log"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"github.com/go-json-experiment/json/jsontext"
+	"go.lsp.dev/protocol"
 )
 
 // DidChangeConfiguration handles the workspace/didChangeConfiguration notification
@@ -53,9 +54,20 @@ func parseConfiguration(settings any) (types.ServerConfig, error) {
 		return config, nil
 	}
 
-	// Settings come as a nested object: { "asimonim": { ... } } or legacy { "designTokensLanguageServer": { ... } }
-	settingsMap, ok := settings.(map[string]any)
-	if !ok {
+	// Settings may arrive as jsontext.Value (raw JSON bytes) from the new
+	// go.lsp.dev/protocol, or as map[string]any from tests / older callers.
+	var settingsMap map[string]any
+	switch v := settings.(type) {
+	case jsontext.Value:
+		if len(v) == 0 {
+			return config, nil
+		}
+		if err := json.Unmarshal(v, &settingsMap); err != nil {
+			return config, fmt.Errorf("settings is not a map")
+		}
+	case map[string]any:
+		settingsMap = v
+	default:
 		return config, fmt.Errorf("settings is not a map")
 	}
 

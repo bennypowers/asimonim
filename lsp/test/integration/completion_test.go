@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/methods/textDocument"
@@ -9,7 +10,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/test/integration/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // TestCompletionBasic tests basic completion functionality
@@ -124,11 +125,12 @@ func TestCompletionResolve(t *testing.T) {
 	testutil.LoadBasicTokens(t, server)
 
 	// Create a basic completion item
+	data, _ := json.Marshal(map[string]interface{}{
+		"tokenName": "--color-primary",
+	})
 	item := protocol.CompletionItem{
 		Label: "--color-primary",
-		Data: map[string]interface{}{
-			"tokenName": "--color-primary",
-		},
+		Data:  protocol.LSPAny(data),
 	}
 
 	// Resolve it
@@ -139,15 +141,16 @@ func TestCompletionResolve(t *testing.T) {
 
 	// Should have documentation
 	assert.NotNil(t, resolved.Documentation)
-	doc, ok := resolved.Documentation.(protocol.MarkupContent)
+	doc, ok := resolved.Documentation.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Equal(t, protocol.MarkupKindMarkdown, doc.Kind)
 	assert.Contains(t, doc.Value, "Primary brand color")
 	assert.Contains(t, doc.Value, "#0000ff")
 
 	// Should have detail (value preview)
-	assert.NotNil(t, resolved.Detail)
-	assert.Contains(t, *resolved.Detail, "#0000ff")
+	detail, detailOK := resolved.Detail.Get()
+	assert.True(t, detailOK)
+	assert.Contains(t, detail, "#0000ff")
 }
 
 // TestCompletionFiltering tests that completion filters by prefix
@@ -223,23 +226,7 @@ func TestCompletionSnippetFormat(t *testing.T) {
 	snippetSupport := true
 	textDoc := &protocol.TextDocumentClientCapabilities{}
 	textDoc.Completion = &protocol.CompletionClientCapabilities{
-		CompletionItem: &struct {
-			SnippetSupport          *bool                   `json:"snippetSupport,omitempty"`
-			CommitCharactersSupport *bool                   `json:"commitCharactersSupport,omitempty"`
-			DocumentationFormat     []protocol.MarkupKind   `json:"documentationFormat,omitempty"`
-			DeprecatedSupport       *bool                   `json:"deprecatedSupport,omitempty"`
-			PreselectSupport        *bool                   `json:"preselectSupport,omitempty"`
-			TagSupport              *struct {
-				ValueSet []protocol.CompletionItemTag `json:"valueSet"`
-			} `json:"tagSupport,omitempty"`
-			InsertReplaceSupport *bool `json:"insertReplaceSupport,omitempty"`
-			ResolveSupport       *struct {
-				Properties []string `json:"properties"`
-			} `json:"resolveSupport,omitempty"`
-			InsertTextModeSupport *struct {
-				ValueSet []protocol.InsertTextMode `json:"valueSet"`
-			} `json:"insertTextModeSupport,omitempty"`
-		}{
+		CompletionItem: &protocol.ClientCompletionItemOptions{
 			SnippetSupport: &snippetSupport,
 		},
 	}
@@ -269,8 +256,8 @@ func TestCompletionSnippetFormat(t *testing.T) {
 
 	// Check first item has snippet format
 	item := completions.Items[0]
-	require.NotNil(t, item.InsertTextFormat, "InsertTextFormat should be set when snippets are supported")
-	assert.Equal(t, protocol.InsertTextFormatSnippet, *item.InsertTextFormat)
+	require.NotZero(t, item.InsertTextFormat, "InsertTextFormat should be set when snippets are supported")
+	assert.Equal(t, protocol.InsertTextFormatSnippet, item.InsertTextFormat)
 }
 
 // TestCompletionResolveNoData tests resolving completion item without data
@@ -299,11 +286,12 @@ func TestCompletionResolveUnknownToken(t *testing.T) {
 	testutil.LoadBasicTokens(t, server)
 
 	// Create a completion item for a token that doesn't exist
+	unknownData, _ := json.Marshal(map[string]interface{}{
+		"tokenName": "--unknown-token",
+	})
 	item := protocol.CompletionItem{
 		Label: "--unknown-token",
-		Data: map[string]interface{}{
-			"tokenName": "--unknown-token",
-		},
+		Data:  protocol.LSPAny(unknownData),
 	}
 
 	// Resolve it - should return unchanged without documentation
@@ -410,11 +398,12 @@ func TestCompletionResolveWithDeprecated(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create completion item
+	deprecatedData, _ := json.Marshal(map[string]interface{}{
+		"tokenName": "--color-old",
+	})
 	item := protocol.CompletionItem{
 		Label: "--color-old",
-		Data: map[string]interface{}{
-			"tokenName": "--color-old",
-		},
+		Data:  protocol.LSPAny(deprecatedData),
 	}
 
 	// Resolve it
@@ -425,7 +414,7 @@ func TestCompletionResolveWithDeprecated(t *testing.T) {
 
 	// Should have deprecation warning in documentation
 	assert.NotNil(t, resolved.Documentation)
-	doc, ok := resolved.Documentation.(protocol.MarkupContent)
+	doc, ok := resolved.Documentation.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, doc.Value, "DEPRECATED")
 }
@@ -438,7 +427,7 @@ func TestCompletionResolveDataNotMap(t *testing.T) {
 	// Create completion item with Data that is not a map
 	item := protocol.CompletionItem{
 		Label: "--color-primary",
-		Data:  "not-a-map", // Invalid data type
+		Data:  protocol.LSPAny(`"not-a-map"`), // Invalid data type (JSON string, not an object)
 	}
 
 	// Resolve it - should fall back to Label

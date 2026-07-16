@@ -11,7 +11,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 // TestServerInitialization tests the full server initialization flow
@@ -23,19 +24,15 @@ func TestServerInitialization(t *testing.T) {
 
 		// Create temp workspace
 		tmpDir := t.TempDir()
-		workspaceURI := "file://" + tmpDir
-		workspacePath := tmpDir
+		rootURI := uri.URI("file://" + tmpDir)
 
 		// Initialize server
 		initParams := &protocol.InitializeParams{}
-		initParams.RootURI = &workspaceURI
-		initParams.RootPath = &workspacePath
-		initParams.ClientInfo = &struct {
-			Name    string  `json:"name"`
-			Version *string `json:"version,omitempty"`
-		}{
+		initParams.RootURI = &rootURI
+		initParams.RootPath = protocol.NewNullable(tmpDir)
+		initParams.ClientInfo = protocol.ClientInfo{
 			Name:    "test-client",
-			Version: strPtr("1.0.0"),
+			Version: protocol.NewOptional("1.0.0"),
 		}
 
 		req := types.NewRequestContext(server, context.Background())
@@ -44,10 +41,7 @@ func TestServerInitialization(t *testing.T) {
 		require.NotNil(t, result)
 
 		// Verify capabilities are returned
-		initResult, ok := result.(protocol.InitializeResult)
-		require.True(t, ok, "Result should be InitializeResult")
-		assert.NotNil(t, initResult.ServerInfo)
-		assert.Equal(t, "design-tokens-language-server", initResult.ServerInfo.Name)
+		assert.Equal(t, "design-tokens-language-server", result.ServerInfo.Name)
 	})
 
 	t.Run("Initialize without workspace root", func(t *testing.T) {
@@ -56,10 +50,7 @@ func TestServerInitialization(t *testing.T) {
 		defer func() { _ = server.Close() }()
 
 		initParams := &protocol.InitializeParams{}
-		initParams.ClientInfo = &struct {
-			Name    string  `json:"name"`
-			Version *string `json:"version,omitempty"`
-		}{
+		initParams.ClientInfo = protocol.ClientInfo{
 			Name: "test-client",
 		}
 
@@ -121,7 +112,7 @@ func TestSetTrace(t *testing.T) {
 
 	traces := []protocol.TraceValue{
 		protocol.TraceValueOff,
-		protocol.TraceValueMessage,
+		protocol.TraceValueMessages,
 		protocol.TraceValueVerbose,
 	}
 	for _, trace := range traces {
@@ -135,6 +126,3 @@ func TestSetTrace(t *testing.T) {
 	}
 }
 
-func strPtr(s string) *string {
-	return &s
-}

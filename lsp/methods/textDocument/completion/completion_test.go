@@ -10,7 +10,8 @@ import (
 	fixtureutil "bennypowers.dev/asimonim/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	lspuri "go.lsp.dev/uri"
 )
 
 func TestCompletion_CSSVariableCompletion(t *testing.T) {
@@ -42,7 +43,7 @@ func TestCompletion_CSSVariableCompletion(t *testing.T) {
 
 	result, err := Completion(req, &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 20}, // Inside "--col"
 		},
 	})
@@ -58,12 +59,11 @@ func TestCompletion_CSSVariableCompletion(t *testing.T) {
 
 	// Check that items have correct structure
 	for _, item := range completionList.Items {
-		assert.NotNil(t, item.Kind)
-		assert.Equal(t, protocol.CompletionItemKindVariable, *item.Kind)
-		assert.NotNil(t, item.InsertTextFormat)
-		assert.Equal(t, protocol.InsertTextFormatSnippet, *item.InsertTextFormat)
-		assert.NotNil(t, item.InsertText)
-		assert.Contains(t, *item.InsertText, "var(")
+		assert.Equal(t, protocol.CompletionItemKindVariable, item.Kind)
+		assert.Equal(t, protocol.InsertTextFormatSnippet, item.InsertTextFormat)
+		insertText, ok := item.InsertText.Get()
+		assert.True(t, ok, "InsertText should be set")
+		assert.Contains(t, insertText, "var(")
 	}
 }
 
@@ -86,7 +86,7 @@ func TestCompletion_AllTokens(t *testing.T) {
 
 	result, err := Completion(req, &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 18}, // Inside "--"
 		},
 	})
@@ -127,7 +127,7 @@ func TestCompletion_FilterText(t *testing.T) {
 
 		result, err := Completion(req, &protocol.CompletionParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 				Position:     protocol.Position{Line: 0, Character: 18},
 			},
 		})
@@ -141,8 +141,9 @@ func TestCompletion_FilterText(t *testing.T) {
 
 		filterTexts := make([]string, len(completionList.Items))
 		for i, item := range completionList.Items {
-			require.NotNil(t, item.FilterText)
-			filterTexts[i] = *item.FilterText
+			ft, ok := item.FilterText.Get()
+			require.True(t, ok, "FilterText should be set")
+			filterTexts[i] = ft
 		}
 		// --rh-color-primary → rh-color-primary (stripped --)
 		assert.Contains(t, filterTexts, "rh-color-primary")
@@ -161,7 +162,7 @@ func TestCompletion_FilterText(t *testing.T) {
 
 		result, err := Completion(req, &protocol.CompletionParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 				Position:     protocol.Position{Line: 0, Character: 20},
 			},
 		})
@@ -175,8 +176,9 @@ func TestCompletion_FilterText(t *testing.T) {
 
 		filterTexts := make([]string, len(completionList.Items))
 		for i, item := range completionList.Items {
-			require.NotNil(t, item.FilterText)
-			filterTexts[i] = *item.FilterText
+			ft, ok := item.FilterText.Get()
+			require.True(t, ok, "FilterText should be set")
+			filterTexts[i] = ft
 		}
 		// --rh-color-primary kept as-is (word already has --)
 		assert.Contains(t, filterTexts, "--rh-color-primary")
@@ -194,7 +196,7 @@ func TestCompletion_NonCSSDocument(t *testing.T) {
 
 	result, err := Completion(req, &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 10},
 		},
 	})
@@ -209,7 +211,7 @@ func TestCompletion_DocumentNotFound(t *testing.T) {
 
 	result, err := Completion(req, &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: "file:///nonexistent.css"},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI("file:///nonexistent.css")},
 			Position:     protocol.Position{Line: 0, Character: 10},
 		},
 	})
@@ -233,7 +235,7 @@ func TestCompletion_NoWordAtPosition(t *testing.T) {
 
 	result, err := Completion(req, &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 10},
 		},
 	})
@@ -256,9 +258,7 @@ func TestCompletionResolve_AddsDocumentation(t *testing.T) {
 
 	item := &protocol.CompletionItem{
 		Label: "--color-primary",
-		Data: map[string]interface{}{
-			"tokenName": "--color-primary",
-		},
+		Data:  protocol.LSPAny(`{"tokenName":"--color-primary"}`),
 	}
 
 	resolved, err := CompletionResolve(req, item)
@@ -267,7 +267,7 @@ func TestCompletionResolve_AddsDocumentation(t *testing.T) {
 	require.NotNil(t, resolved)
 
 	// Check documentation was added
-	doc, ok := resolved.Documentation.(protocol.MarkupContent)
+	doc, ok := resolved.Documentation.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Equal(t, protocol.MarkupKindMarkdown, doc.Kind)
 	assert.Contains(t, doc.Value, "--color-primary")
@@ -277,8 +277,9 @@ func TestCompletionResolve_AddsDocumentation(t *testing.T) {
 	assert.Contains(t, doc.Value, "tokens.json")
 
 	// Check detail was added
-	assert.NotNil(t, resolved.Detail)
-	assert.Contains(t, *resolved.Detail, "#ff0000")
+	detail, ok := resolved.Detail.Get()
+	assert.True(t, ok, "Detail should be set")
+	assert.Contains(t, detail, "#ff0000")
 }
 
 func TestCompletionResolve_DeprecatedToken(t *testing.T) {
@@ -295,9 +296,7 @@ func TestCompletionResolve_DeprecatedToken(t *testing.T) {
 
 	item := &protocol.CompletionItem{
 		Label: "--color-old-primary",
-		Data: map[string]interface{}{
-			"tokenName": "--color-old-primary",
-		},
+		Data:  protocol.LSPAny(`{"tokenName":"--color-old-primary"}`),
 	}
 
 	resolved, err := CompletionResolve(req, item)
@@ -305,7 +304,7 @@ func TestCompletionResolve_DeprecatedToken(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resolved)
 
-	doc, ok := resolved.Documentation.(protocol.MarkupContent)
+	doc, ok := resolved.Documentation.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, doc.Value, "DEPRECATED")
 	assert.Contains(t, doc.Value, "Use color.primary instead")
@@ -317,9 +316,7 @@ func TestCompletionResolve_UnknownToken(t *testing.T) {
 
 	item := &protocol.CompletionItem{
 		Label: "--unknown-token",
-		Data: map[string]interface{}{
-			"tokenName": "--unknown-token",
-		},
+		Data:  protocol.LSPAny(`{"tokenName":"--unknown-token"}`),
 	}
 
 	resolved, err := CompletionResolve(req, item)
@@ -348,7 +345,7 @@ func TestCompletionResolve_NoData(t *testing.T) {
 	require.NotNil(t, resolved)
 
 	// Should still resolve using Label
-	doc, ok := resolved.Documentation.(protocol.MarkupContent)
+	doc, ok := resolved.Documentation.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, doc.Value, "--color-primary")
 }
@@ -557,7 +554,7 @@ func TestCompletion_HTMLDocument(t *testing.T) {
 
 	result, err := Completion(req, &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 27},
 		},
 	})
@@ -595,7 +592,7 @@ func TestCompletion_PHPDocument(t *testing.T) {
 	// Position at "--bg" (col 14 to 18), cursor at col 16
 	result, err := Completion(req, &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 12, Character: 16},
 		},
 	})
@@ -643,7 +640,7 @@ func TestCompletion_TwigDocument(t *testing.T) {
 	// Position at "--bg" (col 14 to 18), cursor at col 16
 	result, err := Completion(req, &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 10, Character: 16},
 		},
 	})
@@ -678,7 +675,7 @@ func TestCompletion_UnsupportedLanguage(t *testing.T) {
 
 	result, err := Completion(req, &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 5},
 		},
 	})
@@ -727,7 +724,7 @@ func TestCompletion_SnippetSupport(t *testing.T) {
 
 		result, err := Completion(req, &protocol.CompletionParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 				Position:     protocol.Position{Line: 0, Character: 20},
 			},
 		})
@@ -740,8 +737,10 @@ func TestCompletion_SnippetSupport(t *testing.T) {
 		require.GreaterOrEqual(t, len(completionList.Items), 1)
 
 		item := completionList.Items[0]
-		assert.Equal(t, protocol.InsertTextFormatSnippet, *item.InsertTextFormat)
-		assert.Contains(t, *item.InsertText, "${1:")
+		assert.Equal(t, protocol.InsertTextFormatSnippet, item.InsertTextFormat)
+		insertText, ok := item.InsertText.Get()
+		assert.True(t, ok)
+		assert.Contains(t, insertText, "${1:")
 	})
 
 	t.Run("uses plain text format when client does not support snippets", func(t *testing.T) {
@@ -760,7 +759,7 @@ func TestCompletion_SnippetSupport(t *testing.T) {
 
 		result, err := Completion(req, &protocol.CompletionParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 				Position:     protocol.Position{Line: 0, Character: 20},
 			},
 		})
@@ -773,9 +772,11 @@ func TestCompletion_SnippetSupport(t *testing.T) {
 		require.GreaterOrEqual(t, len(completionList.Items), 1)
 
 		item := completionList.Items[0]
-		assert.Equal(t, protocol.InsertTextFormatPlainText, *item.InsertTextFormat)
-		assert.NotContains(t, *item.InsertText, "${1:")
-		assert.Contains(t, *item.InsertText, "var(")
+		assert.Equal(t, protocol.InsertTextFormatPlainText, item.InsertTextFormat)
+		insertText, ok := item.InsertText.Get()
+		assert.True(t, ok)
+		assert.NotContains(t, insertText, "${1:")
+		assert.Contains(t, insertText, "var(")
 	})
 
 	t.Run("defaults to plain text when capability is unknown", func(t *testing.T) {
@@ -794,7 +795,7 @@ func TestCompletion_SnippetSupport(t *testing.T) {
 
 		result, err := Completion(req, &protocol.CompletionParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 				Position:     protocol.Position{Line: 0, Character: 20},
 			},
 		})
@@ -808,7 +809,7 @@ func TestCompletion_SnippetSupport(t *testing.T) {
 
 		item := completionList.Items[0]
 		// Default to plain text for safety
-		assert.Equal(t, protocol.InsertTextFormatPlainText, *item.InsertTextFormat)
+		assert.Equal(t, protocol.InsertTextFormatPlainText, item.InsertTextFormat)
 	})
 }
 

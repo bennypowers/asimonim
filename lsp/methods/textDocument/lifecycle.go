@@ -5,7 +5,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/log"
 
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // DidOpen handles the textDocument/didOpen notification
@@ -13,7 +13,10 @@ func DidOpen(req *types.RequestContext, params *protocol.DidOpenTextDocumentPara
 	log.Info("Document opened: %s (language: %s, version: %d)",
 		params.TextDocument.URI, params.TextDocument.LanguageID, int(params.TextDocument.Version))
 
-	err := req.Server.DocumentManager().DidOpen(params.TextDocument.URI, params.TextDocument.LanguageID,
+	uri := string(params.TextDocument.URI)
+	languageID := string(params.TextDocument.LanguageID)
+
+	err := req.Server.DocumentManager().DidOpen(uri, languageID,
 		int(params.TextDocument.Version), params.TextDocument.Text)
 	if err != nil {
 		return err
@@ -21,16 +24,15 @@ func DidOpen(req *types.RequestContext, params *protocol.DidOpenTextDocumentPara
 
 	// Auto-load tokens from files that look like DTCG token files
 	// This enables semantic tokens and other features for token files not in config
-	languageID := params.TextDocument.LanguageID
 	content := params.TextDocument.Text
 	if (languageID == "json" || languageID == "yaml") &&
 		(documents.IsDesignTokensSchema(content) || documents.LooksLikeDTCGContent(content)) {
 		if err := req.Server.LoadTokensFromDocumentContent(
-			params.TextDocument.URI,
+			uri,
 			languageID,
 			content,
 		); err != nil {
-			log.Warn("Failed to auto-load tokens from %s: %v", params.TextDocument.URI, err)
+			log.Warn("Failed to auto-load tokens from %s: %v", uri, err)
 		}
 	}
 
@@ -38,8 +40,8 @@ func DidOpen(req *types.RequestContext, params *protocol.DidOpenTextDocumentPara
 	// If client supports pull diagnostics (LSP 3.17), it will request them via textDocument/diagnostic
 	if !req.Server.UsePullDiagnostics() {
 		if ctx := req.Server.GLSPContext(); ctx != nil {
-			if err := req.Server.PublishDiagnostics(ctx, params.TextDocument.URI); err != nil {
-				log.Warn("Failed to publish diagnostics for %s: %v", params.TextDocument.URI, err)
+			if err := req.Server.PublishDiagnostics(ctx, uri); err != nil {
+				log.Warn("Failed to publish diagnostics for %s: %v", uri, err)
 			}
 		}
 	}
@@ -49,20 +51,12 @@ func DidOpen(req *types.RequestContext, params *protocol.DidOpenTextDocumentPara
 
 // DidChange handles the textDocument/didChange notification
 func DidChange(req *types.RequestContext, params *protocol.DidChangeTextDocumentParams) error {
-	uri := params.TextDocument.URI
+	uri := string(params.TextDocument.URI)
 	version := int(params.TextDocument.Version)
 
 	log.Info("Document changed: %s (version: %d, changes: %d)", uri, version, len(params.ContentChanges))
 
-	// Convert any[] to proper type, filtering out invalid entries
-	changes := make([]protocol.TextDocumentContentChangeEvent, 0, len(params.ContentChanges))
-	for _, change := range params.ContentChanges {
-		if changeEvent, ok := change.(protocol.TextDocumentContentChangeEvent); ok {
-			changes = append(changes, changeEvent)
-		}
-	}
-
-	err := req.Server.DocumentManager().DidChange(uri, version, changes)
+	err := req.Server.DocumentManager().DidChange(uri, version, params.ContentChanges)
 	if err != nil {
 		return err
 	}
@@ -80,7 +74,7 @@ func DidChange(req *types.RequestContext, params *protocol.DidChangeTextDocument
 
 // DidClose handles the textDocument/didClose notification
 func DidClose(req *types.RequestContext, params *protocol.DidCloseTextDocumentParams) error {
-	uri := params.TextDocument.URI
+	uri := string(params.TextDocument.URI)
 
 	log.Info("Document closed: %s", uri)
 

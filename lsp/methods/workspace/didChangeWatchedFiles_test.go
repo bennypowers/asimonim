@@ -6,9 +6,10 @@ import (
 
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 func TestHandleDidChangeWatchedFiles(t *testing.T) {
@@ -24,7 +25,7 @@ func TestHandleDidChangeWatchedFiles(t *testing.T) {
 	params := &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
 			{
-				URI:  "file:///workspace/tokens.json",
+				URI:  uri.URI("file:///workspace/tokens.json"),
 				Type: protocol.FileChangeTypeChanged,
 			},
 		},
@@ -49,15 +50,15 @@ func TestHandleDidChangeWatchedFiles_MultipleChanges(t *testing.T) {
 	params := &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
 			{
-				URI:  "file:///workspace/tokens.json",
+				URI:  uri.URI("file:///workspace/tokens.json"),
 				Type: protocol.FileChangeTypeChanged,
 			},
 			{
-				URI:  "file:///workspace/design-tokens.json",
+				URI:  uri.URI("file:///workspace/design-tokens.json"),
 				Type: protocol.FileChangeTypeChanged,
 			},
 			{
-				URI:  "file:///workspace/package.json", // Not a token file
+				URI:  uri.URI("file:///workspace/package.json"), // Not a token file
 				Type: protocol.FileChangeTypeChanged,
 			},
 		},
@@ -81,7 +82,7 @@ func TestHandleDidChangeWatchedFiles_DeletedFile(t *testing.T) {
 	params := &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
 			{
-				URI:  "file:///workspace/tokens.json",
+				URI:  uri.URI("file:///workspace/tokens.json"),
 				Type: protocol.FileChangeTypeDeleted,
 			},
 		},
@@ -110,11 +111,11 @@ func TestHandleDidChangeWatchedFiles_DeletedAndModified(t *testing.T) {
 	params := &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
 			{
-				URI:  "file:///workspace/tokens.json",
+				URI:  uri.URI("file:///workspace/tokens.json"),
 				Type: protocol.FileChangeTypeDeleted,
 			},
 			{
-				URI:  "file:///workspace/design-tokens.json",
+				URI:  uri.URI("file:///workspace/design-tokens.json"),
 				Type: protocol.FileChangeTypeChanged,
 			},
 		},
@@ -141,7 +142,7 @@ func TestHandleDidChangeWatchedFiles_NonTokenFile(t *testing.T) {
 	params := &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
 			{
-				URI:  "file:///workspace/package.json", // Not a token file
+				URI:  uri.URI("file:///workspace/package.json"), // Not a token file
 				Type: protocol.FileChangeTypeChanged,
 			},
 		},
@@ -167,7 +168,7 @@ func TestHandleDidChangeWatchedFiles_NewlyCreatedFile(t *testing.T) {
 	params := &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
 			{
-				URI:  "file:///workspace/new-tokens.json",
+				URI:  uri.URI("file:///workspace/new-tokens.json"),
 				Type: protocol.FileChangeTypeCreated,
 			},
 		},
@@ -210,7 +211,7 @@ func TestHandleDidChangeWatchedFiles_SkipsDiagnosticsWithPullModel(t *testing.T)
 	params := &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
 			{
-				URI:  "file:///workspace/tokens.json",
+				URI:  uri.URI("file:///workspace/tokens.json"),
 				Type: protocol.FileChangeTypeChanged,
 			},
 		},
@@ -258,7 +259,7 @@ func TestHandleDidChangeWatchedFiles_DeleteClearsTokens(t *testing.T) {
 	params := &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
 			{
-				URI:  "file:///workspace/tokens.json",
+				URI:  uri.URI("file:///workspace/tokens.json"),
 				Type: protocol.FileChangeTypeDeleted,
 			},
 		},
@@ -305,7 +306,7 @@ func TestHandleDidChangeWatchedFiles_PublishesDiagnostics(t *testing.T) {
 	params := &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
 			{
-				URI:  "file:///workspace/tokens.json",
+				URI:  uri.URI("file:///workspace/tokens.json"),
 				Type: protocol.FileChangeTypeChanged,
 			},
 		},

@@ -7,27 +7,28 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/parser"
 	"bennypowers.dev/asimonim/lsp/internal/parser/css"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 // handleDefinition handles the textDocument/definition request
 
 // Definition returns the definition location for a token
-func Definition(req *types.RequestContext, params *protocol.DefinitionParams) (any, error) {
-	uri := params.TextDocument.URI
+func Definition(req *types.RequestContext, params *protocol.DefinitionParams) (protocol.DefinitionResult, error) {
+	docURI := params.TextDocument.URI
 	position := params.Position
 
-	log.Info("Definition requested: %s at line %d, char %d", uri, position.Line, position.Character)
+	log.Info("Definition requested: %s at line %d, char %d", docURI, position.Line, position.Character)
 
 	// Get document
-	doc := req.Server.Document(uri)
+	doc := req.Server.Document(string(docURI))
 	if doc == nil {
 		return nil, nil
 	}
 
 	// Handle token files (JSON/YAML)
 	if doc.LanguageID() == "json" || doc.LanguageID() == "yaml" {
-		if !req.Server.ShouldProcessAsTokenFile(uri) {
+		if !req.Server.ShouldProcessAsTokenFile(string(docURI)) {
 			return nil, nil
 		}
 		return DefinitionForTokenFile(req, doc, position)
@@ -79,19 +80,19 @@ func Definition(req *types.RequestContext, params *protocol.DefinitionParams) (a
 							Character: varCall.Range.End.Character,
 						},
 					}
-					return []protocol.LocationLink{{
+					return protocol.DefinitionLinkSlice([]protocol.DefinitionLink{{
 						OriginSelectionRange: &originRange,
-						TargetURI:            protocol.DocumentUri(token.DefinitionURI),
+						TargetURI:            uri.URI(token.DefinitionURI),
 						TargetRange:          targetRange,
 						TargetSelectionRange: targetRange,
-					}}, nil
+					}}), nil
 				}
 
 				// Return Location for legacy clients
-				return []protocol.Location{{
-					URI:   token.DefinitionURI,
+				return protocol.LocationSlice([]protocol.Location{{
+					URI:   uri.URI(token.DefinitionURI),
 					Range: targetRange,
-				}}, nil
+				}}), nil
 			}
 
 			return nil, nil

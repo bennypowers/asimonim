@@ -4,7 +4,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/log"
 	"bennypowers.dev/asimonim/lsp/methods/textDocument/diagnostic"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 // WorkspaceDiagnostic handles the workspace/diagnostic request (LSP 3.17).
@@ -25,13 +26,13 @@ func collectWorkspaceDiagnostics(ctx types.ServerContext, getDiagnostics func(ty
 			continue
 		}
 
-		version := protocol.Integer(doc.Version())
-		items = append(items, protocol.WorkspaceFullDocumentDiagnosticReport{
+		version := int32(doc.Version())
+		items = append(items, &protocol.WorkspaceFullDocumentDiagnosticReport{
 			FullDocumentDiagnosticReport: protocol.FullDocumentDiagnosticReport{
 				Kind:  string(protocol.DocumentDiagnosticReportKindFull),
 				Items: diagnostics,
 			},
-			URI:     doc.URI(),
+			URI:     uri.URI(doc.URI()),
 			Version: &version,
 		})
 	}

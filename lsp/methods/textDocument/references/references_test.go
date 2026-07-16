@@ -9,7 +9,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	lspuri "go.lsp.dev/uri"
 )
 
 // TestReferences_CSSFile_ReturnsTokenDefinition tests that references from CSS returns the token definition
@@ -32,7 +33,7 @@ func TestReferences_CSSFile_ReturnsTokenDefinition(t *testing.T) {
 
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 24},
 		},
 		Context: protocol.ReferenceContext{IncludeDeclaration: false},
@@ -57,7 +58,7 @@ func TestReferences_CSSFile_UnknownToken(t *testing.T) {
 
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 24},
 		},
 		Context: protocol.ReferenceContext{IncludeDeclaration: false},
@@ -88,7 +89,7 @@ func TestReferences_CSSFile_OutsideVarCall(t *testing.T) {
 	// Cursor at position 0 (on the dot of .button)
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 0},
 		},
 		Context: protocol.ReferenceContext{IncludeDeclaration: false},
@@ -116,7 +117,7 @@ func TestReferences_CSSFile_TokenWithoutDefinitionURI(t *testing.T) {
 
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 24},
 		},
 		Context: protocol.ReferenceContext{IncludeDeclaration: false},
@@ -150,7 +151,7 @@ func TestReferences_CSSFile_PositionOnDifferentLine(t *testing.T) {
 	// Cursor on line 0, which is before the var() call on line 1
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 5},
 		},
 		Context: protocol.ReferenceContext{IncludeDeclaration: false},
@@ -183,7 +184,7 @@ func TestReferences_CSSFile_PositionPastVarCall(t *testing.T) {
 	// Cursor at position 37 (on the semicolon, after the var() call ends)
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 37},
 		},
 		Context: protocol.ReferenceContext{IncludeDeclaration: false},
@@ -233,7 +234,7 @@ func TestReferences_JSONFile_FindsReferencesInCSS(t *testing.T) {
 	// Request references from the JSON token file (cursor on token)
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: jsonURI},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(jsonURI)},
 			Position:     protocol.Position{Line: 2, Character: 6}, // On "primary" key
 		},
 		Context: protocol.ReferenceContext{
@@ -250,10 +251,10 @@ func TestReferences_JSONFile_FindsReferencesInCSS(t *testing.T) {
 	foundInCSS1 := false
 	foundInCSS2 := false
 	for _, loc := range result {
-		if loc.URI == cssURI1 {
+		if string(loc.URI) == cssURI1 {
 			foundInCSS1 = true
 		}
-		if loc.URI == cssURI2 {
+		if string(loc.URI) == cssURI2 {
 			foundInCSS2 = true
 		}
 	}
@@ -296,7 +297,7 @@ func TestReferences_JSONFile_FindsReferencesInJSON(t *testing.T) {
 	// Request references from the JSON file
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: jsonURI},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(jsonURI)},
 			Position:     protocol.Position{Line: 2, Character: 6}, // On "primary"
 		},
 		Context: protocol.ReferenceContext{
@@ -310,7 +311,7 @@ func TestReferences_JSONFile_FindsReferencesInJSON(t *testing.T) {
 	// Should find reference in the same JSON file where brand references primary
 	foundReference := false
 	for _, loc := range result {
-		if loc.URI == jsonURI && loc.Range.Start.Line == 8 {
+		if string(loc.URI) == jsonURI && loc.Range.Start.Line == 8 {
 			foundReference = true
 		}
 	}
@@ -349,7 +350,7 @@ func TestReferences_WithIncludeDeclaration(t *testing.T) {
 
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: jsonURI},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(jsonURI)},
 			Position:     protocol.Position{Line: 2, Character: 6},
 		},
 		Context: protocol.ReferenceContext{
@@ -363,7 +364,7 @@ func TestReferences_WithIncludeDeclaration(t *testing.T) {
 	// Should include declaration
 	foundDeclaration := false
 	for _, loc := range result {
-		if loc.URI == jsonURI && loc.Range.Start.Line == 2 {
+		if string(loc.URI) == jsonURI && loc.Range.Start.Line == 2 {
 			foundDeclaration = true
 		}
 	}
@@ -389,7 +390,7 @@ func TestReferences_UnknownToken(t *testing.T) {
 	// Position not on a token
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: jsonURI},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(jsonURI)},
 			Position:     protocol.Position{Line: 0, Character: 0}, // On opening brace
 		},
 		Context: protocol.ReferenceContext{
@@ -408,7 +409,7 @@ func TestReferences_DocumentNotFound(t *testing.T) {
 
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: "file:///nonexistent.json"},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI("file:///nonexistent.json")},
 			Position:     protocol.Position{Line: 0, Character: 10},
 		},
 		Context: protocol.ReferenceContext{
@@ -449,7 +450,7 @@ func TestReferences_YAMLFile(t *testing.T) {
 
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: yamlURI},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(yamlURI)},
 			Position:     protocol.Position{Line: 1, Character: 3}, // On "primary"
 		},
 		Context: protocol.ReferenceContext{
@@ -463,7 +464,7 @@ func TestReferences_YAMLFile(t *testing.T) {
 	// Should find var() reference in CSS
 	foundInCSS := false
 	for _, loc := range result {
-		if loc.URI == cssURI {
+		if string(loc.URI) == cssURI {
 			foundInCSS = true
 		}
 	}
@@ -614,7 +615,7 @@ func TestFindCSSReferences_SkipsNonCSSDocuments(t *testing.T) {
 
 	// Should only find the CSS reference, not the JSON one
 	for _, loc := range locationMap {
-		assert.Equal(t, protocol.DocumentUri(cssURI), loc.URI, "Should only find references in CSS documents")
+		assert.Equal(t, lspuri.URI(cssURI), loc.URI, "Should only find references in CSS documents")
 	}
 	assert.Len(t, locationMap, 1)
 }
@@ -655,7 +656,7 @@ func TestFindJSONReferences_SkipsCSSDocuments(t *testing.T) {
 
 	// Should only find the JSON reference, not the CSS one
 	for _, loc := range locationMap {
-		assert.Equal(t, protocol.DocumentUri(jsonURI), loc.URI, "Should only find references in JSON documents")
+		assert.Equal(t, lspuri.URI(jsonURI), loc.URI, "Should only find references in JSON documents")
 	}
 	assert.Len(t, locationMap, 1)
 }
@@ -702,7 +703,7 @@ func TestReferences_NonTokenFile(t *testing.T) {
 
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: jsonURI},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(jsonURI)},
 			Position:     protocol.Position{Line: 0, Character: 3},
 		},
 		Context: protocol.ReferenceContext{IncludeDeclaration: false},
@@ -740,7 +741,7 @@ func TestReferences_WithIncludeDeclaration_NoDefinitionURI(t *testing.T) {
 
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: jsonURI},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(jsonURI)},
 			Position:     protocol.Position{Line: 2, Character: 6},
 		},
 		Context: protocol.ReferenceContext{
@@ -752,7 +753,7 @@ func TestReferences_WithIncludeDeclaration_NoDefinitionURI(t *testing.T) {
 	// Should not include declaration since there's no DefinitionURI
 	for _, loc := range result {
 		// None of the locations should be from the token definition
-		if loc.URI == jsonURI && loc.Range.Start.Line == 2 {
+		if string(loc.URI) == jsonURI && loc.Range.Start.Line == 2 {
 			t.Error("Should not include declaration when DefinitionURI is empty")
 		}
 	}
@@ -786,7 +787,7 @@ func TestReferences_WithIncludeDeclaration_DefinitionDocNotFound(t *testing.T) {
 
 	result, err := References(req, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: jsonURI},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(jsonURI)},
 			Position:     protocol.Position{Line: 2, Character: 6},
 		},
 		Context: protocol.ReferenceContext{
@@ -797,7 +798,7 @@ func TestReferences_WithIncludeDeclaration_DefinitionDocNotFound(t *testing.T) {
 	require.NoError(t, err)
 	// Should not crash, and should not include declaration from non-open doc
 	for _, loc := range result {
-		assert.NotEqual(t, protocol.DocumentUri("file:///other-tokens.json"), loc.URI,
+		assert.NotEqual(t, lspuri.URI("file:///other-tokens.json"), loc.URI,
 			"Should not include declaration when definition document is not open")
 	}
 }

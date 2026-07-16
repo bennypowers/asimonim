@@ -10,7 +10,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/test/integration/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 // TestNonTokenFile_Definition verifies that go-to-definition returns nil for non-token files
@@ -167,13 +168,13 @@ func TestNonTokenFile_SemanticTokens(t *testing.T) {
 func TestTokenFileWithSchema_Definition(t *testing.T) {
 	server := testutil.NewTestServer(t)
 
-	uri := "file:///tokens.json"
+	docURI := "file:///tokens.json"
 
 	// Load the token file with schema - this file has a valid Design Tokens $schema
-	testutil.OpenNonTokenFixture(t, server, uri, "token-file-with-schema.json")
+	testutil.OpenNonTokenFixture(t, server, docURI, "token-file-with-schema.json")
 
 	// Verify the file is recognized as a token file due to its $schema
-	require.True(t, server.ShouldProcessAsTokenFile(uri), "File with Design Tokens $schema should be processed as token file")
+	require.True(t, server.ShouldProcessAsTokenFile(docURI), "File with Design Tokens $schema should be processed as token file")
 
 	// Load tokens from the fixture so we can resolve references
 	content := testutil.LoadNonTokenFixture(t, "token-file-with-schema.json")
@@ -187,7 +188,7 @@ func TestTokenFileWithSchema_Definition(t *testing.T) {
 	result, err := definition.Definition(req, &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{
-				URI: uri,
+				URI: uri.URI(docURI),
 			},
 			Position: protocol.Position{Line: 3, Character: 6}, // on "primary" key
 		},

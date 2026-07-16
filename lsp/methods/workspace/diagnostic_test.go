@@ -15,9 +15,10 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"bennypowers.dev/asimonim/schema"
 	rootutil "bennypowers.dev/asimonim/testutil"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 func shouldUpdate() bool {
@@ -77,13 +78,13 @@ func TestWorkspaceDiagnostic_Golden(t *testing.T) {
 	// Build sorted golden-comparable output
 	reports := make([]goldenReport, 0, len(result.Items))
 	for _, item := range result.Items {
-		report := item.(protocol.WorkspaceFullDocumentDiagnosticReport)
+		report := item.(*protocol.WorkspaceFullDocumentDiagnosticReport)
 		var ver int32
 		if report.Version != nil {
 			ver = *report.Version
 		}
 		reports = append(reports, goldenReport{
-			URI:         report.URI,
+			URI:         string(report.URI),
 			Kind:        report.Kind,
 			Version:     ver,
 			Diagnostics: report.Items,
@@ -141,16 +142,16 @@ func TestWorkspaceDiagnostic_NonCSSDocumentsIncludedEmpty(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.Items, 2)
 
-	reportsByURI := make(map[string]protocol.WorkspaceFullDocumentDiagnosticReport)
+	reportsByURI := make(map[uri.URI]*protocol.WorkspaceFullDocumentDiagnosticReport)
 	for _, item := range result.Items {
-		report := item.(protocol.WorkspaceFullDocumentDiagnosticReport)
+		report := item.(*protocol.WorkspaceFullDocumentDiagnosticReport)
 		reportsByURI[report.URI] = report
 	}
 
 	// CSS document: 1 diagnostic (deprecated)
-	assert.Len(t, reportsByURI["file:///test.css"].Items, 1)
+	assert.Len(t, reportsByURI[uri.URI("file:///test.css")].Items, 1)
 	// JSON document: 0 diagnostics (not CSS)
-	assert.Empty(t, reportsByURI["file:///data.json"].Items)
+	assert.Empty(t, reportsByURI[uri.URI("file:///data.json")].Items)
 }
 
 func TestCollectWorkspaceDiagnostics_SkipsOnError(t *testing.T) {
@@ -173,6 +174,6 @@ func TestCollectWorkspaceDiagnostics_SkipsOnError(t *testing.T) {
 
 	// bad.css skipped, only ok.css in results
 	require.Len(t, result.Items, 1)
-	report := result.Items[0].(protocol.WorkspaceFullDocumentDiagnosticReport)
-	assert.Equal(t, "file:///ok.css", report.URI)
+	report := result.Items[0].(*protocol.WorkspaceFullDocumentDiagnosticReport)
+	assert.Equal(t, uri.URI("file:///ok.css"), report.URI)
 }

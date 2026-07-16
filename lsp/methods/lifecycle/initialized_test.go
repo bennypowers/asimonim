@@ -8,7 +8,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 func TestInitialized(t *testing.T) {

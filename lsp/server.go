@@ -2,7 +2,10 @@ package lsp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -13,23 +16,12 @@ import (
 	jsparser "bennypowers.dev/asimonim/lsp/internal/parser/js"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/internal/uriutil"
-	"bennypowers.dev/asimonim/lsp/methods/lifecycle"
-	"bennypowers.dev/asimonim/lsp/methods/textDocument"
-	codeaction "bennypowers.dev/asimonim/lsp/methods/textDocument/codeAction"
-	"bennypowers.dev/asimonim/lsp/methods/textDocument/completion"
-	"bennypowers.dev/asimonim/lsp/methods/textDocument/definition"
 	"bennypowers.dev/asimonim/lsp/methods/textDocument/diagnostic"
-	documentcolor "bennypowers.dev/asimonim/lsp/methods/textDocument/documentColor"
-	"bennypowers.dev/asimonim/lsp/methods/textDocument/hover"
-	inlayhint "bennypowers.dev/asimonim/lsp/methods/textDocument/inlayHint"
-	"bennypowers.dev/asimonim/lsp/methods/textDocument/references"
 	semantictokens "bennypowers.dev/asimonim/lsp/methods/textDocument/semanticTokens"
-	"bennypowers.dev/asimonim/lsp/methods/workspace"
 	"bennypowers.dev/asimonim/lsp/types"
-	"github.com/bennypowers/glsp"
-	protocol316 "github.com/bennypowers/glsp/protocol_3_16"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
-	"github.com/bennypowers/glsp/server"
+	"go.lsp.dev/jsonrpc2"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 // Verify that Server implements ServerContext interface
@@ -47,9 +39,9 @@ func WithVersion(v string) Option {
 type Server struct {
 	documents          *documents.Manager
 	tokens             *tokens.Manager
-	glspServer         *server.Server
+	client             protocol.Client
+	conn               jsonrpc2.Conn
 	ctx                context.Context
-	glspCtxInternal    *glsp.Context
 	version                     string                                // Server version string
 	rootURI                     string                                // Workspace root URI
 	rootPath                    string                                // Workspace root path (file system)
@@ -78,49 +70,22 @@ func NewServer(opts ...Option) (*Server, error) {
 		opt(s)
 	}
 
-	// Create the GLSP server with our handlers wrapped with middleware
-	protocolHandler := protocol.Handler{
-		Handler: protocol316.Handler{
-			Initialized:                        notify(s, "initialized", lifecycle.Initialized),
-			Shutdown:                           noParam(s, "shutdown", lifecycle.Shutdown),
-			SetTrace:                           notify(s, "$/setTrace", lifecycle.SetTrace),
-			WorkspaceDidChangeConfiguration:    notify(s, "workspace/didChangeConfiguration", workspace.DidChangeConfiguration),
-			WorkspaceDidChangeWatchedFiles:     notify(s, "workspace/didChangeWatchedFiles", workspace.DidChangeWatchedFiles),
-			TextDocumentDidOpen:                notify(s, "textDocument/didOpen", textDocument.DidOpen),
-			TextDocumentDidChange:              notify(s, "textDocument/didChange", textDocument.DidChange),
-			TextDocumentDidClose:               notify(s, "textDocument/didClose", textDocument.DidClose),
-			TextDocumentHover:                  method(s, "textDocument/hover", hover.Hover),
-			TextDocumentCompletion:             method(s, "textDocument/completion", completion.Completion),
-			CompletionItemResolve:              method(s, "completionItem/resolve", completion.CompletionResolve),
-			TextDocumentDefinition:             method(s, "textDocument/definition", definition.Definition),
-			TextDocumentReferences:             method(s, "textDocument/references", references.References),
-			TextDocumentColor:                  method(s, "textDocument/documentColor", documentcolor.DocumentColor),
-			TextDocumentColorPresentation:      method(s, "textDocument/colorPresentation", documentcolor.ColorPresentation),
-			TextDocumentCodeAction:             method(s, "textDocument/codeAction", codeaction.CodeAction),
-			CodeActionResolve:                  method(s, "codeAction/resolve", codeaction.CodeActionResolve),
-			TextDocumentSemanticTokensFull:     method(s, "textDocument/semanticTokens/full", semantictokens.SemanticTokensFull),
-			TextDocumentSemanticTokensFullDelta: method(s, "textDocument/semanticTokens/full/delta", semantictokens.SemanticTokensFullDelta),
-		},
-		Initialize:             method(s, "initialize", lifecycle.Initialize),
-		TextDocumentDiagnostic: method(s, "textDocument/diagnostic", diagnostic.DocumentDiagnostic),
-		TextDocumentInlayHint:  method(s, "textDocument/inlayHint", inlayhint.InlayHint),
-		WorkspaceDiagnostic:    method(s, "workspace/diagnostic", workspace.WorkspaceDiagnostic),
-	}
-
-	customHandler := &CustomHandler{
-		Handler: &protocolHandler,
-		server:  s,
-	}
-
-	// Create GLSP server with debug enabled for stdio
-	s.glspServer = server.NewServer(customHandler, "design-tokens-language-server", true)
-
 	return s, nil
 }
 
 // RunStdio starts the LSP server using stdio transport
 func (s *Server) RunStdio() error {
-	return s.glspServer.RunStdio()
+	rwc := struct {
+		io.ReadCloser
+		io.Writer
+	}{os.Stdin, os.Stdout}
+	stream := jsonrpc2.NewStream(rwc)
+	ctx, conn, client := protocol.NewServer(context.Background(), &handler{s: s}, stream)
+	s.client = client
+	s.conn = conn
+	s.ctx = ctx
+	<-conn.Done()
+	return nil
 }
 
 // Close releases server resources including the CSS, HTML, and JS parser pools.
@@ -209,25 +174,6 @@ func (s *Server) SetGLSPContext(ctx context.Context) {
 	s.configMu.Lock()
 	defer s.configMu.Unlock()
 	s.ctx = ctx
-}
-
-// setGLSPInternal stores the raw glsp.Context for server-to-client notifications.
-// Migration shim: will be replaced by protocol.Client.
-func (s *Server) setGLSPInternal(ctx *glsp.Context) {
-	s.configMu.Lock()
-	defer s.configMu.Unlock()
-	s.glspCtxInternal = ctx
-	if ctx != nil && ctx.Context != nil {
-		s.ctx = ctx.Context
-	}
-}
-
-// glspContext returns the internal glsp.Context for server-to-client notifications.
-// Migration shim: will be replaced by protocol.Client.
-func (s *Server) glspContext() *glsp.Context {
-	s.configMu.RLock()
-	defer s.configMu.RUnlock()
-	return s.glspCtxInternal
 }
 
 // ClientDiagnosticCapability returns the detected client diagnostic capability.
@@ -382,7 +328,7 @@ func (s *Server) SupportsCodeActionLiterals() bool {
 		return false
 	}
 	// Only return true when codeActionLiteralSupport is explicitly present
-	return s.clientCapabilities.TextDocument.CodeAction.CodeActionLiteralSupport != nil
+	return len(s.clientCapabilities.TextDocument.CodeAction.CodeActionLiteralSupport.CodeActionKind.ValueSet) > 0
 }
 
 // UsePullDiagnostics returns whether the client supports pull diagnostics (LSP 3.17)
@@ -412,12 +358,10 @@ func (s *Server) Version() string {
 }
 
 // PublishDiagnostics publishes diagnostics for a document.
-// During migration, this still uses the stored glsp.Context internally.
-func (s *Server) PublishDiagnostics(_ context.Context, uri string) error {
-	log.Info("Publishing diagnostics for: %s", uri)
+func (s *Server) PublishDiagnostics(_ context.Context, docURI string) error {
+	log.Info("Publishing diagnostics for: %s", docURI)
 
-	glspCtx := s.glspContext()
-	if glspCtx == nil {
+	if s.client == nil {
 		return fmt.Errorf("cannot publish diagnostics: no client context available")
 	}
 
@@ -425,28 +369,24 @@ func (s *Server) PublishDiagnostics(_ context.Context, uri string) error {
 		return nil
 	}
 
-	diagnostics, err := diagnostic.GetDiagnostics(s, uri)
+	diagnostics, err := diagnostic.GetDiagnostics(s, docURI)
 	if err != nil {
 		return err
 	}
 
-	glspCtx.Notify(protocol.ServerTextDocumentPublishDiagnostics, protocol.PublishDiagnosticsParams{
-		URI:         uri,
+	return s.client.PublishDiagnostics(s.ctx, &protocol.PublishDiagnosticsParams{
+		URI:         uri.URI(docURI),
 		Diagnostics: diagnostics,
 	})
-
-	return nil
 }
 
 // NotifyDiagnosticRefresh sends workspace/diagnostic/refresh to the client.
-// Migration shim: uses stored glsp.Context internally.
 func (s *Server) NotifyDiagnosticRefresh() {
-	glspCtx := s.glspContext()
-	if glspCtx == nil || glspCtx.Notify == nil {
+	if s.client == nil {
 		return
 	}
 	log.Info("Sending workspace/diagnostic/refresh")
-	glspCtx.Notify(protocol.MethodWorkspaceDiagnosticRefresh, nil)
+	_ = s.client.DiagnosticRefresh(s.ctx)
 }
 
 // IsTokenFile checks if a file path is one of our token files
@@ -546,14 +486,14 @@ func (s *Server) RemoveLoadedFile(path string) {
 	s.loadedFilesMu.Unlock()
 }
 
-// buildFileWatchers constructs file system watchers from the server's
+// buildFileWatcherPatterns constructs glob patterns from the server's
 // configured token files. It resolves relative paths against the workspace
 // root and normalizes all patterns to use forward slashes.
-func (s *Server) buildFileWatchers() []protocol.FileSystemWatcher {
+func (s *Server) buildFileWatcherPatterns() []string {
 	cfg := s.GetConfig()
 	state := s.GetState()
 
-	watchers := []protocol.FileSystemWatcher{}
+	var patterns []string
 
 	if len(cfg.TokensFiles) > 0 {
 		for _, item := range cfg.TokensFiles {
@@ -587,48 +527,56 @@ func (s *Server) buildFileWatchers() []protocol.FileSystemWatcher {
 				pattern = filepath.ToSlash(tokenPath)
 			}
 
-			watchers = append(watchers, protocol.FileSystemWatcher{
-				GlobPattern: pattern,
-			})
+			patterns = append(patterns, pattern)
 		}
 	}
 
-	return watchers
+	return patterns
 }
 
 // RegisterFileWatchers registers file watchers with the client.
-// During migration, uses stored glsp.Context internally for the Call RPC.
 func (s *Server) RegisterFileWatchers(_ context.Context) error {
-	glspCtx := s.glspContext()
-	if glspCtx == nil || glspCtx.Call == nil {
+	if s.client == nil {
 		log.Info("Skipping file watcher registration (no client context)")
 		return nil
 	}
 
-	watchers := s.buildFileWatchers()
+	patterns := s.buildFileWatcherPatterns()
 
-	if len(watchers) == 0 {
+	if len(patterns) == 0 {
 		log.Info("No file watchers to register")
 		return nil
+	}
+
+	watchers := make([]protocol.FileSystemWatcher, len(patterns))
+	for i, p := range patterns {
+		watchers[i] = protocol.FileSystemWatcher{
+			GlobPattern: protocol.Pattern(p),
+		}
+	}
+
+	// RegisterOptions must be LSPAny (jsontext.Value); marshal to JSON.
+	regOpts, err := json.Marshal(protocol.DidChangeWatchedFilesRegistrationOptions{
+		Watchers: watchers,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal watcher options: %w", err)
 	}
 
 	params := protocol.RegistrationParams{
 		Registrations: []protocol.Registration{
 			{
-				ID:     "design-tokens-file-watcher",
-				Method: "workspace/didChangeWatchedFiles",
-				RegisterOptions: protocol.DidChangeWatchedFilesRegistrationOptions{
-					Watchers: watchers,
-				},
+				ID:              "design-tokens-file-watcher",
+				Method:          "workspace/didChangeWatchedFiles",
+				RegisterOptions: protocol.LSPAny(regOpts),
 			},
 		},
 	}
 
-	go func(ctx *glsp.Context) {
-		var result any
-		ctx.Call("client/registerCapability", params, &result)
+	go func() {
+		_ = s.client.RegisterCapability(s.ctx, &params)
 		log.Info("File watcher registration completed")
-	}(glspCtx)
+	}()
 
 	log.Info("Sent file watcher registration request (%d watchers)", len(watchers))
 	return nil

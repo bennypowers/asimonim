@@ -9,7 +9,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/test/integration/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 // TestReferencesOnVarCall tests find-all-references from a token file
@@ -51,7 +52,7 @@ func TestReferencesOnVarCall(t *testing.T) {
 	// Check that location is in the CSS file
 	foundInCSS := false
 	for _, loc := range locations {
-		if loc.URI == "file:///test.css" {
+		if loc.URI == uri.URI("file:///test.css") {
 			foundInCSS = true
 		}
 	}
@@ -97,7 +98,7 @@ func TestReferencesMultipleFiles(t *testing.T) {
 	// Check that we have references from both CSS files
 	fileURIs := make(map[string]bool)
 	for _, loc := range locations {
-		fileURIs[loc.URI] = true
+		fileURIs[string(loc.URI)] = true
 	}
 
 	assert.True(t, fileURIs["file:///test1.css"], "Should have reference in test1.css")
@@ -175,7 +176,7 @@ func TestReferencesWithDeclaration(t *testing.T) {
 	// Check that declaration is included
 	foundDeclaration := false
 	for _, loc := range locations {
-		if loc.URI == "file:///tokens.json" && loc.Range.Start.Line == 3 {
+		if loc.URI == uri.URI("file:///tokens.json") && loc.Range.Start.Line == 3 {
 			foundDeclaration = true
 		}
 	}

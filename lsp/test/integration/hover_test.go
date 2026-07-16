@@ -9,7 +9,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/test/integration/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // TestHoverOnVarCall tests hover on a var() function call
@@ -36,7 +36,7 @@ func TestHoverOnVarCall(t *testing.T) {
 	require.NotNil(t, result, "Hover should return content")
 
 	// Verify hover content
-	content, ok := result.Contents.(protocol.MarkupContent)
+	content, ok := result.Contents.(*protocol.MarkupContent)
 	require.True(t, ok, "Contents should be MarkupContent")
 
 	assert.Equal(t, protocol.MarkupKindMarkdown, content.Kind)
@@ -69,7 +69,7 @@ func TestHoverOnUnknownToken(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	content, ok := result.Contents.(protocol.MarkupContent)
+	content, ok := result.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 
 	assert.Contains(t, content.Value, "Unknown token")
@@ -99,7 +99,7 @@ func TestHoverWithPrefix(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	content, ok := result.Contents.(protocol.MarkupContent)
+	content, ok := result.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 
 	assert.Contains(t, content.Value, "--my-ds-color-primary")
@@ -198,7 +198,7 @@ func TestHoverOnVariableDeclaration(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	content_hover, ok := result.Contents.(protocol.MarkupContent)
+	content_hover, ok := result.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content_hover.Value, "--color-primary")
 	assert.Contains(t, content_hover.Value, "#0000ff")
@@ -304,7 +304,7 @@ func TestHoverWithResolvedReference(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		content_hover, ok := result.Contents.(protocol.MarkupContent)
+		content_hover, ok := result.Contents.(*protocol.MarkupContent)
 		require.True(t, ok)
 		// Should show resolved value #ff0000, not the reference {color.base}
 		assert.Contains(t, content_hover.Value, "#ff0000", "Should show resolved value")
@@ -329,7 +329,7 @@ func TestHoverWithResolvedReference(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		content_hover, ok := result.Contents.(protocol.MarkupContent)
+		content_hover, ok := result.Contents.(*protocol.MarkupContent)
 		require.True(t, ok)
 		// Should show resolved value #ff0000, not any reference
 		assert.Contains(t, content_hover.Value, "#ff0000", "Should show resolved value")
@@ -385,7 +385,7 @@ func TestHoverWithDeprecated(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	content_hover, ok := result.Contents.(protocol.MarkupContent)
+	content_hover, ok := result.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content_hover.Value, "DEPRECATED")
 }

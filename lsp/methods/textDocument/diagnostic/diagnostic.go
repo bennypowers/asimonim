@@ -7,21 +7,22 @@ import (
 
 	"bennypowers.dev/asimonim/lsp/internal/parser"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	lspuri "go.lsp.dev/uri"
 )
 
 // DocumentDiagnostic handles the textDocument/diagnostic request (pull diagnostics, LSP 3.17)
-func DocumentDiagnostic(req *types.RequestContext, params *protocol.DocumentDiagnosticParams) (any, error) {
-	uri := params.TextDocument.URI
-	log.Info("Pull diagnostics requested for: %s", uri)
+func DocumentDiagnostic(req *types.RequestContext, params *protocol.DocumentDiagnosticParams) (protocol.DocumentDiagnosticReport, error) {
+	docURI := string(params.TextDocument.URI)
+	log.Info("Pull diagnostics requested for: %s", docURI)
 
-	diagnostics, err := GetDiagnostics(req.Server, uri)
+	diagnostics, err := GetDiagnostics(req.Server, docURI)
 	if err != nil {
 		log.Info("Error getting diagnostics: %v", err)
 		return nil, err
 	}
 
-	return protocol.RelatedFullDocumentDiagnosticReport{
+	return &protocol.RelatedFullDocumentDiagnosticReport{
 		FullDocumentDiagnosticReport: protocol.FullDocumentDiagnosticReport{
 			Kind:  string(protocol.DocumentDiagnosticReportKindFull),
 			Items: diagnostics,
@@ -72,7 +73,6 @@ func GetDiagnostics(ctx types.ServerContext, uri string) ([]protocol.Diagnostic,
 				message += ": " + token.DeprecationMessage
 			}
 
-			severity := protocol.DiagnosticSeverityInformation
 			diag := protocol.Diagnostic{
 				Range: protocol.Range{
 					Start: protocol.Position{
@@ -84,16 +84,16 @@ func GetDiagnostics(ctx types.ServerContext, uri string) ([]protocol.Diagnostic,
 						Character: varCall.Range.End.Character,
 					},
 				},
-				Severity: &severity,
-				Message:  message,
-				Tags:     []protocol.DiagnosticTag{protocol.DiagnosticTagDeprecated},
+				Severity: protocol.DiagnosticSeverityInformation,
+				Message:  protocol.String(message),
+				Tags:     protocol.NewDiagnosticTags(protocol.DiagnosticTagDeprecated),
 			}
 
 			// Add related information pointing to token definition when supported
 			if ctx.SupportsDiagnosticRelatedInfo() && token.DefinitionURI != "" {
 				diag.RelatedInformation = []protocol.DiagnosticRelatedInformation{{
 					Location: protocol.Location{
-						URI: token.DefinitionURI,
+						URI: lspuri.URI(token.DefinitionURI),
 						Range: protocol.Range{
 							Start: protocol.Position{Line: token.Line, Character: token.Character},
 							End:   protocol.Position{Line: token.Line, Character: token.Character},
@@ -113,7 +113,6 @@ func GetDiagnostics(ctx types.ServerContext, uri string) ([]protocol.Diagnostic,
 
 			// Check semantic equivalence (case-insensitive, whitespace-normalized)
 			if !isCSSValueSemanticallyEquivalent(fallbackValue, tokenValue) {
-				severity := protocol.DiagnosticSeverityError
 				diagnostics = append(diagnostics, protocol.Diagnostic{
 					Range: protocol.Range{
 						Start: protocol.Position{
@@ -125,8 +124,8 @@ func GetDiagnostics(ctx types.ServerContext, uri string) ([]protocol.Diagnostic,
 							Character: varCall.Range.End.Character,
 						},
 					},
-					Severity: &severity,
-					Message:  fmt.Sprintf("Token fallback does not match expected value: %s", tokenValue),
+					Severity: protocol.DiagnosticSeverityError,
+					Message:  protocol.String(fmt.Sprintf("Token fallback does not match expected value: %s", tokenValue)),
 				})
 			}
 		}

@@ -12,7 +12,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 // TestPackageJsonConfiguration tests that the server reads configuration from package.json
@@ -62,12 +63,11 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = server.Close() }()
 
-		workspaceURI := "file://" + tmpDir
-		workspacePath := tmpDir
+		rootURI := uri.URI("file://" + tmpDir)
 
 		initParams := &protocol.InitializeParams{}
-		initParams.RootURI = &workspaceURI
-		initParams.RootPath = &workspacePath
+		initParams.RootURI = &rootURI
+		initParams.RootPath = protocol.NewNullable(tmpDir)
 
 		req := types.NewRequestContext(server, context.Background())
 		_, err = lifecycle.Initialize(req, initParams)
@@ -126,12 +126,11 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = server.Close() }()
 
-		workspaceURI := "file://" + tmpDir
-		workspacePath := tmpDir
+		rootURI := uri.URI("file://" + tmpDir)
 
 		initParams := &protocol.InitializeParams{}
-		initParams.RootURI = &workspaceURI
-		initParams.RootPath = &workspacePath
+		initParams.RootURI = &rootURI
+		initParams.RootPath = protocol.NewNullable(tmpDir)
 
 		req := types.NewRequestContext(server, context.Background())
 		_, err = lifecycle.Initialize(req, initParams)
@@ -156,12 +155,11 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = server.Close() }()
 
-		workspaceURI := "file://" + tmpDir
-		workspacePath := tmpDir
+		rootURI := uri.URI("file://" + tmpDir)
 
 		initParams := &protocol.InitializeParams{}
-		initParams.RootURI = &workspaceURI
-		initParams.RootPath = &workspacePath
+		initParams.RootURI = &rootURI
+		initParams.RootPath = protocol.NewNullable(tmpDir)
 
 		req := types.NewRequestContext(server, context.Background())
 		_, err = lifecycle.Initialize(req, initParams)
@@ -204,12 +202,11 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		}
 		server.SetConfig(clientConfig)
 
-		workspaceURI := "file://" + tmpDir
-		workspacePath := tmpDir
+		rootURI := uri.URI("file://" + tmpDir)
 
 		initParams := &protocol.InitializeParams{}
-		initParams.RootURI = &workspaceURI
-		initParams.RootPath = &workspacePath
+		initParams.RootURI = &rootURI
+		initParams.RootPath = protocol.NewNullable(tmpDir)
 
 		req := types.NewRequestContext(server, context.Background())
 		_, err = lifecycle.Initialize(req, initParams)
@@ -270,12 +267,11 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = server.Close() }()
 
-		workspaceURI := "file://" + tmpDir
-		workspacePath := tmpDir
+		rootURI := uri.URI("file://" + tmpDir)
 
 		initParams := &protocol.InitializeParams{}
-		initParams.RootURI = &workspaceURI
-		initParams.RootPath = &workspacePath
+		initParams.RootURI = &rootURI
+		initParams.RootPath = protocol.NewNullable(tmpDir)
 
 		req := types.NewRequestContext(server, context.Background())
 		_, err = lifecycle.Initialize(req, initParams)
@@ -324,12 +320,11 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = server.Close() }()
 
-		workspaceURI := "file://" + tmpDir
-		workspacePath := tmpDir
+		rootURI := uri.URI("file://" + tmpDir)
 
 		initParams := &protocol.InitializeParams{}
-		initParams.RootURI = &workspaceURI
-		initParams.RootPath = &workspacePath
+		initParams.RootURI = &rootURI
+		initParams.RootPath = protocol.NewNullable(tmpDir)
 
 		req := types.NewRequestContext(server, context.Background())
 		_, err = lifecycle.Initialize(req, initParams)

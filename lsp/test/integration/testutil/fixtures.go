@@ -9,7 +9,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/methods/textDocument"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 // FixtureRoot returns the path to the test fixtures directory
@@ -79,12 +80,12 @@ func languageIDFromURI(uri string) string {
 }
 
 // OpenCSSFixture opens a CSS fixture file in the server
-func OpenCSSFixture(t *testing.T, server *lsp.Server, uri, fixtureName string) {
+func OpenCSSFixture(t *testing.T, server *lsp.Server, docURI, fixtureName string) {
 	t.Helper()
 	content := LoadCSSFixture(t, fixtureName)
 	params := &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
-			URI:        uri,
+			URI:        uri.URI(docURI),
 			LanguageID: "css",
 			Version:    1,
 			Text:       content,
@@ -97,14 +98,14 @@ func OpenCSSFixture(t *testing.T, server *lsp.Server, uri, fixtureName string) {
 
 // OpenTokenFixture opens a token fixture file as a document in the server
 // This is useful for testing references/definition from token files
-func OpenTokenFixture(t *testing.T, server *lsp.Server, uri, fixtureName string) {
+func OpenTokenFixture(t *testing.T, server *lsp.Server, docURI, fixtureName string) {
 	t.Helper()
 	content := LoadTokenFixture(t, fixtureName)
 
 	params := &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
-			URI:        uri,
-			LanguageID: languageIDFromURI(uri),
+			URI:        uri.URI(docURI),
+			LanguageID: protocol.LanguageKind(languageIDFromURI(docURI)),
 			Version:    1,
 			Text:       string(content),
 		},
@@ -128,14 +129,8 @@ func LoadNonTokenFixture(t *testing.T, name string) []byte {
 func SetCodeActionLiteralSupport(server *lsp.Server) {
 	textDoc := &protocol.TextDocumentClientCapabilities{}
 	textDoc.CodeAction = &protocol.CodeActionClientCapabilities{
-		CodeActionLiteralSupport: &struct {
-			CodeActionKind struct {
-				ValueSet []protocol.CodeActionKind `json:"valueSet"`
-			} `json:"codeActionKind"`
-		}{
-			CodeActionKind: struct {
-				ValueSet []protocol.CodeActionKind `json:"valueSet"`
-			}{
+		CodeActionLiteralSupport: protocol.ClientCodeActionLiteralOptions{
+			CodeActionKind: protocol.ClientCodeActionKindOptions{
 				ValueSet: []protocol.CodeActionKind{
 					protocol.CodeActionKindQuickFix,
 					protocol.CodeActionKindRefactorRewrite,
@@ -150,14 +145,14 @@ func SetCodeActionLiteralSupport(server *lsp.Server) {
 
 // OpenNonTokenFixture opens a non-token JSON/YAML fixture file as a document in the server
 // This is for testing that LSP features are NOT provided for non-token files
-func OpenNonTokenFixture(t *testing.T, server *lsp.Server, uri, fixtureName string) {
+func OpenNonTokenFixture(t *testing.T, server *lsp.Server, docURI, fixtureName string) {
 	t.Helper()
 	content := LoadNonTokenFixture(t, fixtureName)
 
 	params := &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
-			URI:        uri,
-			LanguageID: languageIDFromURI(uri),
+			URI:        uri.URI(docURI),
+			LanguageID: protocol.LanguageKind(languageIDFromURI(docURI)),
 			Version:    1,
 			Text:       string(content),
 		},

@@ -5,7 +5,7 @@ import (
 
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // ServerContext provides all dependencies needed for LSP handlers.
