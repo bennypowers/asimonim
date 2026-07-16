@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -13,6 +12,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
+	"github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
 	"bennypowers.dev/asimonim/schema"
 	rootutil "bennypowers.dev/asimonim/testutil"
 	"github.com/stretchr/testify/assert"
@@ -92,7 +93,7 @@ func TestWorkspaceDiagnostic_Golden(t *testing.T) {
 	}
 	sort.Slice(reports, func(i, j int) bool { return reports[i].URI < reports[j].URI })
 
-	actual, err := json.MarshalIndent(reports, "", "  ")
+	actual, err := json.Marshal(reports, jsontext.WithIndent("  "))
 	require.NoError(t, err)
 	actual = append(actual, '\n')
 

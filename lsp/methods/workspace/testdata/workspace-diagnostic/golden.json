@@ -23,7 +23,9 @@
         },
         "severity": 3,
         "message": "--color-old is deprecated: Use color.primary instead",
-        "tags": {}
+        "tags": [
+          2
+        ]
       }
     ]
   },
