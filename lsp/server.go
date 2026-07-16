@@ -85,7 +85,7 @@ func (s *Server) RunStdio() error {
 	s.conn = conn
 	s.ctx = ctx
 	<-conn.Done()
-	return nil
+	return conn.Err()
 }
 
 // Close releases server resources including the CSS, HTML, and JS parser pools.
