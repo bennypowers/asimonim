@@ -73,20 +73,32 @@ func NewServer(opts ...Option) (*Server, error) {
 	return s, nil
 }
 
-// RunStdio starts the LSP server using stdio transport
+// RunStdio starts the LSP server using stdio transport.
+// Uses manual wiring instead of protocol.NewServer to ensure s.client
+// is set before conn.Go starts dispatching handlers.
 func (s *Server) RunStdio() error {
 	rwc := struct {
 		io.ReadCloser
 		io.Writer
 	}{os.Stdin, os.Stdout}
 	stream := jsonrpc2.NewStream(rwc)
-	ctx, conn, client := protocol.NewServer(context.Background(), &handler{s: s}, stream)
-	s.client = client
+	conn := jsonrpc2.NewConn(stream, jsonrpc2.WithCodec(protocolCodec{}))
+	s.client = protocol.ClientDispatcher(conn)
 	s.conn = conn
-	s.ctx = ctx
+	s.ctx = context.Background()
+	s.ctx = protocol.WithClient(s.ctx, s.client)
+	conn.Go(s.ctx, protocol.Handlers(protocol.ServerHandler(&handler{s: s}, jsonrpc2.MethodNotFoundHandler)))
 	<-conn.Done()
 	return conn.Err()
 }
+
+// protocolCodec implements jsonrpc2.Codec using the protocol library's
+// reflection-free marshal/unmarshal, matching the internal lspCodec
+// used by protocol.NewServer.
+type protocolCodec struct{}
+
+func (protocolCodec) Marshal(v any) ([]byte, error)     { return protocol.Marshal(v) }
+func (protocolCodec) Unmarshal(data []byte, v any) error { return protocol.Unmarshal(data, v) }
 
 // Close releases server resources including the CSS, HTML, and JS parser pools.
 // It is safe to call Close multiple times.
