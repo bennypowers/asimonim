@@ -66,7 +66,7 @@ func TestCodeAction_IncorrectFallback(t *testing.T) {
 	require.NotNil(t, fixAction.Edit.Changes)
 	edits := fixAction.Edit.Changes[uri.URI(docURI)]
 	require.Len(t, edits, 1)
-	assert.Contains(t, edits[0].NewText, "var(--color-primary, #0000ff)")
+	assert.Equal(t, "var(--color-primary, #0000ff)", edits[0].NewText)
 }
 
 func TestCodeAction_AddFallback(t *testing.T) {
@@ -116,7 +116,7 @@ func TestCodeAction_AddFallback(t *testing.T) {
 	require.NotNil(t, addAction.Edit.Changes)
 	edits := addAction.Edit.Changes[uri.URI(docURI)]
 	require.Len(t, edits, 1)
-	assert.Contains(t, edits[0].NewText, "var(--color-primary, #0000ff)")
+	assert.Equal(t, "var(--color-primary, #0000ff)", edits[0].NewText)
 }
 
 func TestCodeAction_NonCSSDocument(t *testing.T) {

@@ -573,11 +573,10 @@ func (s *Server) RegisterFileWatchers(_ context.Context) error {
 		},
 	}
 
-	go func() {
-		_ = s.client.RegisterCapability(s.ctx, &params)
-		log.Info("File watcher registration completed")
-	}()
+	if err := s.client.RegisterCapability(s.ctx, &params); err != nil {
+		return fmt.Errorf("file watcher registration failed: %w", err)
+	}
 
-	log.Info("Sent file watcher registration request (%d watchers)", len(watchers))
+	log.Info("Registered %d file watchers", len(watchers))
 	return nil
 }

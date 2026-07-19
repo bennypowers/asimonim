@@ -63,7 +63,7 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = server.Close() }()
 
-		rootURI := uri.URI("file://" + tmpDir)
+		rootURI := uri.File(tmpDir)
 
 		initParams := &protocol.InitializeParams{}
 		initParams.RootURI = &rootURI
@@ -126,7 +126,7 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = server.Close() }()
 
-		rootURI := uri.URI("file://" + tmpDir)
+		rootURI := uri.File(tmpDir)
 
 		initParams := &protocol.InitializeParams{}
 		initParams.RootURI = &rootURI
@@ -155,7 +155,7 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = server.Close() }()
 
-		rootURI := uri.URI("file://" + tmpDir)
+		rootURI := uri.File(tmpDir)
 
 		initParams := &protocol.InitializeParams{}
 		initParams.RootURI = &rootURI
@@ -202,7 +202,7 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		}
 		server.SetConfig(clientConfig)
 
-		rootURI := uri.URI("file://" + tmpDir)
+		rootURI := uri.File(tmpDir)
 
 		initParams := &protocol.InitializeParams{}
 		initParams.RootURI = &rootURI
@@ -267,7 +267,7 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = server.Close() }()
 
-		rootURI := uri.URI("file://" + tmpDir)
+		rootURI := uri.File(tmpDir)
 
 		initParams := &protocol.InitializeParams{}
 		initParams.RootURI = &rootURI
@@ -320,7 +320,7 @@ func TestPackageJsonConfiguration(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = server.Close() }()
 
-		rootURI := uri.URI("file://" + tmpDir)
+		rootURI := uri.File(tmpDir)
 
 		initParams := &protocol.InitializeParams{}
 		initParams.RootURI = &rootURI

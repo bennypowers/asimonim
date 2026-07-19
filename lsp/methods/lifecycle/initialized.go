@@ -11,9 +11,6 @@ import (
 func Initialized(req *types.RequestContext, params *protocol.InitializedParams) error {
 	log.Info("Server initialized")
 
-	// Store context for later use (diagnostics)
-	req.Server.SetServerCtx(req.Ctx)
-
 	// Read configuration from package.json if it exists
 	// This provides the "zero-config" experience for projects with package.json config
 	if err := req.Server.LoadPackageJsonConfig(); err != nil {

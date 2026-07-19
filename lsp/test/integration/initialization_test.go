@@ -24,7 +24,7 @@ func TestServerInitialization(t *testing.T) {
 
 		// Create temp workspace
 		tmpDir := t.TempDir()
-		rootURI := uri.URI("file://" + tmpDir)
+		rootURI := uri.File(tmpDir)
 
 		// Initialize server
 		initParams := &protocol.InitializeParams{}
@@ -40,8 +40,17 @@ func TestServerInitialization(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		// Verify capabilities are returned
+		// Verify server info and capabilities
 		assert.Equal(t, "design-tokens-language-server", result.ServerInfo.Name)
+		assert.NotNil(t, result.Capabilities.TextDocumentSync)
+		assert.NotNil(t, result.Capabilities.HoverProvider)
+		assert.NotNil(t, result.Capabilities.CompletionProvider)
+		assert.NotNil(t, result.Capabilities.DefinitionProvider)
+		assert.NotNil(t, result.Capabilities.ReferencesProvider)
+		assert.NotNil(t, result.Capabilities.CodeActionProvider)
+		assert.NotNil(t, result.Capabilities.ColorProvider)
+		assert.NotNil(t, result.Capabilities.InlayHintProvider)
+		assert.NotNil(t, result.Capabilities.SemanticTokensProvider)
 	})
 
 	t.Run("Initialize without workspace root", func(t *testing.T) {

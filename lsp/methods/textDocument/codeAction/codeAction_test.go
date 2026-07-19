@@ -125,11 +125,10 @@ func TestToggleFallback(t *testing.T) {
 
 			if tt.expectedAction == "" {
 				// Should not have toggle action
-				if result != nil {
-					actions := extractCodeActions(t, result)
-					for _, action := range actions {
-						assert.NotEqual(t, tt.expectedAction, action.Title)
-					}
+				for _, item := range result {
+					ca := item.(*protocol.CodeAction)
+					assert.NotEqual(t, "Toggle design token fallback value", ca.Title,
+						"Should not offer toggle action when cursor is outside var call")
 				}
 				return
 			}

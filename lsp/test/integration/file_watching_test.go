@@ -50,7 +50,7 @@ func TestFileWatching_TokenFileChange(t *testing.T) {
 	require.NoError(t, err)
 
 	// Open CSS document
-	cssURI := uri.URI("file://" + cssPath)
+	cssURI := uri.File(cssPath)
 	req := types.NewRequestContext(server, nil)
 	err = textDocument.DidOpen(req, &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
@@ -92,7 +92,7 @@ func TestFileWatching_TokenFileChange(t *testing.T) {
 	require.NoError(t, err)
 
 	// Simulate file change notification
-	tokensURI := uri.URI("file://" + tokensPath)
+	tokensURI := uri.File(tokensPath)
 	req = types.NewRequestContext(server, nil)
 	err = workspace.DidChangeWatchedFiles(req, &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
@@ -150,7 +150,7 @@ func TestFileWatching_TokenFileDeleted(t *testing.T) {
 	err = server.LoadTokenFile(tokensPath, "")
 	require.NoError(t, err)
 
-	cssURI := uri.URI("file://" + cssPath)
+	cssURI := uri.File(cssPath)
 	req := types.NewRequestContext(server, nil)
 	err = textDocument.DidOpen(req, &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
@@ -178,7 +178,7 @@ func TestFileWatching_TokenFileDeleted(t *testing.T) {
 	require.NoError(t, err)
 
 	// Simulate file deletion notification
-	tokensURI := uri.URI("file://" + tokensPath)
+	tokensURI := uri.File(tokensPath)
 	req = types.NewRequestContext(server, nil)
 	err = workspace.DidChangeWatchedFiles(req, &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
@@ -251,7 +251,7 @@ func TestFileWatching_MultipleTokenFiles(t *testing.T) {
 	err = server.LoadTokenFile(tokens2Path, "")
 	require.NoError(t, err)
 
-	cssURI := uri.URI("file://" + cssPath)
+	cssURI := uri.File(cssPath)
 	req := types.NewRequestContext(server, nil)
 	err = textDocument.DidOpen(req, &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
@@ -276,7 +276,7 @@ func TestFileWatching_MultipleTokenFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Simulate file change notification
-	tokens2URI := uri.URI("file://" + tokens2Path)
+	tokens2URI := uri.File(tokens2Path)
 	req = types.NewRequestContext(server, nil)
 	err = workspace.DidChangeWatchedFiles(req, &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
@@ -336,7 +336,7 @@ func TestFileWatching_NonTokenFileIgnored(t *testing.T) {
 	initialCount := server.TokenCount()
 
 	// Simulate change to non-token file
-	pkgURI := uri.URI("file://" + pkgPath)
+	pkgURI := uri.File(pkgPath)
 	req := types.NewRequestContext(server, nil)
 	err = workspace.DidChangeWatchedFiles(req, &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
@@ -385,7 +385,7 @@ func TestFileWatching_YmlExtension(t *testing.T) {
 			assert.Equal(t, 1, server.TokenCount(), "Should load token from .yml file")
 
 			// Simulate file change to .yml file
-			tokensURI := uri.URI("file://" + tokensPath)
+			tokensURI := uri.File(tokensPath)
 			req := types.NewRequestContext(server, nil)
 			err = workspace.DidChangeWatchedFiles(req, &protocol.DidChangeWatchedFilesParams{
 				Changes: []protocol.FileEvent{

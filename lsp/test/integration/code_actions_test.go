@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"strings"
 	"testing"
 
 	codeaction "bennypowers.dev/asimonim/lsp/methods/textDocument/codeAction"
@@ -516,7 +517,7 @@ func TestCodeAction_DeprecatedMessagePatterns(t *testing.T) {
 		if action.Title == "Replace with literal value '24px'" {
 			literalAction = action
 		}
-		if action.Title == "Replace with '--" {
+		if strings.HasPrefix(action.Title, "Replace with '--") {
 			hasReplacementAction = true
 		}
 	}

@@ -12,18 +12,23 @@ import (
 )
 
 func TestInitialized(t *testing.T) {
-	t.Run("stores GLSP context", func(t *testing.T) {
+	t.Run("does not overwrite server context with request context", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		bgCtx := context.Background()
-		req := types.NewRequestContext(ctx, bgCtx)
+		serverCtx := context.Background()
+		ctx.SetServerCtx(serverCtx)
 
-		params := &protocol.InitializedParams{}
+		reqCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		req := types.NewRequestContext(ctx, reqCtx)
 
-		err := Initialized(req, params)
+		err := Initialized(req, &protocol.InitializedParams{})
 		assert.NoError(t, err)
 
-		// Verify context was stored
-		assert.Equal(t, bgCtx, ctx.ServerCtx())
+		// Cancel the request context — server context must survive
+		cancel()
+
+		// Server context should still be the original, not the canceled request context
+		assert.Equal(t, serverCtx, ctx.ServerCtx())
 	})
 
 	t.Run("calls LoadTokensFromConfig", func(t *testing.T) {
