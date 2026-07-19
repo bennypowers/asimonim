@@ -386,7 +386,7 @@ func (s *Server) PublishDiagnostics(_ context.Context, docURI string) error {
 		return err
 	}
 
-	return s.client.PublishDiagnostics(s.ctx, &protocol.PublishDiagnosticsParams{
+	return s.client.PublishDiagnostics(s.ServerCtx(), &protocol.PublishDiagnosticsParams{
 		URI:         uri.URI(docURI),
 		Diagnostics: diagnostics,
 	})
@@ -398,7 +398,7 @@ func (s *Server) NotifyDiagnosticRefresh() {
 		return
 	}
 	log.Info("Sending workspace/diagnostic/refresh")
-	_ = s.client.DiagnosticRefresh(s.ctx)
+	_ = s.client.DiagnosticRefresh(s.ServerCtx())
 }
 
 // IsTokenFile checks if a file path is one of our token files
@@ -585,7 +585,7 @@ func (s *Server) RegisterFileWatchers(_ context.Context) error {
 		},
 	}
 
-	if err := s.client.RegisterCapability(s.ctx, &params); err != nil {
+	if err := s.client.RegisterCapability(s.ServerCtx(), &params); err != nil {
 		return fmt.Errorf("file watcher registration failed: %w", err)
 	}
 
