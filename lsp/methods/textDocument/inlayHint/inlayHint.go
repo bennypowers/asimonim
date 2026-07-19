@@ -7,7 +7,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/parser"
 	"bennypowers.dev/asimonim/lsp/internal/parser/css"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // InlayHint handles the textDocument/inlayHint request.
@@ -17,7 +17,7 @@ func InlayHint(req *types.RequestContext, params *protocol.InlayHintParams) ([]p
 		return nil, nil
 	}
 
-	uri := params.TextDocument.URI
+	uri := string(params.TextDocument.URI)
 	log.Info("InlayHint requested: %s", uri)
 
 	doc := req.Server.Document(uri)
@@ -73,7 +73,7 @@ func hintForVarCall(req *types.RequestContext, requestRange protocol.Range, varC
 			Line:      varCall.Range.End.Line,
 			Character: varCall.Range.End.Character - 1,
 		},
-		Label: ", " + displayValue,
+		Label: protocol.String(", " + displayValue),
 	}, true
 }
 

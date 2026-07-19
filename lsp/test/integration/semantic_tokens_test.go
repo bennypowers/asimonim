@@ -9,7 +9,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/test/integration/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 // TestSemanticTokens_JSONWithReferences tests semantic tokens for JSON file with token references
@@ -289,7 +290,7 @@ func TestSemanticTokensDelta_FullWorkflow(t *testing.T) {
 	// Since document hasn't changed, should return empty delta
 	deltaResponse, ok := deltaResult.(*protocol.SemanticTokensDelta)
 	require.True(t, ok, "Should return SemanticTokensDelta when delta is possible")
-	require.NotNil(t, deltaResponse.ResultId, "Delta response should include ResultID")
+	require.NotNil(t, deltaResponse.ResultID, "Delta response should include ResultID")
 	assert.Empty(t, deltaResponse.Edits, "Should have empty edits when nothing changed")
 }
 
@@ -326,10 +327,10 @@ func TestSemanticTokensDelta_StaleResultID(t *testing.T) {
 func TestSemanticTokensDelta_CacheInvalidationOnClose(t *testing.T) {
 	server := testutil.NewTestServer(t)
 
-	uri := "file:///tokens.json"
+	docURI := "file:///tokens.json"
 
 	// Open the fixture file
-	testutil.OpenTokenFixture(t, server, uri, "semantic-tokens/tokens.json")
+	testutil.OpenTokenFixture(t, server, docURI, "semantic-tokens/tokens.json")
 
 	// Load tokens
 	tokensContent := testutil.LoadTokenFixture(t, "semantic-tokens/tokens.json")
@@ -339,7 +340,7 @@ func TestSemanticTokensDelta_CacheInvalidationOnClose(t *testing.T) {
 	// Get full tokens to populate cache
 	req := types.NewRequestContext(server, nil)
 	fullResult, err := semantictokens.SemanticTokensFull(req, &protocol.SemanticTokensParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, fullResult.ResultID)
@@ -352,7 +353,7 @@ func TestSemanticTokensDelta_CacheInvalidationOnClose(t *testing.T) {
 
 	// Close the document via DidClose - this should invalidate the cache
 	err = textDocument.DidClose(req, &protocol.DidCloseTextDocumentParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 	})
 	require.NoError(t, err)
 
@@ -361,10 +362,10 @@ func TestSemanticTokensDelta_CacheInvalidationOnClose(t *testing.T) {
 	assert.Nil(t, entry, "Cache entry should be invalidated after close")
 
 	// Re-open and request delta with old result ID
-	testutil.OpenTokenFixture(t, server, uri, "semantic-tokens/tokens.json")
+	testutil.OpenTokenFixture(t, server, docURI, "semantic-tokens/tokens.json")
 
 	result, err := semantictokens.SemanticTokensFullDelta(req, &protocol.SemanticTokensDeltaParams{
-		TextDocument:     protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument:     protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		PreviousResultID: originalResultID,
 	})
 
@@ -388,10 +389,10 @@ func TestSemanticTokens_AutoLoadOnDidOpen(t *testing.T) {
 	content := testutil.LoadTokenFixture(t, "semantic-tokens/tokens.json")
 
 	// Simulate opening the file via didOpen - this should auto-load the tokens
-	uri := "file:///auto-load-test/tokens.json"
+	docURI := "file:///auto-load-test/tokens.json"
 	params := &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
-			URI:        uri,
+			URI:        uri.URI(docURI),
 			LanguageID: "json",
 			Version:    1,
 			Text:       string(content),
@@ -405,7 +406,7 @@ func TestSemanticTokens_AutoLoadOnDidOpen(t *testing.T) {
 
 	// Now request semantic tokens - should work without manually loading tokens
 	result, err := semantictokens.SemanticTokensFull(req, &protocol.SemanticTokensParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 	})
 
 	require.NoError(t, err)

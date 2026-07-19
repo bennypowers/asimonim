@@ -3,6 +3,7 @@ package completion
 import (
 	"bennypowers.dev/asimonim/lsp/internal/log"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"text/template"
@@ -11,7 +12,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/position"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // Template for token documentation
@@ -40,8 +41,8 @@ func renderTokenDoc(token *tokens.Token) (string, error) {
 // handleCompletion handles the textDocument/completion request
 
 // Completion handles the textDocument/completion request
-func Completion(req *types.RequestContext, params *protocol.CompletionParams) (any, error) {
-	uri := params.TextDocument.URI
+func Completion(req *types.RequestContext, params *protocol.CompletionParams) (protocol.CompletionResult, error) {
+	uri := string(params.TextDocument.URI)
 	pos := params.Position
 
 	log.Info("Completion requested: %s at line %d, char %d", uri, pos.Line, pos.Character)
@@ -98,15 +99,17 @@ func Completion(req *types.RequestContext, params *protocol.CompletionParams) (a
 				filterText = strings.TrimPrefix(cssVar, "--")
 			}
 
+			dataBytes, _ := json.Marshal(map[string]any{
+				"tokenName": cssVar,
+			})
+
 			item := protocol.CompletionItem{
 				Label:            cssVar,
-				FilterText:       &filterText,
-				Kind:             &kind,
-				InsertTextFormat: &insertTextFormat,
-				InsertText:       &insertText,
-				Data: map[string]any{
-					"tokenName": cssVar,
-				},
+				FilterText:       protocol.NewOptional(filterText),
+				Kind:             kind,
+				InsertTextFormat: insertTextFormat,
+				InsertText:       protocol.NewOptional(insertText),
+				Data:             protocol.LSPAny(dataBytes),
 			}
 
 			items = append(items, item)
@@ -127,8 +130,9 @@ func Completion(req *types.RequestContext, params *protocol.CompletionParams) (a
 func CompletionResolve(req *types.RequestContext, item *protocol.CompletionItem) (*protocol.CompletionItem, error) {
 	// Get token name from data
 	var tokenName string
-	if item.Data != nil {
-		if data, ok := item.Data.(map[string]any); ok {
+	if len(item.Data) > 0 {
+		var data map[string]any
+		if err := json.Unmarshal(item.Data, &data); err == nil {
 			if name, ok := data["tokenName"].(string); ok {
 				tokenName = name
 			}
@@ -153,14 +157,14 @@ func CompletionResolve(req *types.RequestContext, item *protocol.CompletionItem)
 	}
 
 	// Add documentation
-	item.Documentation = protocol.MarkupContent{
+	item.Documentation = &protocol.MarkupContent{
 		Kind:  protocol.MarkupKindMarkdown,
 		Value: documentation,
 	}
 
 	// Add detail (value preview)
 	detail := fmt.Sprintf(": %s", token.Value)
-	item.Detail = &detail
+	item.Detail = protocol.NewOptional(detail)
 
 	return item, nil
 }

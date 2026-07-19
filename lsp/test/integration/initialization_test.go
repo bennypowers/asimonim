@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,8 +11,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 // TestServerInitialization tests the full server initialization flow
@@ -23,32 +24,33 @@ func TestServerInitialization(t *testing.T) {
 
 		// Create temp workspace
 		tmpDir := t.TempDir()
-		workspaceURI := "file://" + tmpDir
-		workspacePath := tmpDir
+		rootURI := uri.File(tmpDir)
 
 		// Initialize server
-		ctx := &glsp.Context{}
 		initParams := &protocol.InitializeParams{}
-		initParams.RootURI = &workspaceURI
-		initParams.RootPath = &workspacePath
-		initParams.ClientInfo = &struct {
-			Name    string  `json:"name"`
-			Version *string `json:"version,omitempty"`
-		}{
+		initParams.RootURI = &rootURI
+		initParams.RootPath = protocol.NewNullable(tmpDir)
+		initParams.ClientInfo = protocol.ClientInfo{
 			Name:    "test-client",
-			Version: strPtr("1.0.0"),
+			Version: protocol.NewOptional("1.0.0"),
 		}
 
-		req := types.NewRequestContext(server, ctx)
+		req := types.NewRequestContext(server, context.Background())
 		result, err := lifecycle.Initialize(req, initParams)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		// Verify capabilities are returned
-		initResult, ok := result.(protocol.InitializeResult)
-		require.True(t, ok, "Result should be InitializeResult")
-		assert.NotNil(t, initResult.ServerInfo)
-		assert.Equal(t, "design-tokens-language-server", initResult.ServerInfo.Name)
+		// Verify server info and capabilities
+		assert.Equal(t, "design-tokens-language-server", result.ServerInfo.Name)
+		assert.NotNil(t, result.Capabilities.TextDocumentSync)
+		assert.NotNil(t, result.Capabilities.HoverProvider)
+		assert.NotNil(t, result.Capabilities.CompletionProvider)
+		assert.NotNil(t, result.Capabilities.DefinitionProvider)
+		assert.NotNil(t, result.Capabilities.ReferencesProvider)
+		assert.NotNil(t, result.Capabilities.CodeActionProvider)
+		assert.NotNil(t, result.Capabilities.ColorProvider)
+		assert.NotNil(t, result.Capabilities.InlayHintProvider)
+		assert.NotNil(t, result.Capabilities.SemanticTokensProvider)
 	})
 
 	t.Run("Initialize without workspace root", func(t *testing.T) {
@@ -56,16 +58,12 @@ func TestServerInitialization(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = server.Close() }()
 
-		ctx := &glsp.Context{}
 		initParams := &protocol.InitializeParams{}
-		initParams.ClientInfo = &struct {
-			Name    string  `json:"name"`
-			Version *string `json:"version,omitempty"`
-		}{
+		initParams.ClientInfo = protocol.ClientInfo{
 			Name: "test-client",
 		}
 
-		req := types.NewRequestContext(server, ctx)
+		req := types.NewRequestContext(server, context.Background())
 		result, err := lifecycle.Initialize(req, initParams)
 		require.NoError(t, err)
 		require.NotNil(t, result)
@@ -104,15 +102,13 @@ func TestServerShutdown(t *testing.T) {
 	server, err := lsp.NewServer()
 	require.NoError(t, err)
 
-	ctx := &glsp.Context{}
-
 	// Shutdown should not error
-	req := types.NewRequestContext(server, ctx)
+	req := types.NewRequestContext(server, context.Background())
 	err = lifecycle.Shutdown(req)
 	assert.NoError(t, err)
 
 	// Multiple shutdowns should be safe
-	req = types.NewRequestContext(server, ctx)
+	req = types.NewRequestContext(server, context.Background())
 	err = lifecycle.Shutdown(req)
 	assert.NoError(t, err)
 }
@@ -123,16 +119,14 @@ func TestSetTrace(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = server.Close() }()
 
-	ctx := &glsp.Context{}
-
 	traces := []protocol.TraceValue{
 		protocol.TraceValueOff,
-		protocol.TraceValueMessage,
+		protocol.TraceValueMessages,
 		protocol.TraceValueVerbose,
 	}
 	for _, trace := range traces {
 		t.Run(string(trace), func(t *testing.T) {
-			req := types.NewRequestContext(server, ctx)
+			req := types.NewRequestContext(server, context.Background())
 			err := lifecycle.SetTrace(req, &protocol.SetTraceParams{
 				Value: trace,
 			})
@@ -141,6 +135,3 @@ func TestSetTrace(t *testing.T) {
 	}
 }
 
-func strPtr(s string) *string {
-	return &s
-}

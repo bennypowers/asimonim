@@ -7,7 +7,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/test/integration/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // TestDiagnosticsIncorrectFallback tests diagnostics for incorrect fallback values
@@ -23,8 +23,7 @@ func TestDiagnosticsIncorrectFallback(t *testing.T) {
 
 	// Should have one diagnostic for incorrect fallback
 	assert.Len(t, diagnostics, 1)
-	require.NotNil(t, diagnostics[0].Severity)
-	assert.Equal(t, protocol.DiagnosticSeverityError, *diagnostics[0].Severity)
+	assert.Equal(t, protocol.DiagnosticSeverityError, diagnostics[0].Severity)
 	assert.Contains(t, diagnostics[0].Message, "fallback does not match")
 	assert.Contains(t, diagnostics[0].Message, "#0000ff")
 }
@@ -83,11 +82,10 @@ func TestDiagnosticsDeprecatedToken(t *testing.T) {
 
 	// Should have one diagnostic for deprecated token
 	assert.Len(t, diagnostics, 1)
-	require.NotNil(t, diagnostics[0].Severity)
-	assert.Equal(t, protocol.DiagnosticSeverityInformation, *diagnostics[0].Severity)
+	assert.Equal(t, protocol.DiagnosticSeverityInformation, diagnostics[0].Severity)
 	assert.Contains(t, diagnostics[0].Message, "deprecated")
 	assert.Contains(t, diagnostics[0].Message, "Use color.primary instead")
-	assert.Contains(t, diagnostics[0].Tags, protocol.DiagnosticTagDeprecated)
+	assert.Equal(t, []protocol.DiagnosticTag{protocol.DiagnosticTagDeprecated}, diagnostics[0].Tags.Slice())
 }
 
 // TestDiagnosticsUnknownToken tests that unknown tokens produce no diagnostics
@@ -124,9 +122,9 @@ func TestDiagnosticsMultipleIssues(t *testing.T) {
 	var deprecated *protocol.Diagnostic
 
 	for i := range diagnostics {
-		if diagnostics[i].Severity != nil && *diagnostics[i].Severity == protocol.DiagnosticSeverityError {
+		if diagnostics[i].Severity == protocol.DiagnosticSeverityError {
 			incorrectFallback = &diagnostics[i]
-		} else if diagnostics[i].Severity != nil && *diagnostics[i].Severity == protocol.DiagnosticSeverityInformation {
+		} else if diagnostics[i].Severity == protocol.DiagnosticSeverityInformation {
 			deprecated = &diagnostics[i]
 		}
 	}

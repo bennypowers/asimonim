@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,8 +12,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // loadConfigFixture loads a JSON fixture file as a settings map for parseConfiguration.
@@ -27,11 +27,17 @@ func loadConfigFixture(t *testing.T, name string) map[string]any {
 	return settings
 }
 
+func mustMarshal(t *testing.T, v any) protocol.LSPAny {
+	t.Helper()
+	b, err := json.Marshal(v)
+	require.NoError(t, err)
+	return protocol.LSPAny(b)
+}
+
 func TestDidChangeConfiguration_WithValidConfig(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
-	ctx.SetGLSPContext(glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
+	ctx.SetServerCtx(context.Background())
 
 	// Prepare configuration with tokens files
 	settings := map[string]any{
@@ -44,7 +50,7 @@ func TestDidChangeConfiguration_WithValidConfig(t *testing.T) {
 	}
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
 	err := DidChangeConfiguration(req, params)
@@ -57,8 +63,7 @@ func TestDidChangeConfiguration_WithValidConfig(t *testing.T) {
 
 func TestDidChangeConfiguration_WithNilSettings(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	params := &protocol.DidChangeConfigurationParams{
 		Settings: nil,
@@ -72,14 +77,14 @@ func TestDidChangeConfiguration_WithNilSettings(t *testing.T) {
 	assert.Equal(t, types.DefaultConfig().Prefix, config.Prefix)
 }
 
+
 func TestDidChangeConfiguration_WithInvalidSettings(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Settings that's not a map
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: "invalid",
+		Settings: mustMarshal(t, "invalid"),
 	}
 
 	err := DidChangeConfiguration(req, params)
@@ -89,8 +94,7 @@ func TestDidChangeConfiguration_WithInvalidSettings(t *testing.T) {
 
 func TestDidChangeConfiguration_WithAlternateKey(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Using hyphenated key instead of camelCase
 	settings := map[string]any{
@@ -100,7 +104,7 @@ func TestDidChangeConfiguration_WithAlternateKey(t *testing.T) {
 	}
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
 	err := DidChangeConfiguration(req, params)
@@ -122,26 +126,25 @@ func TestDidChangeConfiguration_WithoutGLSPContext(t *testing.T) {
 	}
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
-	// Should not panic when glspCtx is nil
+	// Should not panic when context is nil
 	err := DidChangeConfiguration(req, params)
 	require.NoError(t, err)
 }
 
 func TestDidChangeConfiguration_PublishesDiagnosticsForOpenDocs(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
-	ctx.SetGLSPContext(glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
+	ctx.SetServerCtx(context.Background())
 
 	// Open a document
 	_ = ctx.DocumentManager().DidOpen("file:///workspace/test.css", "css", 1, ".test { color: red; }")
 
 	// Track PublishDiagnostics calls
 	publishedURIs := []string{}
-	ctx.PublishDiagnosticsFunc = func(context *glsp.Context, uri string) error {
+	ctx.PublishDiagnosticsFunc = func(_ context.Context, uri string) error {
 		publishedURIs = append(publishedURIs, uri)
 		return nil
 	}
@@ -153,7 +156,7 @@ func TestDidChangeConfiguration_PublishesDiagnosticsForOpenDocs(t *testing.T) {
 	}
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
 	err := DidChangeConfiguration(req, params)
@@ -166,26 +169,14 @@ func TestDidChangeConfiguration_PublishesDiagnosticsForOpenDocs(t *testing.T) {
 
 func TestDidChangeConfiguration_SkipsDiagnosticsWithPullModel(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
+	req := types.NewRequestContext(ctx, context.Background())
 
-	// Track refresh notification
-	var refreshMethod string
-	glspCtx := &glsp.Context{
-		Notify: func(method string, params any) {
-			refreshMethod = method
-		},
-	}
-	req := types.NewRequestContext(ctx, glspCtx)
-	ctx.SetGLSPContext(glspCtx)
-
-	// Enable pull diagnostics
 	ctx.SetUsePullDiagnostics(true)
 
-	// Open a document
 	_ = ctx.DocumentManager().DidOpen("file:///workspace/test.css", "css", 1, ".test { color: red; }")
 
-	// Track PublishDiagnostics calls
 	publishCalled := false
-	ctx.PublishDiagnosticsFunc = func(context *glsp.Context, uri string) error {
+	ctx.PublishDiagnosticsFunc = func(_ context.Context, uri string) error {
 		publishCalled = true
 		return nil
 	}
@@ -197,22 +188,19 @@ func TestDidChangeConfiguration_SkipsDiagnosticsWithPullModel(t *testing.T) {
 	}
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
 	err := DidChangeConfiguration(req, params)
 	require.NoError(t, err)
 
-	// Should NOT have published diagnostics
 	assert.False(t, publishCalled, "Should not publish diagnostics with pull model")
-	// Should have sent workspace/diagnostic/refresh
-	assert.Equal(t, protocol.MethodWorkspaceDiagnosticRefresh, refreshMethod)
+	assert.True(t, ctx.NotifyDiagnosticRefreshCalled, "Should have sent diagnostic refresh")
 }
 
 func TestDidChangeConfiguration_WithGroupMarkers(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	settings := map[string]any{
 		"designTokensLanguageServer": map[string]any{
@@ -221,7 +209,7 @@ func TestDidChangeConfiguration_WithGroupMarkers(t *testing.T) {
 	}
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
 	err := DidChangeConfiguration(req, params)
@@ -375,14 +363,13 @@ func TestParseConfiguration_AsimonimTakesPrecedenceOverLegacy(t *testing.T) {
 
 func TestDidChangeConfiguration_WithAsimonimNamespace(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
-	ctx.SetGLSPContext(glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
+	ctx.SetServerCtx(context.Background())
 
 	settings := loadConfigFixture(t, "asimonim-namespace.json")
 
 	params := &protocol.DidChangeConfigurationParams{
-		Settings: settings,
+		Settings: mustMarshal(t, settings),
 	}
 
 	err := DidChangeConfiguration(req, params)

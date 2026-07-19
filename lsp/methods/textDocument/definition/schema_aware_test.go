@@ -8,9 +8,10 @@ import (
 	"bennypowers.dev/asimonim/lsp/methods/textDocument/definition"
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 func TestDefinition_Draft_CurlyBraceReference(t *testing.T) {
@@ -50,7 +51,7 @@ func TestDefinition_Draft_CurlyBraceReference(t *testing.T) {
 	params := &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{
-				URI: "file:///test.json",
+				URI: uri.URI("file:///test.json"),
 			},
 			// Position in the middle of "{color.primary}" on line 9
 			Position: protocol.Position{Line: 9, Character: 20},
@@ -61,8 +62,8 @@ func TestDefinition_Draft_CurlyBraceReference(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should return location pointing to the definition of color.primary (line 3)
-	locations, ok := result.([]protocol.Location)
-	require.True(t, ok, "Result should be []protocol.Location")
+	locations, ok := result.(protocol.LocationSlice)
+	require.True(t, ok, "Result should be protocol.LocationSlice")
 	assert.NotEmpty(t, locations, "Should find definition location")
 
 	if len(locations) > 0 {
@@ -111,7 +112,7 @@ func TestDefinition_2025_JSONPointerReference(t *testing.T) {
 	params := &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{
-				URI: "file:///test.json",
+				URI: uri.URI("file:///test.json"),
 			},
 			// Position in the JSON Pointer path on line 12
 			Position: protocol.Position{Line: 12, Character: 20},
@@ -122,8 +123,8 @@ func TestDefinition_2025_JSONPointerReference(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should return location pointing to the definition of color/primary (line 3)
-	locations, ok := result.([]protocol.Location)
-	require.True(t, ok, "Result should be []protocol.Location")
+	locations, ok := result.(protocol.LocationSlice)
+	require.True(t, ok, "Result should be protocol.LocationSlice")
 	assert.NotEmpty(t, locations, "Should find definition location for JSON Pointer")
 
 	if len(locations) > 0 {
@@ -154,7 +155,7 @@ func TestDefinition_TokenFile_UnknownToken(t *testing.T) {
 	params := &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{
-				URI: "file:///test.json",
+				URI: uri.URI("file:///test.json"),
 			},
 			Position: protocol.Position{Line: 3, Character: 20},
 		},
@@ -192,7 +193,7 @@ func TestDefinition_TokenFile_TokenWithoutDefinitionURI(t *testing.T) {
 	params := &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{
-				URI: "file:///test.json",
+				URI: uri.URI("file:///test.json"),
 			},
 			Position: protocol.Position{Line: 3, Character: 20},
 		},
@@ -218,7 +219,7 @@ func TestDefinition_TokenFile_CursorBeyondLastLine(t *testing.T) {
 	params := &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{
-				URI: "file:///test.json",
+				URI: uri.URI("file:///test.json"),
 			},
 			// Line 99 is way beyond the document
 			Position: protocol.Position{Line: 99, Character: 0},
@@ -254,7 +255,7 @@ func TestDefinition_TokenFile_CRLFLineEndings(t *testing.T) {
 	params := &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{
-				URI: "file:///test.json",
+				URI: uri.URI("file:///test.json"),
 			},
 			// Position in the middle of "{color.primary}" on line 3 (after CRLF normalization)
 			Position: protocol.Position{Line: 3, Character: 20},
@@ -265,8 +266,8 @@ func TestDefinition_TokenFile_CRLFLineEndings(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should find the definition despite CRLF line endings
-	locations, ok := result.([]protocol.Location)
-	require.True(t, ok, "Result should be []protocol.Location")
+	locations, ok := result.(protocol.LocationSlice)
+	require.True(t, ok, "Result should be protocol.LocationSlice")
 	assert.NotEmpty(t, locations, "Should find definition with CRLF line endings")
 }
 
@@ -305,7 +306,7 @@ func TestDefinition_TokenFile_CursorOnNonReferenceLine(t *testing.T) {
 	params := &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{
-				URI: "file:///test.json",
+				URI: uri.URI("file:///test.json"),
 			},
 			Position: protocol.Position{Line: 4, Character: 20},
 		},
@@ -353,7 +354,7 @@ func TestDefinition_TokenFile_GetLineTextFromDocument(t *testing.T) {
 	params := &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{
-				URI: "file:///tokens.json",
+				URI: uri.URI("file:///tokens.json"),
 			},
 			Position: protocol.Position{Line: 7, Character: 20},
 		},
@@ -362,8 +363,8 @@ func TestDefinition_TokenFile_GetLineTextFromDocument(t *testing.T) {
 	result, err := definition.Definition(req, params)
 	require.NoError(t, err)
 
-	locations, ok := result.([]protocol.Location)
-	require.True(t, ok, "Result should be []protocol.Location")
+	locations, ok := result.(protocol.LocationSlice)
+	require.True(t, ok, "Result should be protocol.LocationSlice")
 	require.Len(t, locations, 1)
 
 	// getLineText should have retrieved the line from the document manager
@@ -403,7 +404,7 @@ func TestDefinition_TokenFile_GetLineTextOutOfBounds(t *testing.T) {
 	params := &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{
-				URI: "file:///tokens.json",
+				URI: uri.URI("file:///tokens.json"),
 			},
 			Position: protocol.Position{Line: 3, Character: 20},
 		},
@@ -413,7 +414,7 @@ func TestDefinition_TokenFile_GetLineTextOutOfBounds(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should fall back to zero-width range when line text is empty
-	locations, ok := result.([]protocol.Location)
+	locations, ok := result.(protocol.LocationSlice)
 	require.True(t, ok)
 	require.Len(t, locations, 1)
 	assert.Equal(t, uint32(999), locations[0].Range.Start.Line)
@@ -453,7 +454,7 @@ func TestDefinition_TokenFile_GetLineTextFromDisk(t *testing.T) {
 	params := &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{
-				URI: "file:///source.json",
+				URI: uri.URI("file:///source.json"),
 			},
 			Position: protocol.Position{Line: 3, Character: 20},
 		},
@@ -463,7 +464,7 @@ func TestDefinition_TokenFile_GetLineTextFromDisk(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should fall back to zero-width range when file can't be read from disk
-	locations, ok := result.([]protocol.Location)
+	locations, ok := result.(protocol.LocationSlice)
 	require.True(t, ok)
 	require.Len(t, locations, 1)
 	assert.Equal(t, "file:///nonexistent-definition-file.json", string(locations[0].URI))
@@ -497,7 +498,7 @@ func TestDefinition_NoReferenceCursor(t *testing.T) {
 	params := &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{
-				URI: "file:///test.json",
+				URI: uri.URI("file:///test.json"),
 			},
 			// Position on "$type" keyword (not a reference)
 			Position: protocol.Position{Line: 4, Character: 10},

@@ -67,8 +67,8 @@ patch minor major:
 v%:
 	@:
 
-# Shared Windows cross-compilation image (from go-release-workflows)
-SHARED_WINDOWS_CC_IMAGE := asimonim-shared-windows-cc
+# Windows cross-compilation image (CI provides WINDOWS_IMAGE via go-release-workflows)
+WINDOWS_IMAGE ?= grw-windows-cross
 
 # Cross-compilation targets (CGO_ENABLED=1 required for tree-sitter)
 linux-x64:
@@ -100,16 +100,7 @@ darwin-arm64:
 		go build $(GO_BUILD_FLAGS) \
 		-o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 .
 
-build-shared-windows-image:
-	@if ! podman image exists $(SHARED_WINDOWS_CC_IMAGE); then \
-		echo "Building shared Windows cross-compilation image..."; \
-		curl -fsSL https://raw.githubusercontent.com/bennypowers/go-release-workflows/main/.github/actions/setup-windows-build/Containerfile \
-			| podman build -t $(SHARED_WINDOWS_CC_IMAGE) -f - .; \
-	else \
-		echo "Image $(SHARED_WINDOWS_CC_IMAGE) already exists, skipping build."; \
-	fi
-
-win32-x64: build-shared-windows-image
+win32-x64:
 	@mkdir -p $(DIST_DIR)
 	podman run --rm \
 		-v $(PWD):/src:Z \
@@ -119,11 +110,11 @@ win32-x64: build-shared-windows-image
 		-e CGO_ENABLED=1 \
 		-e CC=x86_64-w64-mingw32-gcc \
 		-e CXX=x86_64-w64-mingw32-g++ \
-		$(SHARED_WINDOWS_CC_IMAGE) \
+		$(WINDOWS_IMAGE) \
 		go build $(GO_BUILD_FLAGS) \
 			-o $(DIST_DIR)/$(BINARY_NAME)-win32-x64.exe .
 
-win32-arm64: build-shared-windows-image
+win32-arm64:
 	@mkdir -p $(DIST_DIR)
 	podman run --rm \
 		-v $(PWD):/src:Z \
@@ -133,6 +124,6 @@ win32-arm64: build-shared-windows-image
 		-e CGO_ENABLED=1 \
 		-e CC=aarch64-w64-mingw32-gcc \
 		-e CXX=aarch64-w64-mingw32-g++ \
-		$(SHARED_WINDOWS_CC_IMAGE) \
+		$(WINDOWS_IMAGE) \
 		go build $(GO_BUILD_FLAGS) \
 			-o $(DIST_DIR)/$(BINARY_NAME)-win32-arm64.exe .

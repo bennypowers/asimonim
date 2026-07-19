@@ -13,7 +13,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/parser/css"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // hoverData wraps a Token with additional structured fields for hover rendering.
@@ -212,7 +212,7 @@ func findInnermostVariable(position protocol.Position, variables []*css.Variable
 // This is a common helper to avoid duplication across different hover scenarios.
 func createHoverResponse(content string, cssRange css.Range, format protocol.MarkupKind) *protocol.Hover {
 	return &protocol.Hover{
-		Contents: protocol.MarkupContent{
+		Contents: &protocol.MarkupContent{
 			Kind:  format,
 			Value: content,
 		},
@@ -274,7 +274,7 @@ func processVariableHover(req *types.RequestContext, variable *css.Variable) (*p
 // createTokenRefHoverResponse creates a protocol.Hover response for token references.
 func createTokenRefHoverResponse(content string, ref *common.TokenReferenceWithRange, format protocol.MarkupKind) *protocol.Hover {
 	return &protocol.Hover{
-		Contents: protocol.MarkupContent{
+		Contents: &protocol.MarkupContent{
 			Kind:  format,
 			Value: content,
 		},
@@ -335,7 +335,7 @@ func Hover(req *types.RequestContext, params *protocol.HoverParams) (*protocol.H
 	log.Info("Hover requested: %s at line %d, char %d", uri, position.Line, position.Character)
 
 	// Get document
-	doc := req.Server.Document(uri)
+	doc := req.Server.Document(string(uri))
 	if doc == nil {
 		return nil, nil
 	}

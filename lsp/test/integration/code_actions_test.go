@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"strings"
 	"testing"
 
 	codeaction "bennypowers.dev/asimonim/lsp/methods/textDocument/codeAction"
@@ -9,8 +10,21 @@ import (
 	"bennypowers.dev/asimonim/lsp/test/integration/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
+
+// extractCodeActions extracts []*protocol.CodeAction from []protocol.CommandOrCodeAction
+func extractCodeActions(t *testing.T, result []protocol.CommandOrCodeAction) []*protocol.CodeAction {
+	t.Helper()
+	actions := make([]*protocol.CodeAction, len(result))
+	for i, item := range result {
+		ca, ok := item.(*protocol.CodeAction)
+		require.True(t, ok, "expected *protocol.CodeAction, got %T", item)
+		actions[i] = ca
+	}
+	return actions
+}
 
 // TestCodeActionFixIncorrectFallback tests code action for fixing incorrect fallback
 func TestCodeActionFixIncorrectFallback(t *testing.T) {
@@ -28,7 +42,7 @@ func TestCodeActionFixIncorrectFallback(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	result, err := codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: diagnostics[0].Range,
 		Context: protocol.CodeActionContext{
@@ -38,17 +52,16 @@ func TestCodeActionFixIncorrectFallback(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
+	actions := extractCodeActions(t, result)
 
 	// Should have at least one action to fix the fallback
 	assert.GreaterOrEqual(t, len(actions), 1)
 
 	// Find the fix fallback action
 	var fixAction *protocol.CodeAction
-	for i := range actions {
-		if actions[i].Title == "Fix fallback value to '#0000ff'" {
-			fixAction = &actions[i]
+	for _, action := range actions {
+		if action.Title == "Fix fallback value to '#0000ff'" {
+			fixAction = action
 			break
 		}
 	}
@@ -70,7 +83,7 @@ func TestCodeActionFixIncorrectFallback(t *testing.T) {
 	require.NotNil(t, fixAction.Edit)
 	require.NotNil(t, fixAction.Edit.Changes)
 
-	edits := fixAction.Edit.Changes["file:///test.css"]
+	edits := fixAction.Edit.Changes[uri.URI("file:///test.css")]
 	require.Len(t, edits, 1)
 
 	// Should replace with correct fallback
@@ -88,7 +101,7 @@ func TestCodeActionAddFallback(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	result, err := codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 2, Character: 9},
@@ -101,17 +114,16 @@ func TestCodeActionAddFallback(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
+	actions := extractCodeActions(t, result)
 
 	// Should have action to add fallback
 	assert.GreaterOrEqual(t, len(actions), 1)
 
 	// Find the add fallback action
 	var addAction *protocol.CodeAction
-	for i := range actions {
-		if actions[i].Title == "Add fallback value '#0000ff'" {
-			addAction = &actions[i]
+	for _, action := range actions {
+		if action.Title == "Add fallback value '#0000ff'" {
+			addAction = action
 			break
 		}
 	}
@@ -122,7 +134,7 @@ func TestCodeActionAddFallback(t *testing.T) {
 	require.NotNil(t, addAction.Edit)
 	require.NotNil(t, addAction.Edit.Changes)
 
-	edits := addAction.Edit.Changes["file:///test.css"]
+	edits := addAction.Edit.Changes[uri.URI("file:///test.css")]
 	require.Len(t, edits, 1)
 
 	// Should add fallback
@@ -145,7 +157,7 @@ func TestCodeActionDeprecatedToken(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	result, err := codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: diagnostics[0].Range,
 		Context: protocol.CodeActionContext{
@@ -155,8 +167,7 @@ func TestCodeActionDeprecatedToken(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
+	actions := extractCodeActions(t, result)
 
 	// Should have at least 2 actions: replace with recommended + replace with literal
 	assert.GreaterOrEqual(t, len(actions), 2)
@@ -164,12 +175,12 @@ func TestCodeActionDeprecatedToken(t *testing.T) {
 	// Find the replace action
 	var replaceAction *protocol.CodeAction
 	var literalAction *protocol.CodeAction
-	for i := range actions {
-		if actions[i].Title == "Replace with '--color-primary'" {
-			replaceAction = &actions[i]
+	for _, action := range actions {
+		if action.Title == "Replace with '--color-primary'" {
+			replaceAction = action
 		}
-		if actions[i].Title == "Replace with literal value '#ff0000'" {
-			literalAction = &actions[i]
+		if action.Title == "Replace with literal value '#ff0000'" {
+			literalAction = action
 		}
 	}
 
@@ -186,13 +197,13 @@ func TestCodeActionDeprecatedToken(t *testing.T) {
 	require.NotNil(t, replaceAction.Edit)
 	require.NotNil(t, replaceAction.Edit.Changes)
 
-	edits := replaceAction.Edit.Changes["file:///test.css"]
+	edits := replaceAction.Edit.Changes[uri.URI("file:///test.css")]
 	require.Len(t, edits, 1)
 	assert.Contains(t, edits[0].NewText, "var(--color-primary)")
 
 	// Check the literal action
 	require.NotNil(t, literalAction.Edit)
-	literalEdits := literalAction.Edit.Changes["file:///test.css"]
+	literalEdits := literalAction.Edit.Changes[uri.URI("file:///test.css")]
 	require.Len(t, literalEdits, 1)
 	assert.Equal(t, "#ff0000", literalEdits[0].NewText)
 }
@@ -207,7 +218,7 @@ func TestCodeActionNoActions(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	result, err := codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 2, Character: 0},
@@ -222,14 +233,8 @@ func TestCodeActionNoActions(t *testing.T) {
 
 	// Should have no actions (or only add fallback suggestions)
 	// since the fallback is already correct
-	var actions []protocol.CodeAction
-	if result != nil {
-		var ok bool
-		actions, ok = result.([]protocol.CodeAction)
-		require.True(t, ok)
-	}
-
-	if len(actions) > 0 {
+	if len(result) > 0 {
+		actions := extractCodeActions(t, result)
 		for _, action := range actions {
 			// Should not have any "Fix" actions, only suggestions
 			assert.NotContains(t, action.Title, "Fix")
@@ -246,8 +251,8 @@ func TestCodeActionResolve(t *testing.T) {
 		Title: "Test action",
 		Kind:  &kind,
 		Edit: &protocol.WorkspaceEdit{
-			Changes: map[string][]protocol.TextEdit{
-				"file:///test.css": {
+			Changes: map[uri.URI][]protocol.TextEdit{
+				uri.URI("file:///test.css"): {
 					{
 						Range: protocol.Range{
 							Start: protocol.Position{Line: 0, Character: 0},
@@ -281,7 +286,7 @@ func TestCodeAction_CompositeTypes(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	result, err := codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 3, Character: 10},
@@ -293,22 +298,20 @@ func TestCodeAction_CompositeTypes(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should not crash, but should not offer toggle action for composite types
-	if result != nil {
-		actions, ok := result.([]protocol.CodeAction)
-		if ok {
-			for _, action := range actions {
-				assert.NotEqual(t, "Toggle design token fallback value", action.Title,
-					"Should not offer toggle action for composite type (border)")
-				assert.NotEqual(t, "Add fallback value '1px solid #000000'", action.Title,
-					"Should not offer add fallback for unsafe composite type")
-			}
+	if len(result) > 0 {
+		actions := extractCodeActions(t, result)
+		for _, action := range actions {
+			assert.NotEqual(t, "Toggle design token fallback value", action.Title,
+				"Should not offer toggle action for composite type (border)")
+			assert.NotEqual(t, "Add fallback value '1px solid #000000'", action.Title,
+				"Should not offer add fallback for unsafe composite type")
 		}
 	}
 
 	// Also test shadow var call (line 4, character 14)
 	result, err = codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 4, Character: 14},
@@ -319,13 +322,11 @@ func TestCodeAction_CompositeTypes(t *testing.T) {
 
 	require.NoError(t, err)
 
-	if result != nil {
-		actions, ok := result.([]protocol.CodeAction)
-		if ok {
-			for _, action := range actions {
-				assert.NotEqual(t, "Toggle design token fallback value", action.Title,
-					"Should not offer toggle action for composite type (shadow)")
-			}
+	if len(result) > 0 {
+		actions := extractCodeActions(t, result)
+		for _, action := range actions {
+			assert.NotEqual(t, "Toggle design token fallback value", action.Title,
+				"Should not offer toggle action for composite type (shadow)")
 		}
 	}
 }
@@ -341,7 +342,7 @@ func TestCodeAction_FontFamilyFallback(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	result, err := codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 4, Character: 17},
@@ -353,15 +354,14 @@ func TestCodeAction_FontFamilyFallback(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
+	actions := extractCodeActions(t, result)
 
 	// Find toggle or add fallback action
 	var toggleAction *protocol.CodeAction
-	for i := range actions {
-		if actions[i].Title == "Toggle design token fallback value" ||
-			actions[i].Title == "Add fallback value '\"Helvetica Neue\"'" {
-			toggleAction = &actions[i]
+	for _, action := range actions {
+		if action.Title == "Toggle design token fallback value" ||
+			action.Title == "Add fallback value '\"Helvetica Neue\"'" {
+			toggleAction = action
 			break
 		}
 	}
@@ -371,7 +371,7 @@ func TestCodeAction_FontFamilyFallback(t *testing.T) {
 
 	// If it's an add action, check that the font name is quoted
 	if toggleAction.Edit != nil && toggleAction.Edit.Changes != nil {
-		edits := toggleAction.Edit.Changes["file:///test.css"]
+		edits := toggleAction.Edit.Changes[uri.URI("file:///test.css")]
 		if len(edits) > 0 {
 			// Should contain quoted font name
 			assert.Contains(t, edits[0].NewText, "\"Helvetica Neue\"",
@@ -382,7 +382,7 @@ func TestCodeAction_FontFamilyFallback(t *testing.T) {
 	// Test already quoted font (line 24)
 	_, err = codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 24, Character: 17},
@@ -395,7 +395,7 @@ func TestCodeAction_FontFamilyFallback(t *testing.T) {
 	// Test comma-separated font list (line 29)
 	_, err = codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 29, Character: 17},
@@ -408,7 +408,7 @@ func TestCodeAction_FontFamilyFallback(t *testing.T) {
 	// Test quoted list (line 34)
 	_, err = codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 34, Character: 17},
@@ -434,7 +434,7 @@ func TestCodeAction_DeprecatedMessagePatterns(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	result, err := codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 4, Character: 9},
@@ -448,14 +448,13 @@ func TestCodeAction_DeprecatedMessagePatterns(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
+	actions := extractCodeActions(t, result)
 
 	// Should offer replacement with --color-primary
 	var replacementAction *protocol.CodeAction
-	for i := range actions {
-		if actions[i].Title == "Replace with '--color-primary'" {
-			replacementAction = &actions[i]
+	for _, action := range actions {
+		if action.Title == "Replace with '--color-primary'" {
+			replacementAction = action
 			break
 		}
 	}
@@ -465,7 +464,7 @@ func TestCodeAction_DeprecatedMessagePatterns(t *testing.T) {
 	// Test "Replaced by X for better consistency" pattern (line 9, character 10)
 	result, err = codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 9, Character: 10},
@@ -479,14 +478,13 @@ func TestCodeAction_DeprecatedMessagePatterns(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	actions, ok = result.([]protocol.CodeAction)
-	require.True(t, ok)
+	actions = extractCodeActions(t, result)
 
 	// Should offer replacement with --spacing-small (extracted from "Replaced by spacing.small for better consistency")
 	replacementAction = nil
-	for i := range actions {
-		if actions[i].Title == "Replace with '--spacing-small'" {
-			replacementAction = &actions[i]
+	for _, action := range actions {
+		if action.Title == "Replace with '--spacing-small'" {
+			replacementAction = action
 			break
 		}
 	}
@@ -496,7 +494,7 @@ func TestCodeAction_DeprecatedMessagePatterns(t *testing.T) {
 	// Test no suggestion pattern (line 14, character 13) - should only offer literal value
 	result, err = codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 14, Character: 13},
@@ -510,17 +508,16 @@ func TestCodeAction_DeprecatedMessagePatterns(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	actions, ok = result.([]protocol.CodeAction)
-	require.True(t, ok)
+	actions = extractCodeActions(t, result)
 
 	// Should offer literal value but NOT a token replacement
 	var literalAction *protocol.CodeAction
 	hasReplacementAction := false
-	for i := range actions {
-		if actions[i].Title == "Replace with literal value '24px'" {
-			literalAction = &actions[i]
+	for _, action := range actions {
+		if action.Title == "Replace with literal value '24px'" {
+			literalAction = action
 		}
-		if actions[i].Title == "Replace with '--" {
+		if strings.HasPrefix(action.Title, "Replace with '--") {
 			hasReplacementAction = true
 		}
 	}
@@ -531,7 +528,7 @@ func TestCodeAction_DeprecatedMessagePatterns(t *testing.T) {
 	// Test deprecated token with fallback (line 24, character 9) - replacement should preserve fallback
 	result, err = codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 24, Character: 9},
@@ -545,14 +542,13 @@ func TestCodeAction_DeprecatedMessagePatterns(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	actions, ok = result.([]protocol.CodeAction)
-	require.True(t, ok)
+	actions = extractCodeActions(t, result)
 
 	// Should offer replacement with --color-primary AND preserve the fallback
 	var replacementWithFallback *protocol.CodeAction
-	for i := range actions {
-		if actions[i].Title == "Replace with '--color-primary'" {
-			replacementWithFallback = &actions[i]
+	for _, action := range actions {
+		if action.Title == "Replace with '--color-primary'" {
+			replacementWithFallback = action
 			break
 		}
 	}
@@ -561,7 +557,7 @@ func TestCodeAction_DeprecatedMessagePatterns(t *testing.T) {
 
 	// Check that the replacement includes fallback
 	if replacementWithFallback.Edit != nil && replacementWithFallback.Edit.Changes != nil {
-		edits := replacementWithFallback.Edit.Changes["file:///test.css"]
+		edits := replacementWithFallback.Edit.Changes[uri.URI("file:///test.css")]
 		if len(edits) > 0 {
 			// Should contain both the new var and a fallback
 			assert.Contains(t, edits[0].NewText, "var(--color-primary, ",
@@ -572,7 +568,7 @@ func TestCodeAction_DeprecatedMessagePatterns(t *testing.T) {
 	// Test "Replaced by X" with no suffix text (line 30, character 17) - tests line 119 coverage
 	result, err = codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 29, Character: 17},
@@ -586,14 +582,13 @@ func TestCodeAction_DeprecatedMessagePatterns(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	actions, ok = result.([]protocol.CodeAction)
-	require.True(t, ok)
+	actions = extractCodeActions(t, result)
 
 	// Should offer replacement with --lineHeight-normal (extracted from "Replaced by lineHeight.normal")
 	replacementAction = nil
-	for i := range actions {
-		if actions[i].Title == "Replace with '--lineHeight-normal'" {
-			replacementAction = &actions[i]
+	for _, action := range actions {
+		if action.Title == "Replace with '--lineHeight-normal'" {
+			replacementAction = action
 			break
 		}
 	}
@@ -613,7 +608,7 @@ func TestCodeAction_FallbackTypes(t *testing.T) {
 	// Test color without fallback (line 4, character 15) - should suggest adding
 	result, err := codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 4, Character: 15},
@@ -625,14 +620,13 @@ func TestCodeAction_FallbackTypes(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
+	actions := extractCodeActions(t, result)
 
 	// Should have add fallback action for color
 	var addAction *protocol.CodeAction
-	for i := range actions {
-		if actions[i].Title == "Add fallback value '#0000ff'" {
-			addAction = &actions[i]
+	for _, action := range actions {
+		if action.Title == "Add fallback value '#0000ff'" {
+			addAction = action
 			break
 		}
 	}
@@ -641,7 +635,7 @@ func TestCodeAction_FallbackTypes(t *testing.T) {
 	// Test dimension without fallback (line 7, character 16) - should suggest adding
 	result, err = codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 7, Character: 16},
@@ -653,14 +647,13 @@ func TestCodeAction_FallbackTypes(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	actions, ok = result.([]protocol.CodeAction)
-	require.True(t, ok)
+	actions = extractCodeActions(t, result)
 
 	// Should have add fallback action for dimension
 	addAction = nil
-	for i := range actions {
-		if actions[i].Title == "Add fallback value '8px'" {
-			addAction = &actions[i]
+	for _, action := range actions {
+		if action.Title == "Add fallback value '8px'" {
+			addAction = action
 			break
 		}
 	}
@@ -683,7 +676,7 @@ func TestCodeAction_FallbackTypes(t *testing.T) {
 	if incorrectDiag != nil {
 		result, err = codeaction.CodeAction(req, &protocol.CodeActionParams{
 			TextDocument: protocol.TextDocumentIdentifier{
-				URI: "file:///test.css",
+				URI: uri.URI("file:///test.css"),
 			},
 			Range: incorrectDiag.Range,
 			Context: protocol.CodeActionContext{
@@ -694,14 +687,13 @@ func TestCodeAction_FallbackTypes(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		actions, ok = result.([]protocol.CodeAction)
-		require.True(t, ok)
+		actions = extractCodeActions(t, result)
 
 		// Should have fix fallback action
 		var fixAction *protocol.CodeAction
-		for i := range actions {
-			if actions[i].Title == "Fix fallback value to '#0000ff'" {
-				fixAction = &actions[i]
+		for _, action := range actions {
+			if action.Title == "Fix fallback value to '#0000ff'" {
+				fixAction = action
 				break
 			}
 		}
@@ -721,7 +713,7 @@ func TestCodeAction_TokenTypeVariations(t *testing.T) {
 	// Test rgb color (line 4, character 12)
 	result, err := codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 4, Character: 12},
@@ -735,7 +727,7 @@ func TestCodeAction_TokenTypeVariations(t *testing.T) {
 	// Test rem dimension (line 11, character 16)
 	result, err = codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 11, Character: 16},
@@ -749,7 +741,7 @@ func TestCodeAction_TokenTypeVariations(t *testing.T) {
 	// Test number opacity (line 18, character 14)
 	result, err = codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 18, Character: 14},
@@ -763,7 +755,7 @@ func TestCodeAction_TokenTypeVariations(t *testing.T) {
 	// Test font-weight keyword (line 24, character: 18)
 	result, err = codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 24, Character: 18},
@@ -786,7 +778,7 @@ func TestCodeAction_MalformedCSS(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	result, err := codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 2, Character: 0},
@@ -799,7 +791,7 @@ func TestCodeAction_MalformedCSS(t *testing.T) {
 	// It may parse partially and return some actions or no actions
 	require.NoError(t, err, "Parser should handle malformed CSS gracefully")
 	// Result may be nil or contain partial actions - both are acceptable
-	t.Logf("Parser handled malformed CSS, returned %v", result != nil)
+	t.Logf("Parser handled malformed CSS, returned %v", len(result) > 0)
 }
 
 // TestCodeAction_UnknownToken tests that code actions for unknown tokens don't crash
@@ -811,7 +803,7 @@ func TestCodeAction_UnknownToken(t *testing.T) {
 	req := types.NewRequestContext(server, nil)
 	result, err := codeaction.CodeAction(req, &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
-			URI: "file:///test.css",
+			URI: uri.URI("file:///test.css"),
 		},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 3, Character: 9},
@@ -823,9 +815,8 @@ func TestCodeAction_UnknownToken(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should have no actions or only toggle action (no deprecated/fix actions for unknown tokens)
-	if result != nil {
-		actions, ok := result.([]protocol.CodeAction)
-		require.True(t, ok)
+	if len(result) > 0 {
+		actions := extractCodeActions(t, result)
 		// Should not have any fix/deprecated/add fallback actions for unknown tokens
 		for _, action := range actions {
 			assert.NotContains(t, action.Title, "Replace with")

@@ -5,13 +5,13 @@ import (
 
 	"bennypowers.dev/asimonim/lsp/internal/uriutil"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // Initialize handles the LSP initialize request
-func Initialize(req *types.RequestContext, params *protocol.InitializeParams) (any, error) {
+func Initialize(req *types.RequestContext, params *protocol.InitializeParams) (*protocol.InitializeResult, error) {
 	clientName := "unknown"
-	if params.ClientInfo != nil {
+	if params.ClientInfo.Name != "" {
 		clientName = params.ClientInfo.Name
 	}
 
@@ -39,57 +39,58 @@ func Initialize(req *types.RequestContext, params *protocol.InitializeParams) (a
 
 	// Store the workspace root
 	if params.RootURI != nil {
-		req.Server.SetRootURI(*params.RootURI)
+		rootURIStr := string(*params.RootURI)
+		req.Server.SetRootURI(rootURIStr)
 		// Convert URI to file path
-		req.Server.SetRootPath(uriutil.URIToPath(*params.RootURI))
+		req.Server.SetRootPath(uriutil.URIToPath(rootURIStr))
 		log.Info("Workspace root: %s", req.Server.RootPath())
-	} else if params.RootPath != nil {
-		req.Server.SetRootPath(*params.RootPath)
-		req.Server.SetRootURI(uriutil.PathToURI(*params.RootPath))
+	} else if rootPath, ok := params.RootPath.Get(); ok {
+		req.Server.SetRootPath(rootPath)
+		req.Server.SetRootURI(uriutil.PathToURI(rootPath))
 		log.Info("Workspace root (from rootPath): %s", req.Server.RootPath())
 	}
 
 	syncKind := protocol.TextDocumentSyncKindIncremental
 	capabilities := protocol.ServerCapabilities{}
-	capabilities.TextDocumentSync = protocol.TextDocumentSyncOptions{
+	capabilities.TextDocumentSync = &protocol.TextDocumentSyncOptions{
 		OpenClose: boolPtr(true),
 		Change:    &syncKind,
 	}
-	capabilities.HoverProvider = true
+	capabilities.HoverProvider = protocol.Boolean(true)
 	capabilities.CompletionProvider = &protocol.CompletionOptions{
 		TriggerCharacters: []string{"-"},
 		ResolveProvider:   boolPtr(true),
 	}
-	capabilities.DefinitionProvider = true
-	capabilities.ReferencesProvider = true
-	capabilities.CodeActionProvider = protocol.CodeActionOptions{
+	capabilities.DefinitionProvider = protocol.Boolean(true)
+	capabilities.ReferencesProvider = protocol.Boolean(true)
+	capabilities.CodeActionProvider = &protocol.CodeActionOptions{
 		ResolveProvider: boolPtr(true),
 	}
-	capabilities.ColorProvider = true
-	capabilities.InlayHintProvider = true
-	capabilities.SemanticTokensProvider = protocol.SemanticTokensOptions{
+	capabilities.ColorProvider = protocol.Boolean(true)
+	capabilities.InlayHintProvider = protocol.Boolean(true)
+	capabilities.SemanticTokensProvider = &protocol.SemanticTokensOptions{
 		Legend: protocol.SemanticTokensLegend{
 			TokenTypes:     []string{"class", "property"},
 			TokenModifiers: []string{},
 		},
-		Full: protocol.SemanticDelta{
+		Full: &protocol.SemanticTokensFullDelta{
 			Delta: boolPtr(true),
 		},
 	}
 
 	if supportsPullDiagnostics {
-		capabilities.DiagnosticProvider = protocol.DiagnosticOptions{
+		capabilities.DiagnosticProvider = &protocol.DiagnosticOptions{
 			Identifier:            strPtr("asimonim"),
 			InterFileDependencies: false,
 			WorkspaceDiagnostics:  true,
 		}
 	}
 
-	return protocol.InitializeResult{
+	return &protocol.InitializeResult{
 		Capabilities: capabilities,
-		ServerInfo: &protocol.InitializeResultServerInfo{
+		ServerInfo: protocol.ServerInfo{
 			Name:    "design-tokens-language-server",
-			Version: strPtr(req.Server.Version()),
+			Version: protocol.NewOptional(req.Server.Version()),
 		},
 	}, nil
 }

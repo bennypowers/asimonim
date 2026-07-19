@@ -12,7 +12,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/tidwall/jsonc"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	lspuri "go.lsp.dev/uri"
 	"gopkg.in/yaml.v3"
 )
 
@@ -35,7 +36,7 @@ func handleCSSReferences(req *types.RequestContext, doc *documents.Document, pos
 
 			if token.DefinitionURI != "" {
 				location := protocol.Location{
-					URI: token.DefinitionURI,
+					URI: lspuri.URI(token.DefinitionURI),
 					Range: protocol.Range{
 						Start: protocol.Position{Line: token.Line, Character: token.Character},
 						End:   protocol.Position{Line: token.Line, Character: token.Character},
@@ -65,7 +66,7 @@ func isPositionInVarCall(pos protocol.Position, varCall *css.VarCall) bool {
 
 // validateTokenContext validates the basic request context and extracts the token at cursor.
 // Returns the token and tokenName, or (nil, "") if validation fails.
-func validateTokenContext(req *types.RequestContext, uri protocol.DocumentUri, position protocol.Position) (*tokens.Token, string) {
+func validateTokenContext(req *types.RequestContext, uri string, position protocol.Position) (*tokens.Token, string) {
 	// Get document
 	doc := req.Server.Document(uri)
 	if doc == nil {
@@ -73,7 +74,7 @@ func validateTokenContext(req *types.RequestContext, uri protocol.DocumentUri, p
 	}
 
 	// Only process files that should be treated as token files
-	if !req.Server.ShouldProcessAsTokenFile(string(uri)) {
+	if !req.Server.ShouldProcessAsTokenFile(uri) {
 		return nil, ""
 	}
 
@@ -127,7 +128,7 @@ func findCSSReferences(docs []*documents.Document, cssVarName string, locationMa
 
 		for _, r := range ranges {
 			if isValidCSSReference(docContent, r.End) {
-				loc := protocol.Location{URI: docURI, Range: r}
+				loc := protocol.Location{URI: lspuri.URI(docURI), Range: r}
 				key := fmt.Sprintf("%s:%d:%d", docURI, r.Start.Line, r.Start.Character)
 				locationMap[key] = loc
 			}
@@ -152,7 +153,7 @@ func findJSONReferences(docs []*documents.Document, tokenReference string, locat
 		ranges := findSubstringRanges(docContent, tokenReference)
 
 		for _, r := range ranges {
-			loc := protocol.Location{URI: docURI, Range: r}
+			loc := protocol.Location{URI: lspuri.URI(docURI), Range: r}
 			key := fmt.Sprintf("%s:%d:%d", docURI, r.Start.Line, r.Start.Character)
 			locationMap[key] = loc
 		}
@@ -173,7 +174,7 @@ func addDeclarationIfRequested(req *types.RequestContext, params *protocol.Refer
 
 	defRange := findTokenDefinitionRange(defDoc.Content(), token.Path, defDoc.LanguageID())
 	location := protocol.Location{
-		URI:   token.DefinitionURI,
+		URI:   lspuri.URI(token.DefinitionURI),
 		Range: defRange,
 	}
 	*locations = append(*locations, location)
@@ -183,7 +184,7 @@ func addDeclarationIfRequested(req *types.RequestContext, params *protocol.Refer
 // For CSS files: returns the token definition location
 // For JSON/YAML files: finds all references to the token at cursor
 func References(req *types.RequestContext, params *protocol.ReferenceParams) ([]protocol.Location, error) {
-	uri := params.TextDocument.URI
+	uri := string(params.TextDocument.URI)
 	position := params.Position
 
 	log.Info("References requested: %s at line %d, char %d", uri, position.Line, position.Character)

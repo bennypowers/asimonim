@@ -12,7 +12,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/test/integration/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 // TestFileWatching_TokenFileChange tests that changing a token file updates hover/diagnostics
@@ -49,7 +50,7 @@ func TestFileWatching_TokenFileChange(t *testing.T) {
 	require.NoError(t, err)
 
 	// Open CSS document
-	cssURI := "file://" + cssPath
+	cssURI := uri.File(cssPath)
 	req := types.NewRequestContext(server, nil)
 	err = textDocument.DidOpen(req, &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
@@ -72,7 +73,7 @@ func TestFileWatching_TokenFileChange(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, hover1)
 
-	content1, ok := hover1.Contents.(protocol.MarkupContent)
+	content1, ok := hover1.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content1.Value, "#ff0000", "Should show initial color value")
 	assert.Contains(t, content1.Value, "Initial primary color", "Should show initial description")
@@ -91,7 +92,7 @@ func TestFileWatching_TokenFileChange(t *testing.T) {
 	require.NoError(t, err)
 
 	// Simulate file change notification
-	tokensURI := "file://" + tokensPath
+	tokensURI := uri.File(tokensPath)
 	req = types.NewRequestContext(server, nil)
 	err = workspace.DidChangeWatchedFiles(req, &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
@@ -114,7 +115,7 @@ func TestFileWatching_TokenFileChange(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, hover2)
 
-	content2, ok := hover2.Contents.(protocol.MarkupContent)
+	content2, ok := hover2.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content2.Value, "#00ff00", "Should show updated color value")
 	assert.Contains(t, content2.Value, "Updated primary color", "Should show updated description")
@@ -149,7 +150,7 @@ func TestFileWatching_TokenFileDeleted(t *testing.T) {
 	err = server.LoadTokenFile(tokensPath, "")
 	require.NoError(t, err)
 
-	cssURI := "file://" + cssPath
+	cssURI := uri.File(cssPath)
 	req := types.NewRequestContext(server, nil)
 	err = textDocument.DidOpen(req, &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
@@ -177,7 +178,7 @@ func TestFileWatching_TokenFileDeleted(t *testing.T) {
 	require.NoError(t, err)
 
 	// Simulate file deletion notification
-	tokensURI := "file://" + tokensPath
+	tokensURI := uri.File(tokensPath)
 	req = types.NewRequestContext(server, nil)
 	err = workspace.DidChangeWatchedFiles(req, &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
@@ -200,7 +201,7 @@ func TestFileWatching_TokenFileDeleted(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, hover2)
 
-	content2, ok := hover2.Contents.(protocol.MarkupContent)
+	content2, ok := hover2.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content2.Value, "Unknown token", "Should show unknown token message")
 }
@@ -250,7 +251,7 @@ func TestFileWatching_MultipleTokenFiles(t *testing.T) {
 	err = server.LoadTokenFile(tokens2Path, "")
 	require.NoError(t, err)
 
-	cssURI := "file://" + cssPath
+	cssURI := uri.File(cssPath)
 	req := types.NewRequestContext(server, nil)
 	err = textDocument.DidOpen(req, &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
@@ -275,7 +276,7 @@ func TestFileWatching_MultipleTokenFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Simulate file change notification
-	tokens2URI := "file://" + tokens2Path
+	tokens2URI := uri.File(tokens2Path)
 	req = types.NewRequestContext(server, nil)
 	err = workspace.DidChangeWatchedFiles(req, &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
@@ -298,7 +299,7 @@ func TestFileWatching_MultipleTokenFiles(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	content, ok := result.Contents.(protocol.MarkupContent)
+	content, ok := result.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content.Value, "16px", "Should show updated spacing value")
 	assert.NotContains(t, content.Value, "8px", "Should not show old spacing value")
@@ -335,7 +336,7 @@ func TestFileWatching_NonTokenFileIgnored(t *testing.T) {
 	initialCount := server.TokenCount()
 
 	// Simulate change to non-token file
-	pkgURI := "file://" + pkgPath
+	pkgURI := uri.File(pkgPath)
 	req := types.NewRequestContext(server, nil)
 	err = workspace.DidChangeWatchedFiles(req, &protocol.DidChangeWatchedFilesParams{
 		Changes: []protocol.FileEvent{
@@ -384,7 +385,7 @@ func TestFileWatching_YmlExtension(t *testing.T) {
 			assert.Equal(t, 1, server.TokenCount(), "Should load token from .yml file")
 
 			// Simulate file change to .yml file
-			tokensURI := "file://" + tokensPath
+			tokensURI := uri.File(tokensPath)
 			req := types.NewRequestContext(server, nil)
 			err = workspace.DidChangeWatchedFiles(req, &protocol.DidChangeWatchedFilesParams{
 				Changes: []protocol.FileEvent{

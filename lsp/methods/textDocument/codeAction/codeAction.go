@@ -2,6 +2,7 @@ package codeaction
 
 import (
 	"bennypowers.dev/asimonim/lsp/internal/log"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -11,7 +12,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/helpers"
 	"bennypowers.dev/asimonim/lsp/helpers/css"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	lspuri "go.lsp.dev/uri"
 )
 
 // validateCSSDocument validates that the document exists and supports CSS extraction.
@@ -126,9 +128,12 @@ func extractRecommendedToken(deprecationMessage string) string {
 
 // resolveFixAllFallbacks resolves the fixAll action by computing edits for all incorrect fallbacks
 func resolveFixAllFallbacks(req *types.RequestContext, action *protocol.CodeAction) (*protocol.CodeAction, error) {
-	// Get the URI from the data field
-	data, ok := action.Data.(map[string]any)
-	if !ok {
+	// Get the URI from the data field (LSPAny = jsontext.Value)
+	var data map[string]any
+	if len(action.Data) == 0 {
+		return action, nil
+	}
+	if err := json.Unmarshal(action.Data, &data); err != nil {
 		return action, nil
 	}
 
@@ -136,7 +141,10 @@ func resolveFixAllFallbacks(req *types.RequestContext, action *protocol.CodeActi
 	if !ok {
 		return action, nil
 	}
-	uri := uriVal.(string)
+	uri, ok := uriVal.(string)
+	if !ok {
+		return action, nil
+	}
 
 	// Get document
 	doc := req.Server.Document(uri)
@@ -197,8 +205,8 @@ func resolveFixAllFallbacks(req *types.RequestContext, action *protocol.CodeActi
 
 	// Add edits to the action
 	action.Edit = &protocol.WorkspaceEdit{
-		Changes: map[string][]protocol.TextEdit{
-			uri: edits,
+		Changes: map[lspuri.URI][]protocol.TextEdit{
+			lspuri.URI(uri): edits,
 		},
 	}
 
@@ -206,8 +214,8 @@ func resolveFixAllFallbacks(req *types.RequestContext, action *protocol.CodeActi
 }
 
 // CodeAction handles the textDocument/codeAction request
-func CodeAction(req *types.RequestContext, params *protocol.CodeActionParams) (any, error) {
-	uri := params.TextDocument.URI
+func CodeAction(req *types.RequestContext, params *protocol.CodeActionParams) ([]protocol.CommandOrCodeAction, error) {
+	uri := string(params.TextDocument.URI)
 	log.Info("CodeAction requested: %s", uri)
 
 	// Check if client supports CodeAction literals
@@ -241,7 +249,13 @@ func CodeAction(req *types.RequestContext, params *protocol.CodeActionParams) (a
 	}
 
 	log.Info("Returning %d code actions", len(actions))
-	return actions, nil
+
+	// Convert []CodeAction to []CommandOrCodeAction (each *CodeAction satisfies the interface)
+	result := make([]protocol.CommandOrCodeAction, len(actions))
+	for i := range actions {
+		result[i] = &actions[i]
+	}
+	return result, nil
 }
 
 // CodeActionResolve handles the codeAction/resolve request

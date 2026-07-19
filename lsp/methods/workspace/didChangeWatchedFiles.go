@@ -5,7 +5,7 @@ import (
 
 	"bennypowers.dev/asimonim/lsp/internal/uriutil"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // DidChangeWatchedFiles handles the workspace/didChangeWatchedFiles notification
@@ -17,7 +17,7 @@ func DidChangeWatchedFiles(req *types.RequestContext, params *protocol.DidChange
 	hasDeletedFile := false
 
 	for _, change := range params.Changes {
-		uri := change.URI
+		uri := string(change.URI)
 		path := uriutil.URIToPath(uri)
 		log.Info("File change: %s (type: %d)", path, change.Type)
 
@@ -54,12 +54,12 @@ func DidChangeWatchedFiles(req *types.RequestContext, params *protocol.DidChange
 
 		// Refresh diagnostics for all open documents
 		if req.Server.UsePullDiagnostics() {
-			NotifyDiagnosticRefresh(req.GLSP)
+			req.Server.NotifyDiagnosticRefresh()
 		} else {
-			glspCtx := req.Server.GLSPContext()
-			if glspCtx != nil {
+			ctx := req.Server.ServerCtx()
+			if ctx != nil {
 				for _, doc := range req.Server.AllDocuments() {
-					if err := req.Server.PublishDiagnostics(glspCtx, doc.URI()); err != nil {
+					if err := req.Server.PublishDiagnostics(ctx, doc.URI()); err != nil {
 						log.Info("Warning: failed to publish diagnostics for %s: %v", doc.URI(), err)
 					}
 				}

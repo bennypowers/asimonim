@@ -7,7 +7,7 @@ import (
 
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 
@@ -24,7 +24,7 @@ type SemanticTokenIntermediate struct {
 
 // SemanticTokensFull handles the textDocument/semanticTokens/full request
 func SemanticTokensFull(req *types.RequestContext, params *protocol.SemanticTokensParams) (*protocol.SemanticTokens, error) {
-	uri := params.TextDocument.URI
+	uri := string(params.TextDocument.URI)
 	log.Info("Semantic tokens requested for: %s", uri)
 
 	doc := req.Server.Document(uri)
@@ -136,7 +136,7 @@ func GetSemanticTokensForDocument(ctx types.ServerContext, doc *documents.Docume
 // SemanticTokensRange handles the textDocument/semanticTokens/range request
 func SemanticTokensRange(req *types.RequestContext, params *protocol.SemanticTokensRangeParams) (*protocol.SemanticTokens, error) {
 	// Get the document
-	doc := req.Server.Document(params.TextDocument.URI)
+	doc := req.Server.Document(string(params.TextDocument.URI))
 	if doc == nil {
 		return nil, fmt.Errorf("document not found: %s", params.TextDocument.URI)
 	}
@@ -181,9 +181,9 @@ func SemanticTokensRange(req *types.RequestContext, params *protocol.SemanticTok
 // SemanticTokensFullDelta handles the textDocument/semanticTokens/full/delta request
 // Returns either SemanticTokens (full) or SemanticTokensDelta depending on whether
 // the previous result ID is still valid and a delta can be computed.
-func SemanticTokensFullDelta(req *types.RequestContext, params *protocol.SemanticTokensDeltaParams) (any, error) {
-	uri := params.TextDocument.URI
-	log.Info("Semantic tokens delta requested for: %s (previousResultId: %s)", uri, params.PreviousResultID)
+func SemanticTokensFullDelta(req *types.RequestContext, params *protocol.SemanticTokensDeltaParams) (protocol.SemanticTokensDeltaResult, error) {
+	uri := string(params.TextDocument.URI)
+	log.Info("Semantic tokens delta requested for: %s (previousResultID: %s)", uri, params.PreviousResultID)
 
 	doc := req.Server.Document(uri)
 	if doc == nil {
@@ -233,14 +233,14 @@ func SemanticTokensFullDelta(req *types.RequestContext, params *protocol.Semanti
 	if len(edits) == 0 {
 		log.Info("No changes detected, returning empty delta")
 		return &protocol.SemanticTokensDelta{
-			ResultId: &newResultID,
+			ResultID: &newResultID,
 			Edits:    []protocol.SemanticTokensEdit{},
 		}, nil
 	}
 
 	log.Info("Returning delta with %d edits", len(edits))
 	return &protocol.SemanticTokensDelta{
-		ResultId: &newResultID,
+		ResultID: &newResultID,
 		Edits:    edits,
 	}, nil
 }

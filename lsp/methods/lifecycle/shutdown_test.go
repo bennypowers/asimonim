@@ -1,19 +1,18 @@
 package lifecycle
 
 import (
+	"context"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/bennypowers/glsp"
 )
 
 func TestShutdown(t *testing.T) {
 	t.Run("completes successfully", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		err := Shutdown(req)
 		assert.NoError(t, err)
@@ -21,8 +20,7 @@ func TestShutdown(t *testing.T) {
 
 	t.Run("cleans up CSS parser pool", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		// Call shutdown
 		err := Shutdown(req)
@@ -33,8 +31,7 @@ func TestShutdown(t *testing.T) {
 
 	t.Run("can be called multiple times safely", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		// Call shutdown multiple times
 		err1 := Shutdown(req)

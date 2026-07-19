@@ -1,35 +1,39 @@
 package lifecycle
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/bennypowers/glsp"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 func TestInitialized(t *testing.T) {
-	t.Run("stores GLSP context", func(t *testing.T) {
+	t.Run("does not overwrite server context with request context", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		serverCtx := context.Background()
+		ctx.SetServerCtx(serverCtx)
 
-		params := &protocol.InitializedParams{}
+		reqCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		req := types.NewRequestContext(ctx, reqCtx)
 
-		err := Initialized(req, params)
+		err := Initialized(req, &protocol.InitializedParams{})
 		assert.NoError(t, err)
 
-		// Verify context was stored
-		assert.Equal(t, glspCtx, ctx.GLSPContext())
+		// Cancel the request context — server context must survive
+		cancel()
+
+		// Server context should still be the original, not the canceled request context
+		assert.Equal(t, serverCtx, ctx.ServerCtx())
 	})
 
 	t.Run("calls LoadTokensFromConfig", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 		params := &protocol.InitializedParams{}
 
 		err := Initialized(req, params)
@@ -39,8 +43,7 @@ func TestInitialized(t *testing.T) {
 
 	t.Run("calls RegisterFileWatchers", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 		params := &protocol.InitializedParams{}
 
 		err := Initialized(req, params)
@@ -54,8 +57,7 @@ func TestInitialized(t *testing.T) {
 			return errors.New("load error")
 		}
 
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 		params := &protocol.InitializedParams{}
 
 		// Should not fail, just log warning
@@ -66,12 +68,11 @@ func TestInitialized(t *testing.T) {
 
 	t.Run("continues on RegisterFileWatchers error", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		ctx.RegisterWatchersFunc = func(*glsp.Context) error {
+		ctx.RegisterWatchersFunc = func(context.Context) error {
 			return errors.New("watcher error")
 		}
 
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 		params := &protocol.InitializedParams{}
 
 		// Should not fail, just log warning

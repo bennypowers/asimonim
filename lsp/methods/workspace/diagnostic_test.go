@@ -1,7 +1,7 @@
 package workspace
 
 import (
-	"encoding/json"
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -12,12 +12,14 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
+	"github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
 	"bennypowers.dev/asimonim/schema"
 	rootutil "bennypowers.dev/asimonim/testutil"
-	"github.com/bennypowers/glsp"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 func shouldUpdate() bool {
@@ -47,8 +49,7 @@ type goldenReport struct {
 
 func TestWorkspaceDiagnostic_Golden(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Load tokens from fixture (color.old: deprecated, color.primary: #0000ff)
 	fixtureTokens := rootutil.ParseFixtureTokens(t, "workspace-diagnostic", schema.Draft)
@@ -78,13 +79,13 @@ func TestWorkspaceDiagnostic_Golden(t *testing.T) {
 	// Build sorted golden-comparable output
 	reports := make([]goldenReport, 0, len(result.Items))
 	for _, item := range result.Items {
-		report := item.(protocol.WorkspaceFullDocumentDiagnosticReport)
+		report := item.(*protocol.WorkspaceFullDocumentDiagnosticReport)
 		var ver int32
 		if report.Version != nil {
 			ver = *report.Version
 		}
 		reports = append(reports, goldenReport{
-			URI:         report.URI,
+			URI:         string(report.URI),
 			Kind:        report.Kind,
 			Version:     ver,
 			Diagnostics: report.Items,
@@ -92,7 +93,7 @@ func TestWorkspaceDiagnostic_Golden(t *testing.T) {
 	}
 	sort.Slice(reports, func(i, j int) bool { return reports[i].URI < reports[j].URI })
 
-	actual, err := json.MarshalIndent(reports, "", "  ")
+	actual, err := json.Marshal(reports, jsontext.WithIndent("  "))
 	require.NoError(t, err)
 	actual = append(actual, '\n')
 
@@ -113,8 +114,7 @@ func TestWorkspaceDiagnostic_Golden(t *testing.T) {
 
 func TestWorkspaceDiagnostic_NoDocuments(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	result, err := WorkspaceDiagnostic(req, &protocol.WorkspaceDiagnosticParams{})
 	require.NoError(t, err)
@@ -124,8 +124,7 @@ func TestWorkspaceDiagnostic_NoDocuments(t *testing.T) {
 
 func TestWorkspaceDiagnostic_NonCSSDocumentsIncludedEmpty(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:       "color.old",
@@ -144,16 +143,16 @@ func TestWorkspaceDiagnostic_NonCSSDocumentsIncludedEmpty(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.Items, 2)
 
-	reportsByURI := make(map[string]protocol.WorkspaceFullDocumentDiagnosticReport)
+	reportsByURI := make(map[uri.URI]*protocol.WorkspaceFullDocumentDiagnosticReport)
 	for _, item := range result.Items {
-		report := item.(protocol.WorkspaceFullDocumentDiagnosticReport)
+		report := item.(*protocol.WorkspaceFullDocumentDiagnosticReport)
 		reportsByURI[report.URI] = report
 	}
 
 	// CSS document: 1 diagnostic (deprecated)
-	assert.Len(t, reportsByURI["file:///test.css"].Items, 1)
+	assert.Len(t, reportsByURI[uri.URI("file:///test.css")].Items, 1)
 	// JSON document: 0 diagnostics (not CSS)
-	assert.Empty(t, reportsByURI["file:///data.json"].Items)
+	assert.Empty(t, reportsByURI[uri.URI("file:///data.json")].Items)
 }
 
 func TestCollectWorkspaceDiagnostics_SkipsOnError(t *testing.T) {
@@ -176,6 +175,6 @@ func TestCollectWorkspaceDiagnostics_SkipsOnError(t *testing.T) {
 
 	// bad.css skipped, only ok.css in results
 	require.Len(t, result.Items, 1)
-	report := result.Items[0].(protocol.WorkspaceFullDocumentDiagnosticReport)
-	assert.Equal(t, "file:///ok.css", report.URI)
+	report := result.Items[0].(*protocol.WorkspaceFullDocumentDiagnosticReport)
+	assert.Equal(t, uri.URI("file:///ok.css"), report.URI)
 }

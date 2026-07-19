@@ -1,20 +1,19 @@
 package types
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"github.com/stretchr/testify/assert"
-	"github.com/bennypowers/glsp"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 func TestRequestContext_AddWarning(t *testing.T) {
 	mockServer := NewMockServerContextForTest()
-	glspCtx := &glsp.Context{Method: "test"}
-	req := NewRequestContext(mockServer, glspCtx)
+	req := NewRequestContext(mockServer, context.Background())
 
 	// Should start with no warnings
 	assert.False(t, req.HasWarnings())
@@ -45,13 +44,12 @@ func TestRequestContext_AddWarning_Nil(t *testing.T) {
 
 func TestRequestContext_ContextAccess(t *testing.T) {
 	mockServer := NewMockServerContextForTest()
-	glspCtx := &glsp.Context{Method: "testMethod"}
-	req := NewRequestContext(mockServer, glspCtx)
+	ctx := context.Background()
+	req := NewRequestContext(mockServer, ctx)
 
 	// Should be able to access both contexts
 	assert.Equal(t, mockServer, req.Server)
-	assert.Equal(t, glspCtx, req.GLSP)
-	assert.Equal(t, "testMethod", req.GLSP.Method)
+	assert.Equal(t, ctx, req.Ctx)
 }
 
 // Helper to create mock for these tests
@@ -82,10 +80,10 @@ func (m *mockServerContextMinimal) SetConfig(config ServerConfig)               
 func (m *mockServerContextMinimal) LoadPackageJsonConfig() error                 { return nil }
 func (m *mockServerContextMinimal) IsTokenFile(path string) bool                 { return false }
 func (m *mockServerContextMinimal) LoadTokensFromConfig() error                  { return nil }
-func (m *mockServerContextMinimal) RegisterFileWatchers(ctx *glsp.Context) error { return nil }
-func (m *mockServerContextMinimal) RemoveLoadedFile(path string)                 {}
-func (m *mockServerContextMinimal) GLSPContext() *glsp.Context                   { return nil }
-func (m *mockServerContextMinimal) SetGLSPContext(ctx *glsp.Context)             {}
+func (m *mockServerContextMinimal) RegisterFileWatchers(ctx context.Context) error { return nil }
+func (m *mockServerContextMinimal) RemoveLoadedFile(path string)                   {}
+func (m *mockServerContextMinimal) ServerCtx() context.Context                   { return nil }
+func (m *mockServerContextMinimal) SetServerCtx(ctx context.Context)             {}
 func (m *mockServerContextMinimal) ClientDiagnosticCapability() *bool            { return nil }
 func (m *mockServerContextMinimal) SetClientDiagnosticCapability(hasCapability bool) {}
 func (m *mockServerContextMinimal) ClientCapabilities() *protocol.ClientCapabilities { return nil }
@@ -95,9 +93,10 @@ func (m *mockServerContextMinimal) PreferredHoverFormat() protocol.MarkupKind { 
 func (m *mockServerContextMinimal) SupportsDefinitionLinks() bool { return false }
 func (m *mockServerContextMinimal) SupportsDiagnosticRelatedInfo() bool { return false }
 func (m *mockServerContextMinimal) SupportsCodeActionLiterals() bool   { return true }
-func (m *mockServerContextMinimal) PublishDiagnostics(context *glsp.Context, uri string) error {
+func (m *mockServerContextMinimal) PublishDiagnostics(ctx context.Context, uri string) error {
 	return nil
 }
+func (m *mockServerContextMinimal) NotifyDiagnosticRefresh() {}
 func (m *mockServerContextMinimal) UsePullDiagnostics() bool         { return false }
 func (m *mockServerContextMinimal) SetUsePullDiagnostics(use bool)   {}
 func (m *mockServerContextMinimal) AddWarning(err error)             {}

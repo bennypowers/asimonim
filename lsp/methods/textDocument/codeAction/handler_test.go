@@ -1,6 +1,8 @@
 package codeaction
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
 
 	cssparser "bennypowers.dev/asimonim/lsp/internal/parser/css"
@@ -9,15 +11,14 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 func TestCodeAction_IncorrectFallback(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a color token
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -26,13 +27,13 @@ func TestCodeAction_IncorrectFallback(t *testing.T) {
 		Type:  "color",
 	})
 
-	uri := "file:///test.css"
+	docURI := "file:///test.css"
 	// Incorrect fallback: token is #0000ff but fallback is #ff0000
 	cssContent := `.button { color: var(--color-primary, #ff0000); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 	result, err := CodeAction(req, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 17},
 			End:   protocol.Position{Line: 0, Character: 45},
@@ -43,15 +44,14 @@ func TestCodeAction_IncorrectFallback(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
-	require.NotEmpty(t, actions)
+	require.NotEmpty(t, result)
 
 	// Should have a fix fallback action with the correct value
 	var fixAction *protocol.CodeAction
-	for i := range actions {
-		if actions[i].Title == "Fix fallback value to '#0000ff'" {
-			fixAction = &actions[i]
+	for _, item := range result {
+		ca := item.(*protocol.CodeAction)
+		if ca.Title == "Fix fallback value to '#0000ff'" {
+			fixAction = ca
 			break
 		}
 	}
@@ -64,16 +64,15 @@ func TestCodeAction_IncorrectFallback(t *testing.T) {
 	// Verify the edit contains the correct replacement
 	require.NotNil(t, fixAction.Edit)
 	require.NotNil(t, fixAction.Edit.Changes)
-	edits := fixAction.Edit.Changes[uri]
+	edits := fixAction.Edit.Changes[uri.URI(docURI)]
 	require.Len(t, edits, 1)
-	assert.Contains(t, edits[0].NewText, "var(--color-primary, #0000ff)")
+	assert.Equal(t, "var(--color-primary, #0000ff)", edits[0].NewText)
 }
 
 func TestCodeAction_AddFallback(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a color token
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -82,13 +81,13 @@ func TestCodeAction_AddFallback(t *testing.T) {
 		Type:  "color",
 	})
 
-	uri := "file:///test.css"
+	docURI := "file:///test.css"
 	// No fallback provided
 	cssContent := `.button { color: var(--color-primary); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 	result, err := CodeAction(req, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 17},
 			End:   protocol.Position{Line: 0, Character: 36},
@@ -99,15 +98,14 @@ func TestCodeAction_AddFallback(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
-	require.NotEmpty(t, actions)
+	require.NotEmpty(t, result)
 
 	// Should suggest adding a fallback with the correct value
 	var addAction *protocol.CodeAction
-	for i := range actions {
-		if actions[i].Title == "Add fallback value '#0000ff'" {
-			addAction = &actions[i]
+	for _, item := range result {
+		ca := item.(*protocol.CodeAction)
+		if ca.Title == "Add fallback value '#0000ff'" {
+			addAction = ca
 			break
 		}
 	}
@@ -116,22 +114,21 @@ func TestCodeAction_AddFallback(t *testing.T) {
 	// Verify the edit contains the correct value
 	require.NotNil(t, addAction.Edit)
 	require.NotNil(t, addAction.Edit.Changes)
-	edits := addAction.Edit.Changes[uri]
+	edits := addAction.Edit.Changes[uri.URI(docURI)]
 	require.Len(t, edits, 1)
-	assert.Contains(t, edits[0].NewText, "var(--color-primary, #0000ff)")
+	assert.Equal(t, "var(--color-primary, #0000ff)", edits[0].NewText)
 }
 
 func TestCodeAction_NonCSSDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
-	uri := "file:///test.json"
+	docURI := "file:///test.json"
 	jsonContent := `{"color": {"$value": "#ff0000"}}`
-	_ = ctx.DocumentManager().DidOpen(uri, "json", 1, jsonContent)
+	_ = ctx.DocumentManager().DidOpen(docURI, "json", 1, jsonContent)
 
 	result, err := CodeAction(req, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 0},
 			End:   protocol.Position{Line: 0, Character: 10},
@@ -147,11 +144,10 @@ func TestCodeAction_NonCSSDocument(t *testing.T) {
 
 func TestCodeAction_DocumentNotFound(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	result, err := CodeAction(req, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///nonexistent.css"},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI("file:///nonexistent.css")},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 0},
 			End:   protocol.Position{Line: 0, Character: 10},
@@ -168,8 +164,7 @@ func TestCodeAction_DocumentNotFound(t *testing.T) {
 func TestCodeAction_OutsideRange(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -177,13 +172,13 @@ func TestCodeAction_OutsideRange(t *testing.T) {
 		Type:  "color",
 	})
 
-	uri := "file:///test.css"
+	docURI := "file:///test.css"
 	cssContent := `.button { color: var(--color-primary, #ff0000); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 	// Request range that doesn't intersect with var()
 	result, err := CodeAction(req, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 0},
 			End:   protocol.Position{Line: 0, Character: 7}, // Before var()
@@ -194,15 +189,13 @@ func TestCodeAction_OutsideRange(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
-	assert.Empty(t, actions) // No actions for range outside var()
+	require.NotNil(t, result)
+	assert.Empty(t, result) // No actions for range outside var()
 }
 
 func TestCodeActionResolve_ReturnsActionUnchanged(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	action := &protocol.CodeAction{
 		Title: "Test action",
@@ -280,8 +273,7 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 	t.Run("deprecated token with recommended replacement", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsCodeActionLiterals(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		// Add deprecated token and its replacement
 		_ = ctx.TokenManager().Add(&tokens.Token{
@@ -297,13 +289,13 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 			Type:  "color",
 		})
 
-		uri := "file:///test.css"
+		docURI := "file:///test.css"
 		// var() referencing the deprecated token
 		cssContent := `.button { color: var(--color-old, #ff0000); }`
-		_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+		_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 		result, err := CodeAction(req, &protocol.CodeActionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 17},
 				End:   protocol.Position{Line: 0, Character: 44},
@@ -315,23 +307,22 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 							Start: protocol.Position{Line: 0, Character: 17},
 							End:   protocol.Position{Line: 0, Character: 44},
 						},
-						Message: "Token is deprecated",
-						Code:    &protocol.IntegerOrString{Value: "deprecated-token"},
+						Message: protocol.String("Token is deprecated"),
+						Code:    protocol.String("deprecated-token"),
 					},
 				},
 			},
 		})
 
 		require.NoError(t, err)
-		actions, ok := result.([]protocol.CodeAction)
-		require.True(t, ok)
-		require.NotEmpty(t, actions)
+		require.NotEmpty(t, result)
 
 		// Should have a replacement action for the recommended token
 		var replaceAction *protocol.CodeAction
-		for i := range actions {
-			if actions[i].Title == "Replace with '--color-new'" {
-				replaceAction = &actions[i]
+		for _, item := range result {
+			ca := item.(*protocol.CodeAction)
+			if ca.Title == "Replace with '--color-new'" {
+				replaceAction = ca
 				break
 			}
 		}
@@ -339,7 +330,7 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 		assert.NotNil(t, replaceAction.Kind)
 		assert.Equal(t, protocol.CodeActionKindQuickFix, *replaceAction.Kind)
 		require.NotNil(t, replaceAction.Edit)
-		edits := replaceAction.Edit.Changes[uri]
+		edits := replaceAction.Edit.Changes[uri.URI(docURI)]
 		require.Len(t, edits, 1)
 		// Has fallback, so replacement should include formatted fallback from replacement token
 		assert.Equal(t, "var(--color-new, #00ff00)", edits[0].NewText)
@@ -351,15 +342,16 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 
 		// Should also have a literal value action
 		var literalAction *protocol.CodeAction
-		for i := range actions {
-			if actions[i].Title == "Replace with literal value '#ff0000'" {
-				literalAction = &actions[i]
+		for _, item := range result {
+			ca := item.(*protocol.CodeAction)
+			if ca.Title == "Replace with literal value '#ff0000'" {
+				literalAction = ca
 				break
 			}
 		}
 		require.NotNil(t, literalAction, "Should have literal value action")
 		require.NotNil(t, literalAction.Edit)
-		literalEdits := literalAction.Edit.Changes[uri]
+		literalEdits := literalAction.Edit.Changes[uri.URI(docURI)]
 		require.Len(t, literalEdits, 1)
 		assert.Equal(t, "#ff0000", literalEdits[0].NewText)
 	})
@@ -367,8 +359,7 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 	t.Run("deprecated token without recommended replacement", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsCodeActionLiterals(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		// Deprecated token with no recommendation
 		_ = ctx.TokenManager().Add(&tokens.Token{
@@ -379,12 +370,12 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 			DeprecationMessage: "This token is deprecated",
 		})
 
-		uri := "file:///test.css"
+		docURI := "file:///test.css"
 		cssContent := `.card { color: var(--color-legacy); }`
-		_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+		_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 		result, err := CodeAction(req, &protocol.CodeActionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 15},
 				End:   protocol.Position{Line: 0, Character: 34},
@@ -395,30 +386,30 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		actions, ok := result.([]protocol.CodeAction)
-		require.True(t, ok)
+		require.NotNil(t, result)
 
 		// Should have literal value action but no replacement action
 		var literalAction *protocol.CodeAction
-		for i := range actions {
-			if actions[i].Title == "Replace with literal value '#aabbcc'" {
-				literalAction = &actions[i]
+		for _, item := range result {
+			ca := item.(*protocol.CodeAction)
+			if ca.Title == "Replace with literal value '#aabbcc'" {
+				literalAction = ca
 				break
 			}
 		}
 		require.NotNil(t, literalAction, "Should have literal value action")
 
 		// Should NOT have a replacement action (no recommendation found)
-		for _, action := range actions {
-			assert.NotContains(t, action.Title, "Replace with '--")
+		for _, item := range result {
+			ca := item.(*protocol.CodeAction)
+			assert.NotContains(t, ca.Title, "Replace with '--")
 		}
 	})
 
 	t.Run("deprecated token with replacement but no fallback in var()", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsCodeActionLiterals(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:               "spacing.old",
@@ -433,13 +424,13 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 			Type:  "dimension",
 		})
 
-		uri := "file:///test.css"
+		docURI := "file:///test.css"
 		// No fallback in var() call
 		cssContent := `.box { padding: var(--spacing-old); }`
-		_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+		_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 		result, err := CodeAction(req, &protocol.CodeActionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 16},
 				End:   protocol.Position{Line: 0, Character: 34},
@@ -450,19 +441,19 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		actions, ok := result.([]protocol.CodeAction)
-		require.True(t, ok)
+		require.NotNil(t, result)
 
 		// Replacement action should not include fallback (original had none)
 		var replaceAction *protocol.CodeAction
-		for i := range actions {
-			if actions[i].Title == "Replace with '--spacing-medium'" {
-				replaceAction = &actions[i]
+		for _, item := range result {
+			ca := item.(*protocol.CodeAction)
+			if ca.Title == "Replace with '--spacing-medium'" {
+				replaceAction = ca
 				break
 			}
 		}
 		require.NotNil(t, replaceAction, "Should have replacement action")
-		edits := replaceAction.Edit.Changes[uri]
+		edits := replaceAction.Edit.Changes[uri.URI(docURI)]
 		require.Len(t, edits, 1)
 		// No fallback in original, so replacement should not have fallback
 		assert.Equal(t, "var(--spacing-medium)", edits[0].NewText)
@@ -472,8 +463,7 @@ func TestCreateDeprecatedTokenActions(t *testing.T) {
 func TestCreateReplacementAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Deprecated token pointing to a replacement with unsupported type
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -489,13 +479,13 @@ func TestCreateReplacementAction_UnformattableToken(t *testing.T) {
 		Type:  "border", // composite type, cannot be formatted for CSS
 	})
 
-	uri := "file:///test.css"
+	docURI := "file:///test.css"
 	// Has fallback, which triggers FormatTokenValueForCSS on the replacement token
 	cssContent := `.box { border: var(--border-old, 1px solid #000); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 	result, err := CodeAction(req, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 15},
 			End:   protocol.Position{Line: 0, Character: 49},
@@ -506,12 +496,12 @@ func TestCreateReplacementAction_UnformattableToken(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
+	require.NotNil(t, result)
 
 	// Should NOT have replacement action (replacement token is composite type)
-	for _, action := range actions {
-		assert.NotContains(t, action.Title, "Replace with '--border-new'",
+	for _, item := range result {
+		ca := item.(*protocol.CodeAction)
+		assert.NotContains(t, ca.Title, "Replace with '--border-new'",
 			"Should not offer replacement when token value can't be formatted")
 	}
 }
@@ -519,8 +509,7 @@ func TestCreateReplacementAction_UnformattableToken(t *testing.T) {
 func TestCreateLiteralValueAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Deprecated token with composite type that can't be formatted
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -531,12 +520,12 @@ func TestCreateLiteralValueAction_UnformattableToken(t *testing.T) {
 		DeprecationMessage: "This token is deprecated",
 	})
 
-	uri := "file:///test.css"
+	docURI := "file:///test.css"
 	cssContent := `.card { box-shadow: var(--shadow-old); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 	result, err := CodeAction(req, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 20},
 			End:   protocol.Position{Line: 0, Character: 37},
@@ -547,12 +536,12 @@ func TestCreateLiteralValueAction_UnformattableToken(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
+	require.NotNil(t, result)
 
 	// Should NOT have literal value action (shadow is composite type)
-	for _, action := range actions {
-		assert.NotContains(t, action.Title, "Replace with literal value",
+	for _, item := range result {
+		ca := item.(*protocol.CodeAction)
+		assert.NotContains(t, ca.Title, "Replace with literal value",
 			"Should not offer literal value when token type is unsupported")
 	}
 }
@@ -560,8 +549,7 @@ func TestCreateLiteralValueAction_UnformattableToken(t *testing.T) {
 func TestFixFallbackAction_WithMatchingDiagnostic(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	_ = ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -569,10 +557,10 @@ func TestFixFallbackAction_WithMatchingDiagnostic(t *testing.T) {
 		Type:  "color",
 	})
 
-	uri := "file:///test.css"
+	docURI := "file:///test.css"
 	// Incorrect fallback: token is #0000ff but fallback is red
 	cssContent := `.button { color: var(--color-primary, red); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 	// Include a matching diagnostic at the var() call position
 	diag := protocol.Diagnostic{
@@ -580,12 +568,12 @@ func TestFixFallbackAction_WithMatchingDiagnostic(t *testing.T) {
 			Start: protocol.Position{Line: 0, Character: 17},
 			End:   protocol.Position{Line: 0, Character: 43},
 		},
-		Message: "Incorrect fallback value",
-		Code:    &protocol.IntegerOrString{Value: "incorrect-fallback"},
+		Message: protocol.String("Incorrect fallback value"),
+		Code:    protocol.String("incorrect-fallback"),
 	}
 
 	result, err := CodeAction(req, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 17},
 			End:   protocol.Position{Line: 0, Character: 43},
@@ -596,13 +584,13 @@ func TestFixFallbackAction_WithMatchingDiagnostic(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
+	require.NotEmpty(t, result)
 
 	var fixAction *protocol.CodeAction
-	for i := range actions {
-		if actions[i].Title == "Fix fallback value to '#0000ff'" {
-			fixAction = &actions[i]
+	for _, item := range result {
+		ca := item.(*protocol.CodeAction)
+		if ca.Title == "Fix fallback value to '#0000ff'" {
+			fixAction = ca
 			break
 		}
 	}
@@ -618,8 +606,7 @@ func TestFixFallbackAction_WithMatchingDiagnostic(t *testing.T) {
 func TestFixFallbackAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Token with composite type that can't be formatted for CSS fallback
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -628,12 +615,12 @@ func TestFixFallbackAction_UnformattableToken(t *testing.T) {
 		Type:  "border",
 	})
 
-	uri := "file:///test.css"
+	docURI := "file:///test.css"
 	cssContent := `.box { border: var(--border-primary, 2px dashed red); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 	result, err := CodeAction(req, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 15},
 			End:   protocol.Position{Line: 0, Character: 53},
@@ -644,20 +631,19 @@ func TestFixFallbackAction_UnformattableToken(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
+	require.NotNil(t, result)
 
 	// Should NOT have fix fallback action (border can't be formatted)
-	for _, action := range actions {
-		assert.NotContains(t, action.Title, "Fix fallback value",
+	for _, item := range result {
+		ca := item.(*protocol.CodeAction)
+		assert.NotContains(t, ca.Title, "Fix fallback value",
 			"Should not offer fix fallback when token type is unsupported")
 	}
 }
 
 func TestCreateAddFallbackAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Token with composite type that FormatTokenValueForCSS rejects
 	token := &tokens.Token{
@@ -682,7 +668,7 @@ func TestCreateAddFallbackAction_UnformattableToken(t *testing.T) {
 func TestCreateFixAllActionIfNeeded(t *testing.T) {
 	t.Run("returns nil with fewer than 2 diagnostics", func(t *testing.T) {
 		diags := []protocol.Diagnostic{
-			{Code: &protocol.IntegerOrString{Value: "incorrect-fallback"}},
+			{Code: protocol.String("incorrect-fallback")},
 		}
 		result := createFixAllActionIfNeeded("file:///test.css", nil, diags)
 		assert.Nil(t, result)
@@ -690,8 +676,8 @@ func TestCreateFixAllActionIfNeeded(t *testing.T) {
 
 	t.Run("returns nil when fewer than 2 incorrect-fallback diagnostics", func(t *testing.T) {
 		diags := []protocol.Diagnostic{
-			{Code: &protocol.IntegerOrString{Value: "incorrect-fallback"}},
-			{Code: &protocol.IntegerOrString{Value: "deprecated-token"}},
+			{Code: protocol.String("incorrect-fallback")},
+			{Code: protocol.String("deprecated-token")},
 		}
 		result := createFixAllActionIfNeeded("file:///test.css", nil, diags)
 		assert.Nil(t, result)
@@ -699,8 +685,8 @@ func TestCreateFixAllActionIfNeeded(t *testing.T) {
 
 	t.Run("returns action when 2+ incorrect-fallback diagnostics", func(t *testing.T) {
 		diags := []protocol.Diagnostic{
-			{Code: &protocol.IntegerOrString{Value: "incorrect-fallback"}},
-			{Code: &protocol.IntegerOrString{Value: "incorrect-fallback"}},
+			{Code: protocol.String("incorrect-fallback")},
+			{Code: protocol.String("incorrect-fallback")},
 		}
 		result := createFixAllActionIfNeeded("file:///test.css", nil, diags)
 		require.NotNil(t, result)
@@ -717,15 +703,22 @@ func TestCreateFixAllActionIfNeeded(t *testing.T) {
 	})
 }
 
+// marshalLSPAny marshals a value to protocol.LSPAny (jsontext.Value) for test data
+func marshalLSPAny(t *testing.T, v any) protocol.LSPAny {
+	t.Helper()
+	b, err := json.Marshal(v)
+	require.NoError(t, err)
+	return protocol.LSPAny(b)
+}
+
 func TestResolveFixAllFallbacks(t *testing.T) {
 	t.Run("returns action unchanged when data is not map", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		action := &protocol.CodeAction{
 			Title: "Fix all token fallback values",
-			Data:  "not-a-map",
+			Data:  marshalLSPAny(t, "not-a-map"),
 		}
 
 		resolved, err := resolveFixAllFallbacks(req, action)
@@ -735,12 +728,11 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 
 	t.Run("returns action unchanged when uri key missing", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		action := &protocol.CodeAction{
 			Title: "Fix all token fallback values",
-			Data:  map[string]any{"other": "data"},
+			Data:  marshalLSPAny(t, map[string]any{"other": "data"}),
 		}
 
 		resolved, err := resolveFixAllFallbacks(req, action)
@@ -750,12 +742,11 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 
 	t.Run("returns action unchanged when document not found", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		action := &protocol.CodeAction{
 			Title: "Fix all token fallback values",
-			Data:  map[string]any{"uri": "file:///nonexistent.css"},
+			Data:  marshalLSPAny(t, map[string]any{"uri": "file:///nonexistent.css"}),
 		}
 
 		resolved, err := resolveFixAllFallbacks(req, action)
@@ -766,8 +757,7 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 	t.Run("resolves edits for all incorrect fallbacks", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsCodeActionLiterals(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:  "color.primary",
@@ -780,14 +770,14 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 			Type:  "color",
 		})
 
-		uri := "file:///fixall.css"
+		docURI := "file:///fixall.css"
 		cssContent := `.a { color: var(--color-primary, blue); }
 .b { color: var(--color-secondary, red); }`
-		_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+		_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 		action := &protocol.CodeAction{
 			Title: "Fix all token fallback values",
-			Data:  map[string]any{"uri": uri},
+			Data:  marshalLSPAny(t, map[string]any{"uri": docURI}),
 		}
 
 		resolved, err := resolveFixAllFallbacks(req, action)
@@ -795,7 +785,7 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 		require.NotNil(t, resolved.Edit)
 		require.NotNil(t, resolved.Edit.Changes)
 
-		edits := resolved.Edit.Changes[uri]
+		edits := resolved.Edit.Changes[uri.URI(docURI)]
 		// Both var() calls have incorrect fallbacks
 		assert.Len(t, edits, 2)
 
@@ -811,8 +801,7 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 	t.Run("skips var calls with correct fallbacks", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsCodeActionLiterals(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:  "color.correct",
@@ -820,21 +809,21 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 			Type:  "color",
 		})
 
-		uri := "file:///correct.css"
+		docURI := "file:///correct.css"
 		// Fallback matches token value
 		cssContent := `.a { color: var(--color-correct, #ff0000); }`
-		_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+		_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 		action := &protocol.CodeAction{
 			Title: "Fix all token fallback values",
-			Data:  map[string]any{"uri": uri},
+			Data:  marshalLSPAny(t, map[string]any{"uri": docURI}),
 		}
 
 		resolved, err := resolveFixAllFallbacks(req, action)
 		require.NoError(t, err)
 		require.NotNil(t, resolved.Edit)
 
-		edits := resolved.Edit.Changes[uri]
+		edits := resolved.Edit.Changes[uri.URI(docURI)]
 		// No edits needed since fallback is correct
 		assert.Empty(t, edits)
 	})
@@ -842,8 +831,7 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 	t.Run("skips unformattable tokens", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetSupportsCodeActionLiterals(true)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		_ = ctx.TokenManager().Add(&tokens.Token{
 			Name:  "border.main",
@@ -851,20 +839,20 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 			Type:  "border", // composite type, can't be formatted
 		})
 
-		uri := "file:///border.css"
+		docURI := "file:///border.css"
 		cssContent := `.a { border: var(--border-main, 2px dashed red); }`
-		_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+		_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 		action := &protocol.CodeAction{
 			Title: "Fix all token fallback values",
-			Data:  map[string]any{"uri": uri},
+			Data:  marshalLSPAny(t, map[string]any{"uri": docURI}),
 		}
 
 		resolved, err := resolveFixAllFallbacks(req, action)
 		require.NoError(t, err)
 		require.NotNil(t, resolved.Edit)
 
-		edits := resolved.Edit.Changes[uri]
+		edits := resolved.Edit.Changes[uri.URI(docURI)]
 		// No edits for unformattable token types
 		assert.Empty(t, edits)
 	})
@@ -872,8 +860,7 @@ func TestResolveFixAllFallbacks(t *testing.T) {
 
 func TestCreateToggleFallbackAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Token with composite type
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -897,8 +884,7 @@ func TestCreateToggleFallbackAction_UnformattableToken(t *testing.T) {
 
 func TestCreateToggleFallbackAction_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Don't add any tokens
 
@@ -917,8 +903,7 @@ func TestCreateToggleFallbackAction_UnknownToken(t *testing.T) {
 func TestToggleFallbackAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Token with composite type that can't be formatted
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -927,13 +912,13 @@ func TestToggleFallbackAction_UnformattableToken(t *testing.T) {
 		Type:  "shadow",
 	})
 
-	uri := "file:///test.css"
+	docURI := "file:///test.css"
 	// No fallback -- toggle would try to add one, but formatting will fail
 	cssContent := `.card { box-shadow: var(--shadow-main); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 	result, err := CodeAction(req, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			// Collapsed cursor on the var() call
 			Start: protocol.Position{Line: 0, Character: 24},
@@ -945,23 +930,17 @@ func TestToggleFallbackAction_UnformattableToken(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	// Toggle action should not be present for unformattable token types
-	if result != nil {
-		actions, ok := result.([]protocol.CodeAction)
-		if ok {
-			for _, action := range actions {
-				assert.NotEqual(t, "Toggle design token fallback value", action.Title,
-					"Should not offer toggle when token value can't be formatted")
-			}
-		}
+	for _, item := range result {
+		ca := item.(*protocol.CodeAction)
+		assert.NotEqual(t, "Toggle design token fallback value", ca.Title,
+			"Should not offer toggle when token value can't be formatted")
 	}
 }
 
 func TestToggleRangeFallbacksAction_UnformattableToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Only add an unformattable token
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -970,12 +949,12 @@ func TestToggleRangeFallbacksAction_UnformattableToken(t *testing.T) {
 		Type:  "shadow",
 	})
 
-	uri := "file:///test.css"
+	docURI := "file:///test.css"
 	cssContent := `.card { box-shadow: var(--shadow-main); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 	result, err := CodeAction(req, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			// Expanded selection covering the var() call
 			Start: protocol.Position{Line: 0, Character: 20},
@@ -987,32 +966,26 @@ func TestToggleRangeFallbacksAction_UnformattableToken(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	// Range toggle should not be present for unformattable tokens
-	if result != nil {
-		actions, ok := result.([]protocol.CodeAction)
-		if ok {
-			for _, action := range actions {
-				assert.NotEqual(t, "Toggle design token fallback values (in range)", action.Title,
-					"Should not offer range toggle when token value can't be formatted")
-			}
-		}
+	for _, item := range result {
+		ca := item.(*protocol.CodeAction)
+		assert.NotEqual(t, "Toggle design token fallback values (in range)", ca.Title,
+			"Should not offer range toggle when token value can't be formatted")
 	}
 }
 
 func TestProcessVarCalls_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Don't add any tokens -- var() references an unknown token
 
-	uri := "file:///test.css"
+	docURI := "file:///test.css"
 	cssContent := `.button { color: var(--unknown-token); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 	result, err := CodeAction(req, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 17},
 			End:   protocol.Position{Line: 0, Character: 37},
@@ -1024,16 +997,14 @@ func TestProcessVarCalls_UnknownToken(t *testing.T) {
 
 	require.NoError(t, err)
 	// Should return empty actions list (token not found, no actions to offer)
-	actions, ok := result.([]protocol.CodeAction)
-	require.True(t, ok)
-	assert.Empty(t, actions)
+	require.NotNil(t, result)
+	assert.Empty(t, result)
 }
 
 func TestCodeAction_NoAddFallbackForNonColorDimension(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetSupportsCodeActionLiterals(true)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Token with type "number" -- add-fallback only for color/dimension
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -1042,12 +1013,12 @@ func TestCodeAction_NoAddFallbackForNonColorDimension(t *testing.T) {
 		Type:  "number",
 	})
 
-	uri := "file:///test.css"
+	docURI := "file:///test.css"
 	cssContent := `.card { opacity: var(--opacity-default); }`
-	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	_ = ctx.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 	result, err := CodeAction(req, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 17},
 			End:   protocol.Position{Line: 0, Character: 39},
@@ -1058,14 +1029,10 @@ func TestCodeAction_NoAddFallbackForNonColorDimension(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	if result != nil {
-		actions, ok := result.([]protocol.CodeAction)
-		if ok {
-			for _, action := range actions {
-				assert.NotContains(t, action.Title, "Add fallback value",
-					"Should not suggest add-fallback for number type tokens (only color/dimension)")
-			}
-		}
+	for _, item := range result {
+		ca := item.(*protocol.CodeAction)
+		assert.NotContains(t, ca.Title, "Add fallback value",
+			"Should not suggest add-fallback for number type tokens (only color/dimension)")
 	}
 }
 

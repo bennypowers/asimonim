@@ -3,37 +3,27 @@ package codeaction_test
 import (
 	"testing"
 
-	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp"
+	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	codeaction "bennypowers.dev/asimonim/lsp/methods/textDocument/codeAction"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 const (
-	// CodeActionKindSourceFixAll is not defined in glsp v0.2.2
+	// codeActionKindSourceFixAll is not a standard constant in the protocol package
 	codeActionKindSourceFixAll protocol.CodeActionKind = "source.fixAll"
 )
-
-// ptrIntegerOrString returns a pointer to IntegerOrString from a string
-func ptrIntegerOrString(s string) *protocol.IntegerOrString {
-	return &protocol.IntegerOrString{Value: s}
-}
 
 // setCodeActionLiteralSupport sets the client capabilities to support CodeAction literals
 func setCodeActionLiteralSupport(s *lsp.Server) {
 	textDoc := &protocol.TextDocumentClientCapabilities{}
 	textDoc.CodeAction = &protocol.CodeActionClientCapabilities{
-		CodeActionLiteralSupport: &struct {
-			CodeActionKind struct {
-				ValueSet []protocol.CodeActionKind `json:"valueSet"`
-			} `json:"codeActionKind"`
-		}{
-			CodeActionKind: struct {
-				ValueSet []protocol.CodeActionKind `json:"valueSet"`
-			}{
+		CodeActionLiteralSupport: protocol.ClientCodeActionLiteralOptions{
+			CodeActionKind: protocol.ClientCodeActionKindOptions{
 				ValueSet: []protocol.CodeActionKind{
 					protocol.CodeActionKindQuickFix,
 					protocol.CodeActionKindRefactorRewrite,
@@ -44,6 +34,18 @@ func setCodeActionLiteralSupport(s *lsp.Server) {
 	s.SetClientCapabilities(protocol.ClientCapabilities{
 		TextDocument: textDoc,
 	})
+}
+
+// extractCodeActions extracts []*protocol.CodeAction from []protocol.CommandOrCodeAction
+func extractCodeActions(t *testing.T, result []protocol.CommandOrCodeAction) []*protocol.CodeAction {
+	t.Helper()
+	actions := make([]*protocol.CodeAction, len(result))
+	for i, item := range result {
+		ca, ok := item.(*protocol.CodeAction)
+		require.True(t, ok, "expected *protocol.CodeAction, got %T", item)
+		actions[i] = ca
+	}
+	return actions
 }
 
 // TestRangesIntersect tests the rangesIntersect function with half-open range semantics [start, end)
@@ -104,12 +106,12 @@ func TestToggleFallback(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Open document
-			uri := "file:///test.css"
-			_ = s.DocumentManager().DidOpen(uri, "css", 1, tt.cssContent)
+			docURI := "file:///test.css"
+			_ = s.DocumentManager().DidOpen(docURI, "css", 1, tt.cssContent)
 
 			// Request code actions at cursor position (collapsed range)
 			params := &protocol.CodeActionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 				Range: protocol.Range{
 					Start: protocol.Position{Line: tt.cursorLine, Character: tt.cursorChar},
 					End:   protocol.Position{Line: tt.cursorLine, Character: tt.cursorChar},
@@ -123,23 +125,22 @@ func TestToggleFallback(t *testing.T) {
 
 			if tt.expectedAction == "" {
 				// Should not have toggle action
-				if result != nil {
-					actions := result.([]protocol.CodeAction)
-					for _, action := range actions {
-						assert.NotEqual(t, tt.expectedAction, action.Title)
-					}
+				for _, item := range result {
+					ca := item.(*protocol.CodeAction)
+					assert.NotEqual(t, "Toggle design token fallback value", ca.Title,
+						"Should not offer toggle action when cursor is outside var call")
 				}
 				return
 			}
 
 			// Should have the toggle action
 			require.NotNil(t, result)
-			actions := result.([]protocol.CodeAction)
+			actions := extractCodeActions(t, result)
 
 			var toggleAction *protocol.CodeAction
-			for i := range actions {
-				if actions[i].Title == tt.expectedAction {
-					toggleAction = &actions[i]
+			for _, action := range actions {
+				if action.Title == tt.expectedAction {
+					toggleAction = action
 					break
 				}
 			}
@@ -153,7 +154,7 @@ func TestToggleFallback(t *testing.T) {
 			// Check edit
 			require.NotNil(t, toggleAction.Edit)
 			require.NotNil(t, toggleAction.Edit.Changes)
-			edits, ok := toggleAction.Edit.Changes[uri]
+			edits, ok := toggleAction.Edit.Changes[uri.URI(docURI)]
 			require.True(t, ok)
 			require.Len(t, edits, 1)
 			assert.Equal(t, tt.expectedEdit, edits[0].NewText)
@@ -217,11 +218,11 @@ func TestToggleRangeFallbacks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			uri := "file:///test.css"
-			_ = s.DocumentManager().DidOpen(uri, "css", 1, tt.cssContent)
+			docURI := "file:///test.css"
+			_ = s.DocumentManager().DidOpen(docURI, "css", 1, tt.cssContent)
 
 			params := &protocol.CodeActionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 				Range: protocol.Range{
 					Start: tt.rangeStart,
 					End:   tt.rangeEnd,
@@ -235,7 +236,7 @@ func TestToggleRangeFallbacks(t *testing.T) {
 
 			if tt.expectedAction == "" {
 				if result != nil {
-					actions := result.([]protocol.CodeAction)
+					actions := extractCodeActions(t, result)
 					for _, action := range actions {
 						assert.NotEqual(t, "Toggle design token fallback values (in range)", action.Title)
 					}
@@ -244,12 +245,12 @@ func TestToggleRangeFallbacks(t *testing.T) {
 			}
 
 			require.NotNil(t, result)
-			actions := result.([]protocol.CodeAction)
+			actions := extractCodeActions(t, result)
 
 			var rangeAction *protocol.CodeAction
-			for i := range actions {
-				if actions[i].Title == tt.expectedAction {
-					rangeAction = &actions[i]
+			for _, action := range actions {
+				if action.Title == tt.expectedAction {
+					rangeAction = action
 					break
 				}
 			}
@@ -260,7 +261,7 @@ func TestToggleRangeFallbacks(t *testing.T) {
 
 			require.NotNil(t, rangeAction.Edit)
 			require.NotNil(t, rangeAction.Edit.Changes)
-			edits, ok := rangeAction.Edit.Changes[uri]
+			edits, ok := rangeAction.Edit.Changes[uri.URI(docURI)]
 			require.True(t, ok)
 			assert.Len(t, edits, tt.numEdits)
 		})
@@ -283,8 +284,8 @@ func TestFixAllFallbacks(t *testing.T) {
   border-color: var(--color-primary, #0000ff);
 }`
 
-	uri := "file:///test.css"
-	_ = s.DocumentManager().DidOpen(uri, "css", 1, cssContent)
+	docURI := "file:///test.css"
+	_ = s.DocumentManager().DidOpen(docURI, "css", 1, cssContent)
 
 	// Create diagnostics for incorrect fallbacks
 	diagnostics := []protocol.Diagnostic{
@@ -293,21 +294,21 @@ func TestFixAllFallbacks(t *testing.T) {
 				Start: protocol.Position{Line: 1, Character: 9},
 				End:   protocol.Position{Line: 1, Character: 40},
 			},
-			Code:    ptrIntegerOrString("incorrect-fallback"),
-			Message: "Incorrect fallback",
+			Code:    protocol.String("incorrect-fallback"),
+			Message: protocol.String("Incorrect fallback"),
 		},
 		{
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 2, Character: 14},
 				End:   protocol.Position{Line: 2, Character: 48},
 			},
-			Code:    ptrIntegerOrString("incorrect-fallback"),
-			Message: "Incorrect fallback",
+			Code:    protocol.String("incorrect-fallback"),
+			Message: protocol.String("Incorrect fallback"),
 		},
 	}
 
 	params := &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 0},
 			End:   protocol.Position{Line: 4, Character: 0},
@@ -322,13 +323,13 @@ func TestFixAllFallbacks(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	actions := result.([]protocol.CodeAction)
+	actions := extractCodeActions(t, result)
 
 	// Find the fixAll action
 	var fixAllAction *protocol.CodeAction
-	for i := range actions {
-		if actions[i].Title == "Fix all token fallback values" {
-			fixAllAction = &actions[i]
+	for _, action := range actions {
+		if action.Title == "Fix all token fallback values" {
+			fixAllAction = action
 			break
 		}
 	}
@@ -344,7 +345,7 @@ func TestFixAllFallbacks(t *testing.T) {
 	require.NotNil(t, resolved.Edit)
 	require.NotNil(t, resolved.Edit.Changes)
 
-	edits, ok := resolved.Edit.Changes[uri]
+	edits, ok := resolved.Edit.Changes[uri.URI(docURI)]
 	require.True(t, ok)
 
 	// Should fix all incorrect fallbacks (3 total: blue, red, #0000ff)
@@ -367,14 +368,8 @@ func TestCodeAction_LiteralSupport(t *testing.T) {
 		// Set client capabilities with codeActionLiteralSupport
 		textDoc := &protocol.TextDocumentClientCapabilities{}
 		textDoc.CodeAction = &protocol.CodeActionClientCapabilities{
-			CodeActionLiteralSupport: &struct {
-				CodeActionKind struct {
-					ValueSet []protocol.CodeActionKind `json:"valueSet"`
-				} `json:"codeActionKind"`
-			}{
-				CodeActionKind: struct {
-					ValueSet []protocol.CodeActionKind `json:"valueSet"`
-				}{
+			CodeActionLiteralSupport: protocol.ClientCodeActionLiteralOptions{
+				CodeActionKind: protocol.ClientCodeActionKindOptions{
 					ValueSet: []protocol.CodeActionKind{
 						protocol.CodeActionKindRefactorRewrite,
 					},
@@ -385,11 +380,11 @@ func TestCodeAction_LiteralSupport(t *testing.T) {
 			TextDocument: textDoc,
 		})
 
-		uri := "file:///test.css"
-		_ = s.DocumentManager().DidOpen(uri, "css", 1, `.button { color: var(--color-primary); }`)
+		docURI := "file:///test.css"
+		_ = s.DocumentManager().DidOpen(docURI, "css", 1, `.button { color: var(--color-primary); }`)
 
 		params := &protocol.CodeActionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 21},
 				End:   protocol.Position{Line: 0, Character: 21},
@@ -402,7 +397,7 @@ func TestCodeAction_LiteralSupport(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result, "Should return code actions when literals are supported")
 
-		actions := result.([]protocol.CodeAction)
+		actions := extractCodeActions(t, result)
 		assert.NotEmpty(t, actions, "Should have code actions")
 	})
 
@@ -426,11 +421,11 @@ func TestCodeAction_LiteralSupport(t *testing.T) {
 			TextDocument: textDoc,
 		})
 
-		uri := "file:///test.css"
-		_ = s.DocumentManager().DidOpen(uri, "css", 1, `.button { color: var(--color-primary); }`)
+		docURI := "file:///test.css"
+		_ = s.DocumentManager().DidOpen(docURI, "css", 1, `.button { color: var(--color-primary); }`)
 
 		params := &protocol.CodeActionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 21},
 				End:   protocol.Position{Line: 0, Character: 21},
@@ -457,11 +452,11 @@ func TestCodeAction_LiteralSupport(t *testing.T) {
 
 		// Don't set any client capabilities - per LSP spec, assume not supported
 
-		uri := "file:///test.css"
-		_ = s.DocumentManager().DidOpen(uri, "css", 1, `.button { color: var(--color-primary); }`)
+		docURI := "file:///test.css"
+		_ = s.DocumentManager().DidOpen(docURI, "css", 1, `.button { color: var(--color-primary); }`)
 
 		params := &protocol.CodeActionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 21},
 				End:   protocol.Position{Line: 0, Character: 21},

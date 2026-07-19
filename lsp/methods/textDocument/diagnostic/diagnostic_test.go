@@ -4,13 +4,15 @@ import (
 	"encoding/json"
 	"testing"
 
+	"context"
+
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	lspuri "go.lsp.dev/uri"
 )
 
 func TestGetDiagnostics_DeprecatedToken(t *testing.T) {
@@ -33,10 +35,10 @@ func TestGetDiagnostics_DeprecatedToken(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, diagnostics, 1)
 
-	assert.Equal(t, protocol.DiagnosticSeverityInformation, *diagnostics[0].Severity)
+	assert.Equal(t, protocol.DiagnosticSeverityInformation, diagnostics[0].Severity)
 	assert.Contains(t, diagnostics[0].Message, "deprecated")
 	assert.Contains(t, diagnostics[0].Message, "Use color.primary instead")
-	assert.Equal(t, []protocol.DiagnosticTag{protocol.DiagnosticTagDeprecated}, diagnostics[0].Tags)
+	assert.Equal(t, []protocol.DiagnosticTag{protocol.DiagnosticTagDeprecated}, diagnostics[0].Tags.Slice())
 }
 
 func TestGetDiagnostics_IncorrectFallback(t *testing.T) {
@@ -58,7 +60,7 @@ func TestGetDiagnostics_IncorrectFallback(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, diagnostics, 1)
 
-	assert.Equal(t, protocol.DiagnosticSeverityError, *diagnostics[0].Severity)
+	assert.Equal(t, protocol.DiagnosticSeverityError, diagnostics[0].Severity)
 	assert.Contains(t, diagnostics[0].Message, "fallback does not match")
 	assert.Contains(t, diagnostics[0].Message, "#0000ff")
 }
@@ -163,8 +165,7 @@ func TestGetDiagnostics_MultipleIssues(t *testing.T) {
 
 func TestDocumentDiagnostic(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a deprecated token
 	_ = ctx.TokenManager().Add(&tokens.Token{
@@ -179,7 +180,7 @@ func TestDocumentDiagnostic(t *testing.T) {
 	_ = ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent)
 
 	params := &protocol.DocumentDiagnosticParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	}
 
 	result, err := DocumentDiagnostic(req, params)
@@ -187,8 +188,8 @@ func TestDocumentDiagnostic(t *testing.T) {
 	require.NotNil(t, result)
 
 	// Check that result is a RelatedFullDocumentDiagnosticReport
-	report, ok := result.(protocol.RelatedFullDocumentDiagnosticReport)
-	require.True(t, ok, "Result should be RelatedFullDocumentDiagnosticReport")
+	report, ok := result.(*protocol.RelatedFullDocumentDiagnosticReport)
+	require.True(t, ok, "Result should be *RelatedFullDocumentDiagnosticReport")
 	assert.Equal(t, string(protocol.DocumentDiagnosticReportKindFull), report.Kind)
 	assert.Len(t, report.Items, 1)
 }
@@ -321,7 +322,7 @@ func TestGetDiagnostics_DeprecatedWithoutMessage(t *testing.T) {
 	// Should just say "is deprecated" without additional message
 	assert.Contains(t, diagnostics[0].Message, "--color-legacy is deprecated")
 	// Make sure there's no colon followed by extra message
-	assert.Equal(t, "--color-legacy is deprecated", diagnostics[0].Message)
+	assert.Equal(t, protocol.String("--color-legacy is deprecated"), diagnostics[0].Message)
 }
 
 func TestGetDiagnostics_EmptyArrayJSON(t *testing.T) {
@@ -371,7 +372,7 @@ func TestGetDiagnostics_RelatedInformation(t *testing.T) {
 		require.Len(t, diag.RelatedInformation, 1)
 
 		relatedInfo := diag.RelatedInformation[0]
-		assert.Equal(t, "file:///tokens.json", relatedInfo.Location.URI)
+		assert.Equal(t, lspuri.URI("file:///tokens.json"), relatedInfo.Location.URI)
 		assert.Contains(t, relatedInfo.Message, "Token")
 		assert.Contains(t, relatedInfo.Message, "defined here")
 	})

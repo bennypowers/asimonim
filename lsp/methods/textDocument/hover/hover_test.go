@@ -1,6 +1,7 @@
 package hover
 
 import (
+	"context"
 	"testing"
 
 	asimonim "bennypowers.dev/asimonim/parser"
@@ -11,8 +12,8 @@ import (
 	fixtureutil "bennypowers.dev/asimonim/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	lspuri "go.lsp.dev/uri"
 )
 
 // TestIsPositionInRange tests the isPositionInRange function with half-open range semantics [start, end)
@@ -62,8 +63,7 @@ func TestIsPositionInRange(t *testing.T) {
 
 func TestHover_CSSVariableReference(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -82,7 +82,7 @@ func TestHover_CSSVariableReference(t *testing.T) {
 	// Hover over --color-primary in var() call
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 24},
 		},
 	})
@@ -91,7 +91,7 @@ func TestHover_CSSVariableReference(t *testing.T) {
 	require.NotNil(t, hover)
 
 	// Assert hover content
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok, "Contents should be MarkupContent")
 	assert.Contains(t, content.Value, "--color-primary")
 	assert.Contains(t, content.Value, "#ff0000")
@@ -105,8 +105,7 @@ func TestHover_CSSVariableReference(t *testing.T) {
 
 func TestHover_DeprecatedToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add deprecated token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -123,7 +122,7 @@ func TestHover_DeprecatedToken(t *testing.T) {
 
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 28},
 		},
 	})
@@ -132,7 +131,7 @@ func TestHover_DeprecatedToken(t *testing.T) {
 	require.NotNil(t, hover)
 
 	// Assert deprecation warning
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content.Value, "DEPRECATED")
 	assert.Contains(t, content.Value, "Use color.primary instead")
@@ -140,8 +139,7 @@ func TestHover_DeprecatedToken(t *testing.T) {
 
 func TestHover_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.css"
 	cssContent := `.button { color: var(--unknown-token); }`
@@ -149,7 +147,7 @@ func TestHover_UnknownToken(t *testing.T) {
 
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 28},
 		},
 	})
@@ -158,7 +156,7 @@ func TestHover_UnknownToken(t *testing.T) {
 	require.NotNil(t, hover, "Should show 'unknown token' message for var() calls with unknown tokens")
 
 	// Assert unknown token message
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content.Value, "Unknown token")
 	assert.Contains(t, content.Value, "--unknown-token")
@@ -169,8 +167,7 @@ func TestHover_UnknownToken(t *testing.T) {
 
 func TestHover_VarCallWithFallback(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.large",
@@ -185,7 +182,7 @@ func TestHover_VarCallWithFallback(t *testing.T) {
 	// Hover over the token name in var() call with fallback
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 28},
 		},
 	})
@@ -193,7 +190,7 @@ func TestHover_VarCallWithFallback(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, hover)
 
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content.Value, "--spacing-large")
 	assert.Contains(t, content.Value, "2rem")
@@ -201,8 +198,7 @@ func TestHover_VarCallWithFallback(t *testing.T) {
 
 func TestHover_NestedVarCalls(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -217,7 +213,7 @@ func TestHover_NestedVarCalls(t *testing.T) {
 
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 47},
 		},
 	})
@@ -225,15 +221,14 @@ func TestHover_NestedVarCalls(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, hover)
 
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content.Value, "--color-primary")
 }
 
 func TestHover_VarCallOutsideCursorRange(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -247,7 +242,7 @@ func TestHover_VarCallOutsideCursorRange(t *testing.T) {
 	// Hover on "color:" property, not in var() range
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 12},
 		},
 	})
@@ -258,8 +253,7 @@ func TestHover_VarCallOutsideCursorRange(t *testing.T) {
 
 func TestHover_VariableDeclaration(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -276,7 +270,7 @@ func TestHover_VariableDeclaration(t *testing.T) {
 	// Hover over variable declaration (on the property name)
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 10},
 		},
 	})
@@ -285,7 +279,7 @@ func TestHover_VariableDeclaration(t *testing.T) {
 	require.NotNil(t, hover)
 
 	// Assert hover content for declaration
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content.Value, "--color-primary")
 	assert.Contains(t, content.Value, "#ff0000")
@@ -301,8 +295,7 @@ func TestHover_VariableDeclaration(t *testing.T) {
 
 func TestHover_VariableDeclaration_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.css"
 	// --local-var is not a known design token, just a local CSS custom property
@@ -312,7 +305,7 @@ func TestHover_VariableDeclaration_UnknownToken(t *testing.T) {
 	// Hover over unknown variable declaration
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 10},
 		},
 	})
@@ -323,8 +316,7 @@ func TestHover_VariableDeclaration_UnknownToken(t *testing.T) {
 
 func TestHover_VariableDeclaration_OnValue(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -341,7 +333,7 @@ func TestHover_VariableDeclaration_OnValue(t *testing.T) {
 	// Character 25 is on "#ff0000"
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 25},
 		},
 	})
@@ -352,8 +344,7 @@ func TestHover_VariableDeclaration_OnValue(t *testing.T) {
 
 func TestHover_VariableDeclaration_Boundaries(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -381,7 +372,7 @@ func TestHover_VariableDeclaration_Boundaries(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			hover, err := Hover(req, &protocol.HoverParams{
 				TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-					TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+					TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 					Position:     protocol.Position{Line: 0, Character: tt.character},
 				},
 			})
@@ -398,8 +389,7 @@ func TestHover_VariableDeclaration_Boundaries(t *testing.T) {
 
 func TestHover_VariableDeclaration_WithPrefix(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a token with prefix
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -417,7 +407,7 @@ func TestHover_VariableDeclaration_WithPrefix(t *testing.T) {
 
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 12},
 		},
 	})
@@ -425,7 +415,7 @@ func TestHover_VariableDeclaration_WithPrefix(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, hover)
 
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content.Value, "--ds-color-primary")
 	assert.Contains(t, content.Value, "#0000ff")
@@ -434,8 +424,7 @@ func TestHover_VariableDeclaration_WithPrefix(t *testing.T) {
 
 func TestHover_VariableDeclaration_MultipleInSameBlock(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -458,34 +447,33 @@ func TestHover_VariableDeclaration_MultipleInSameBlock(t *testing.T) {
 	// Test first declaration
 	hover1, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 1, Character: 5},
 		},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, hover1)
-	content1, ok := hover1.Contents.(protocol.MarkupContent)
+	content1, ok := hover1.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content1.Value, "--color-primary")
 
 	// Test second declaration
 	hover2, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 2, Character: 5},
 		},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, hover2)
-	content2, ok := hover2.Contents.(protocol.MarkupContent)
+	content2, ok := hover2.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content2.Value, "--color-secondary")
 }
 
 func TestHover_InvalidPosition(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -499,7 +487,7 @@ func TestHover_InvalidPosition(t *testing.T) {
 	// Hover outside var() call
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 5},
 		},
 	})
@@ -510,8 +498,7 @@ func TestHover_InvalidPosition(t *testing.T) {
 
 func TestHover_NonCSSDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.json"
 	jsonContent := `{"color": {"$value": "#ff0000"}}`
@@ -519,7 +506,7 @@ func TestHover_NonCSSDocument(t *testing.T) {
 
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 10},
 		},
 	})
@@ -530,12 +517,11 @@ func TestHover_NonCSSDocument(t *testing.T) {
 
 func TestHover_DocumentNotFound(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: "file:///nonexistent.css"},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI("file:///nonexistent.css")},
 			Position:     protocol.Position{Line: 0, Character: 10},
 		},
 	})
@@ -548,8 +534,7 @@ func TestHover_DocumentNotFound(t *testing.T) {
 // This is the RHDS pattern: var(--local, var(--design-token, fallback))
 func TestHover_NestedVarInFallback(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add design tokens (not the local variables)
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -579,7 +564,7 @@ func TestHover_NestedVarInFallback(t *testing.T) {
 		// Line 1, character 40 is approximately over --color-text-primary
 		hover, err := Hover(req, &protocol.HoverParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 				Position:     protocol.Position{Line: 1, Character: 40},
 			},
 		})
@@ -587,7 +572,7 @@ func TestHover_NestedVarInFallback(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, hover, "Should find hover for inner token")
 
-		content, ok := hover.Contents.(protocol.MarkupContent)
+		content, ok := hover.Contents.(*protocol.MarkupContent)
 		require.True(t, ok)
 
 		// Should show info for the INNER token, not the outer --_local-color
@@ -603,7 +588,7 @@ func TestHover_NestedVarInFallback(t *testing.T) {
 		// Line 1, character 18 is approximately over --_local-color
 		hover, err := Hover(req, &protocol.HoverParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 				Position:     protocol.Position{Line: 1, Character: 18},
 			},
 		})
@@ -613,7 +598,7 @@ func TestHover_NestedVarInFallback(t *testing.T) {
 		// It may return an "unknown token" hover or nil — either is acceptable.
 		// What matters is that it does NOT show the inner token's information.
 		if hover != nil {
-			content, ok := hover.Contents.(protocol.MarkupContent)
+			content, ok := hover.Contents.(*protocol.MarkupContent)
 			if ok {
 				assert.NotContains(t, content.Value, "--color-text-primary", "Should not show inner token")
 				assert.NotContains(t, content.Value, "Primary text color", "Should not show inner token description")
@@ -626,7 +611,7 @@ func TestHover_NestedVarInFallback(t *testing.T) {
 		// Line 2, character 50 is approximately over --color-surface-lightest
 		hover, err := Hover(req, &protocol.HoverParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 				Position:     protocol.Position{Line: 2, Character: 50},
 			},
 		})
@@ -634,7 +619,7 @@ func TestHover_NestedVarInFallback(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, hover, "Should find hover for second inner token")
 
-		content, ok := hover.Contents.(protocol.MarkupContent)
+		content, ok := hover.Contents.(*protocol.MarkupContent)
 		require.True(t, ok)
 
 		assert.Contains(t, content.Value, "--color-surface-lightest", "Should show correct token name")
@@ -648,8 +633,7 @@ func TestHover_ContentFormat(t *testing.T) {
 	t.Run("returns markdown when client prefers it", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetPreferredHoverFormat(protocol.MarkupKindMarkdown)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 			Name:        "color.primary",
@@ -664,7 +648,7 @@ func TestHover_ContentFormat(t *testing.T) {
 
 		hover, err := Hover(req, &protocol.HoverParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 				Position:     protocol.Position{Line: 0, Character: 24},
 			},
 		})
@@ -672,7 +656,7 @@ func TestHover_ContentFormat(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, hover)
 
-		content, ok := hover.Contents.(protocol.MarkupContent)
+		content, ok := hover.Contents.(*protocol.MarkupContent)
 		require.True(t, ok)
 		assert.Equal(t, protocol.MarkupKindMarkdown, content.Kind)
 		assert.Contains(t, content.Value, "**Value (CSS)**") // Markdown formatting
@@ -681,8 +665,7 @@ func TestHover_ContentFormat(t *testing.T) {
 	t.Run("returns plaintext when client only supports plaintext", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		ctx.SetPreferredHoverFormat(protocol.MarkupKindPlainText)
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 			Name:        "color.primary",
@@ -697,7 +680,7 @@ func TestHover_ContentFormat(t *testing.T) {
 
 		hover, err := Hover(req, &protocol.HoverParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 				Position:     protocol.Position{Line: 0, Character: 24},
 			},
 		})
@@ -705,7 +688,7 @@ func TestHover_ContentFormat(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, hover)
 
-		content, ok := hover.Contents.(protocol.MarkupContent)
+		content, ok := hover.Contents.(*protocol.MarkupContent)
 		require.True(t, ok)
 		assert.Equal(t, protocol.MarkupKindPlainText, content.Kind)
 		assert.NotContains(t, content.Value, "**") // No markdown formatting
@@ -715,8 +698,7 @@ func TestHover_ContentFormat(t *testing.T) {
 	t.Run("defaults to markdown when no preference", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
 		// Don't set format preference - test default behavior
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 			Name:  "color.primary",
@@ -729,7 +711,7 @@ func TestHover_ContentFormat(t *testing.T) {
 
 		hover, err := Hover(req, &protocol.HoverParams{
 			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 				Position:     protocol.Position{Line: 0, Character: 24},
 			},
 		})
@@ -737,7 +719,7 @@ func TestHover_ContentFormat(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, hover)
 
-		content, ok := hover.Contents.(protocol.MarkupContent)
+		content, ok := hover.Contents.(*protocol.MarkupContent)
 		require.True(t, ok)
 		assert.Equal(t, protocol.MarkupKindMarkdown, content.Kind)
 	})
@@ -749,8 +731,7 @@ func TestHover_ContentFormat(t *testing.T) {
 
 func TestHover_HTMLStyleTag(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -768,14 +749,14 @@ func TestHover_HTMLStyleTag(t *testing.T) {
 	// Character 30 is inside var(--color-primary)
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 30},
 		},
 	})
 
 	require.NoError(t, err)
 	require.NotNil(t, hover)
-	mc, ok := hover.Contents.(protocol.MarkupContent)
+	mc, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, mc.Value, "--color-primary")
 
@@ -785,8 +766,7 @@ func TestHover_HTMLStyleTag(t *testing.T) {
 
 func TestHover_PHPStyleTag(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.md",
@@ -810,14 +790,14 @@ func TestHover_PHPStyleTag(t *testing.T) {
 	//                    ^ char 19 is inside --spacing-md
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 8, Character: 19},
 		},
 	})
 
 	require.NoError(t, err)
 	require.NotNil(t, hover, "hover should not be nil for var() call in PHP style tag")
-	mc, ok := hover.Contents.(protocol.MarkupContent)
+	mc, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, mc.Value, "--spacing-md")
 
@@ -827,8 +807,7 @@ func TestHover_PHPStyleTag(t *testing.T) {
 
 func TestHover_PHPStyleAttribute(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.sm",
@@ -847,22 +826,21 @@ func TestHover_PHPStyleAttribute(t *testing.T) {
 	//                                  ^ char 30 is inside --spacing-sm
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 17, Character: 30},
 		},
 	})
 
 	require.NoError(t, err)
 	require.NotNil(t, hover, "hover should not be nil for var() call in PHP style attribute")
-	mc, ok := hover.Contents.(protocol.MarkupContent)
+	mc, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, mc.Value, "--spacing-sm")
 }
 
 func TestHover_TwigStyleTag(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.md",
@@ -881,14 +859,14 @@ func TestHover_TwigStyleTag(t *testing.T) {
 	//                    ^ char 19 is inside --spacing-md
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 5, Character: 19},
 		},
 	})
 
 	require.NoError(t, err)
 	require.NotNil(t, hover, "hover should not be nil for var() call in Twig style tag")
-	mc, ok := hover.Contents.(protocol.MarkupContent)
+	mc, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, mc.Value, "--spacing-md")
 
@@ -898,8 +876,7 @@ func TestHover_TwigStyleTag(t *testing.T) {
 
 func TestHover_TwigStyleAttribute(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.sm",
@@ -917,22 +894,21 @@ func TestHover_TwigStyleAttribute(t *testing.T) {
 	//                                  ^ char 30 is inside --spacing-sm
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 14, Character: 30},
 		},
 	})
 
 	require.NoError(t, err)
 	require.NotNil(t, hover, "hover should not be nil for var() call in Twig style attribute")
-	mc, ok := hover.Contents.(protocol.MarkupContent)
+	mc, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, mc.Value, "--spacing-sm")
 }
 
 func TestHover_JSCSSTemplate(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.small",
@@ -947,14 +923,14 @@ func TestHover_JSCSSTemplate(t *testing.T) {
 	// Character 30 is inside var(--spacing-small) on line 1
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 1, Character: 30},
 		},
 	})
 
 	require.NoError(t, err)
 	require.NotNil(t, hover)
-	mc, ok := hover.Contents.(protocol.MarkupContent)
+	mc, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, mc.Value, "--spacing-small")
 
@@ -964,8 +940,7 @@ func TestHover_JSCSSTemplate(t *testing.T) {
 
 func TestHover_TSXCSSTemplate(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.small",
@@ -980,14 +955,14 @@ func TestHover_TSXCSSTemplate(t *testing.T) {
 	// Character 30 is inside var(--spacing-small) on line 1
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 1, Character: 30},
 		},
 	})
 
 	require.NoError(t, err)
 	require.NotNil(t, hover)
-	mc, ok := hover.Contents.(protocol.MarkupContent)
+	mc, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, mc.Value, "--spacing-small")
 
@@ -1001,8 +976,7 @@ func TestHover_TSXCSSTemplate(t *testing.T) {
 
 func TestHover_CurlyBraceReference_JSON(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add tokens
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -1029,7 +1003,7 @@ func TestHover_CurlyBraceReference_JSON(t *testing.T) {
 	// Character 20 is inside "color.primary"
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 3, Character: 20},
 		},
 	})
@@ -1038,7 +1012,7 @@ func TestHover_CurlyBraceReference_JSON(t *testing.T) {
 	require.NotNil(t, hover)
 
 	// Assert hover content
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok, "Contents should be MarkupContent")
 	assert.Contains(t, content.Value, "--color-primary")
 	assert.Contains(t, content.Value, "#ff0000")
@@ -1050,8 +1024,7 @@ func TestHover_CurlyBraceReference_JSON(t *testing.T) {
 
 func TestHover_CurlyBraceReference_YAML(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add tokens
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -1074,7 +1047,7 @@ func TestHover_CurlyBraceReference_YAML(t *testing.T) {
 	// Character 20 is inside "color.accent.base"
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 3, Character: 20},
 		},
 	})
@@ -1083,7 +1056,7 @@ func TestHover_CurlyBraceReference_YAML(t *testing.T) {
 	require.NotNil(t, hover)
 
 	// Assert hover content
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok, "Contents should be MarkupContent")
 	assert.Contains(t, content.Value, "--color-accent-base")
 	assert.Contains(t, content.Value, "#0066cc")
@@ -1092,8 +1065,7 @@ func TestHover_CurlyBraceReference_YAML(t *testing.T) {
 
 func TestHover_JSONPointerReference(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add tokens
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -1119,7 +1091,7 @@ func TestHover_JSONPointerReference(t *testing.T) {
 	// Character 20 is inside "spacing/large"
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 3, Character: 20},
 		},
 	})
@@ -1128,7 +1100,7 @@ func TestHover_JSONPointerReference(t *testing.T) {
 	require.NotNil(t, hover)
 
 	// Assert hover content
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok, "Contents should be MarkupContent")
 	assert.Contains(t, content.Value, "--spacing-large")
 	assert.Contains(t, content.Value, "2rem")
@@ -1137,8 +1109,7 @@ func TestHover_JSONPointerReference(t *testing.T) {
 
 func TestHover_TokenReference_UnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Open a JSON document with reference to unknown token
 	uri := "file:///tokens.json"
@@ -1154,7 +1125,7 @@ func TestHover_TokenReference_UnknownToken(t *testing.T) {
 	// Hover over {unknown.token}
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 3, Character: 20},
 		},
 	})
@@ -1163,15 +1134,14 @@ func TestHover_TokenReference_UnknownToken(t *testing.T) {
 	require.NotNil(t, hover, "Should show 'unknown token' message")
 
 	// Assert unknown token message
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content.Value, "Unknown token")
 }
 
 func TestHover_TokenReference_NoReferenceAtPosition(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Open a JSON document
 	uri := "file:///tokens.json"
@@ -1189,7 +1159,7 @@ func TestHover_TokenReference_NoReferenceAtPosition(t *testing.T) {
 	// Position on "$value" key, not on a reference
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 3, Character: 10},
 		},
 	})
@@ -1200,8 +1170,7 @@ func TestHover_TokenReference_NoReferenceAtPosition(t *testing.T) {
 
 func TestHover_TokenReference_DeprecatedToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add deprecated token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -1221,7 +1190,7 @@ func TestHover_TokenReference_DeprecatedToken(t *testing.T) {
 	// Hover over the deprecated token reference
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 2, Character: 18},
 		},
 	})
@@ -1230,7 +1199,7 @@ func TestHover_TokenReference_DeprecatedToken(t *testing.T) {
 	require.NotNil(t, hover)
 
 	// Assert deprecation warning
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Contains(t, content.Value, "DEPRECATED")
 	assert.Contains(t, content.Value, "Use color.primary instead")
@@ -1267,8 +1236,7 @@ func parseTokensFile(t *testing.T, path string) map[string]*tokens.Token {
 func TestHover_PlaintextUnknownToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetPreferredHoverFormat(protocol.MarkupKindPlainText)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.css"
 	cssContent := `.button { color: var(--unknown-token); }`
@@ -1277,7 +1245,7 @@ func TestHover_PlaintextUnknownToken(t *testing.T) {
 	// unknown token with plaintext format
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 28},
 		},
 	})
@@ -1285,7 +1253,7 @@ func TestHover_PlaintextUnknownToken(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, hover)
 
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Equal(t, protocol.MarkupKindPlainText, content.Kind)
 	assert.Contains(t, content.Value, "Unknown token")
@@ -1508,8 +1476,7 @@ func TestFindInnermostVariable(t *testing.T) {
 func TestHover_TokenFileHover_PlaintextFormat(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetPreferredHoverFormat(protocol.MarkupKindPlainText)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:        "color-primary",
@@ -1530,7 +1497,7 @@ func TestHover_TokenFileHover_PlaintextFormat(t *testing.T) {
 
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 3, Character: 20},
 		},
 	})
@@ -1538,7 +1505,7 @@ func TestHover_TokenFileHover_PlaintextFormat(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, hover)
 
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Equal(t, protocol.MarkupKindPlainText, content.Kind)
 	assert.NotContains(t, content.Value, "**") // no markdown
@@ -1549,8 +1516,7 @@ func TestHover_TokenFileHover_PlaintextFormat(t *testing.T) {
 func TestHover_PlaintextUnknownTokenRef(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
 	ctx.SetPreferredHoverFormat(protocol.MarkupKindPlainText)
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///tokens.json"
 	jsonContent := `{
@@ -1564,7 +1530,7 @@ func TestHover_PlaintextUnknownTokenRef(t *testing.T) {
 
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 3, Character: 20},
 		},
 	})
@@ -1572,7 +1538,7 @@ func TestHover_PlaintextUnknownTokenRef(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, hover)
 
-	content, ok := hover.Contents.(protocol.MarkupContent)
+	content, ok := hover.Contents.(*protocol.MarkupContent)
 	require.True(t, ok)
 	assert.Equal(t, protocol.MarkupKindPlainText, content.Kind)
 	assert.Contains(t, content.Value, "Unknown token")
@@ -1582,8 +1548,7 @@ func TestHover_PlaintextUnknownTokenRef(t *testing.T) {
 // TestHover_UnsupportedLanguage tests that hover returns nil for unsupported languages
 func TestHover_UnsupportedLanguage(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.py"
 	content := `print("hello")`
@@ -1591,7 +1556,7 @@ func TestHover_UnsupportedLanguage(t *testing.T) {
 
 	hover, err := Hover(req, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 			Position:     protocol.Position{Line: 0, Character: 5},
 		},
 	})

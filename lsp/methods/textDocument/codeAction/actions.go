@@ -1,6 +1,7 @@
 package codeaction
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -8,7 +9,8 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	"bennypowers.dev/asimonim/lsp/helpers/css"
 	"bennypowers.dev/asimonim/lsp/types"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	lspuri "go.lsp.dev/uri"
 )
 
 // createReplacementAction creates a code action to replace a deprecated token with a recommended token.
@@ -31,8 +33,8 @@ func createReplacementAction(req *types.RequestContext, uri string, varCall cssp
 		Title: fmt.Sprintf("Replace with '%s'", cssVarName),
 		Kind:  &kind,
 		Edit: &protocol.WorkspaceEdit{
-			Changes: map[string][]protocol.TextEdit{
-				uri: {
+			Changes: map[lspuri.URI][]protocol.TextEdit{
+				lspuri.URI(uri): {
 					{
 						Range: protocol.Range{
 							Start: protocol.Position{
@@ -73,8 +75,8 @@ func createLiteralValueAction(uri string, varCall cssparser.VarCall, token *toke
 		Title: fmt.Sprintf("Replace with literal value '%s'", formattedValue),
 		Kind:  &kind,
 		Edit: &protocol.WorkspaceEdit{
-			Changes: map[string][]protocol.TextEdit{
-				uri: {
+			Changes: map[lspuri.URI][]protocol.TextEdit{
+				lspuri.URI(uri): {
 					{
 						Range: protocol.Range{
 							Start: protocol.Position{
@@ -129,8 +131,8 @@ func createFixFallbackAction(req *types.RequestContext, uri string, varCall cssp
 		Title: fmt.Sprintf("Fix fallback value to '%s'", formattedValue),
 		Kind:  &kind,
 		Edit: &protocol.WorkspaceEdit{
-			Changes: map[string][]protocol.TextEdit{
-				uri: {
+			Changes: map[lspuri.URI][]protocol.TextEdit{
+				lspuri.URI(uri): {
 					{
 						Range: protocol.Range{
 							Start: protocol.Position{
@@ -177,8 +179,8 @@ func createAddFallbackAction(req *types.RequestContext, uri string, varCall cssp
 		Title: fmt.Sprintf("Add fallback value '%s'", formattedValue),
 		Kind:  &kind,
 		Edit: &protocol.WorkspaceEdit{
-			Changes: map[string][]protocol.TextEdit{
-				uri: {
+			Changes: map[lspuri.URI][]protocol.TextEdit{
+				lspuri.URI(uri): {
 					{
 						Range: protocol.Range{
 							Start: protocol.Position{
@@ -262,8 +264,8 @@ func createToggleFallbackAction(req *types.RequestContext, uri string, varCall c
 		Title: "Toggle design token fallback value",
 		Kind:  &kind,
 		Edit: &protocol.WorkspaceEdit{
-			Changes: map[string][]protocol.TextEdit{
-				uri: {
+			Changes: map[lspuri.URI][]protocol.TextEdit{
+				lspuri.URI(uri): {
 					{
 						Range: protocol.Range{
 							Start: protocol.Position{
@@ -332,8 +334,8 @@ func createToggleRangeFallbacksAction(req *types.RequestContext, uri string, var
 		Title: "Toggle design token fallback values (in range)",
 		Kind:  &kind,
 		Edit: &protocol.WorkspaceEdit{
-			Changes: map[string][]protocol.TextEdit{
-				uri: edits,
+			Changes: map[lspuri.URI][]protocol.TextEdit{
+				lspuri.URI(uri): edits,
 			},
 		},
 	}
@@ -347,11 +349,14 @@ func createFixAllFallbacksAction(uri string, varCalls []*cssparser.VarCall) *pro
 	action := protocol.CodeAction{
 		Title: "Fix all token fallback values",
 		Kind:  &kind,
-		// Data field is used to pass var calls to resolve step
-		Data: map[string]any{
-			"uri":      uri,
-			"varCalls": varCalls,
-		},
+		// Data field is used to pass var calls to resolve step (LSPAny = jsontext.Value)
+		Data: func() protocol.LSPAny {
+			b, _ := json.Marshal(map[string]any{
+				"uri":      uri,
+				"varCalls": varCalls,
+			})
+			return protocol.LSPAny(b)
+		}(),
 	}
 	return &action
 }
@@ -394,7 +399,7 @@ func createFixAllActionIfNeeded(uri string, varCalls []*cssparser.VarCall, diagn
 	incorrectFallbackCount := 0
 	for i := range diagnostics {
 		diag := &diagnostics[i]
-		if diag.Code != nil && diag.Code.Value == "incorrect-fallback" {
+		if code, ok := diag.Code.(protocol.String); ok && string(code) == "incorrect-fallback" {
 			incorrectFallbackCount++
 		}
 	}

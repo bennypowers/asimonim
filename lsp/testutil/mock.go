@@ -1,14 +1,14 @@
 package testutil
 
 import (
+	"context"
 	"path/filepath"
 
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
 	semantictokens "bennypowers.dev/asimonim/lsp/methods/textDocument/semanticTokens"
 	"bennypowers.dev/asimonim/lsp/types"
-	"github.com/bennypowers/glsp"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // MockServerContext implements types.ServerContext for testing.
@@ -20,7 +20,7 @@ type MockServerContext struct {
 	rootPath    string
 	config                     types.ServerConfig
 	loadedFiles                map[string]string
-	glspContext                *glsp.Context
+	glspContext                context.Context
 	clientDiagnosticCapability *bool
 	clientCapabilities         *protocol.ClientCapabilities
 	supportsSnippets           *bool
@@ -34,10 +34,10 @@ type MockServerContext struct {
 	// Optional callbacks for custom behavior in tests.
 	// When set, these functions are called instead of the default implementations.
 	LoadTokensFunc                    func() error
-	RegisterWatchersFunc              func(*glsp.Context) error
+	RegisterWatchersFunc              func(context.Context) error
 	IsTokenFileFunc                   func(string) bool
 	ShouldProcessAsTokenFileFunc      func(string) bool
-	PublishDiagnosticsFunc            func(*glsp.Context, string) error
+	PublishDiagnosticsFunc            func(context.Context, string) error
 	// LoadTokensFromDocumentContentFunc is called when LoadTokensFromDocumentContent is invoked.
 	// Use this to customize auto-load behavior or verify the parameters passed.
 	LoadTokensFromDocumentContentFunc func(uri, languageID, content string) error
@@ -46,6 +46,7 @@ type MockServerContext struct {
 	// These are set to true when the corresponding method is invoked.
 	LoadTokensCalled bool
 	RegisterWatchersCalled bool
+	NotifyDiagnosticRefreshCalled bool
 	// LoadTokensFromDocumentContentCalled is set to true when LoadTokensFromDocumentContent is called.
 	// Use this to verify that the auto-load path was triggered during didOpen.
 	LoadTokensFromDocumentContentCalled bool
@@ -183,7 +184,7 @@ func (m *MockServerContext) LoadPackageJsonConfig() error {
 }
 
 // RegisterFileWatchers registers file watchers with the client
-func (m *MockServerContext) RegisterFileWatchers(ctx *glsp.Context) error {
+func (m *MockServerContext) RegisterFileWatchers(ctx context.Context) error {
 	m.RegisterWatchersCalled = true
 	if m.RegisterWatchersFunc != nil {
 		return m.RegisterWatchersFunc(ctx)
@@ -207,13 +208,13 @@ func (m *MockServerContext) RemoveLoadedFile(path string) {
 	delete(m.loadedFiles, cleanPath)
 }
 
-// GLSPContext returns the GLSP context
-func (m *MockServerContext) GLSPContext() *glsp.Context {
+// ServerCtx returns the stored context
+func (m *MockServerContext) ServerCtx() context.Context {
 	return m.glspContext
 }
 
-// SetGLSPContext sets the GLSP context
-func (m *MockServerContext) SetGLSPContext(ctx *glsp.Context) {
+// SetServerCtx sets the stored context
+func (m *MockServerContext) SetServerCtx(ctx context.Context) {
 	m.glspContext = ctx
 }
 
@@ -333,7 +334,7 @@ func (m *MockServerContext) SupportsCodeActionLiterals() bool {
 	if m.clientCapabilities != nil &&
 		m.clientCapabilities.TextDocument != nil &&
 		m.clientCapabilities.TextDocument.CodeAction != nil &&
-		m.clientCapabilities.TextDocument.CodeAction.CodeActionLiteralSupport != nil {
+		len(m.clientCapabilities.TextDocument.CodeAction.CodeActionLiteralSupport.CodeActionKind.ValueSet) > 0 {
 		return true
 	}
 	return false
@@ -353,11 +354,16 @@ func (m *MockServerContext) InlayHintsEnabled() bool {
 }
 
 // PublishDiagnostics publishes diagnostics for a document
-func (m *MockServerContext) PublishDiagnostics(context *glsp.Context, uri string) error {
+func (m *MockServerContext) PublishDiagnostics(ctx context.Context, uri string) error {
 	if m.PublishDiagnosticsFunc != nil {
-		return m.PublishDiagnosticsFunc(context, uri)
+		return m.PublishDiagnosticsFunc(ctx, uri)
 	}
 	return nil
+}
+
+// NotifyDiagnosticRefresh tracks that refresh was requested
+func (m *MockServerContext) NotifyDiagnosticRefresh() {
+	m.NotifyDiagnosticRefreshCalled = true
 }
 
 // UsePullDiagnostics returns whether to use pull diagnostics (LSP 3.17)

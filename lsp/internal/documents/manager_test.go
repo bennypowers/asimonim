@@ -6,7 +6,7 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // TestDocumentManagerOpenClose tests opening and closing documents
@@ -61,9 +61,8 @@ func TestDocumentManagerFullUpdate(t *testing.T) {
 	// Update with full content
 	newContent := `:root { --color: blue; }`
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
+		&protocol.TextDocumentContentChangeWholeDocument{
 			Text: newContent,
-			// No Range means full document update
 		},
 	}
 
@@ -94,8 +93,8 @@ func TestDocumentManagerIncrementalUpdate(t *testing.T) {
 	startPos := protocol.Position{Line: 1, Character: 11}
 	endPos := protocol.Position{Line: 1, Character: 14}
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: startPos,
 				End:   endPos,
 			},
@@ -127,8 +126,8 @@ func TestDocumentManagerMultipleIncrementalUpdates(t *testing.T) {
 
 	// Change 1: Replace "hello" with "goodbye"
 	changes1 := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 0},
 				End:   protocol.Position{Line: 0, Character: 5},
 			},
@@ -143,8 +142,8 @@ func TestDocumentManagerMultipleIncrementalUpdates(t *testing.T) {
 
 	// Change 2: Replace "world" with "universe"
 	changes2 := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 8},
 				End:   protocol.Position{Line: 0, Character: 13},
 			},
@@ -174,15 +173,15 @@ func TestDocumentManagerBatchChanges(t *testing.T) {
 	// Change 1: Replace "1" with " ONE" at position 5-6 of line 0
 	// Change 2: Replace "2" with " TWO" at position 5-6 of line 1 (in modified document)
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 5},
 				End:   protocol.Position{Line: 0, Character: 6},
 			},
 			Text: " ONE",
 		},
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 1, Character: 5},
 				End:   protocol.Position{Line: 1, Character: 6},
 			},
@@ -212,8 +211,8 @@ func TestDocumentManagerInsertText(t *testing.T) {
 
 	// Insert " beautiful" at position 5 (after "hello")
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 5},
 				End:   protocol.Position{Line: 0, Character: 5},
 			},
@@ -241,8 +240,8 @@ func TestDocumentManagerDeleteText(t *testing.T) {
 
 	// Delete " beautiful" (characters 5-15)
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 5},
 				End:   protocol.Position{Line: 0, Character: 15},
 			},
@@ -272,8 +271,8 @@ line 3`
 
 	// Replace from middle of line 1 to middle of line 2
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 5},
 				End:   protocol.Position{Line: 1, Character: 5},
 			},
@@ -349,8 +348,8 @@ func TestDocumentManagerUTF16Incremental(t *testing.T) {
 	// Replace "blue" with "red"
 	// "/* 👍 */ color: " is 18 bytes but only 16 UTF-16 code units (👍 = 2 units)
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 16}, // UTF-16 position
 				End:   protocol.Position{Line: 0, Character: 20}, // UTF-16 position
 			},
@@ -378,8 +377,8 @@ func TestDocumentManagerUTF16CJK(t *testing.T) {
 	// Replace "blue" with "red"
 	// "/* 颜色 */ color: " is 20 bytes, 16 UTF-16 code units (each CJK char = 1 unit)
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 16},
 				End:   protocol.Position{Line: 0, Character: 20},
 			},
@@ -406,8 +405,8 @@ func TestDocumentManagerEOFInsertion(t *testing.T) {
 
 	// Insert at EOF (line == len(lines))
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 2, Character: 0}, // EOF
 				End:   protocol.Position{Line: 2, Character: 0},
 			},
@@ -433,8 +432,8 @@ func TestDocumentManagerEmptyDocumentEOF(t *testing.T) {
 
 	// Insert at EOF in empty document
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 0},
 				End:   protocol.Position{Line: 0, Character: 0},
 			},
@@ -461,8 +460,8 @@ func TestDocumentManagerCharBoundsCheck(t *testing.T) {
 	// Try to edit with out-of-bounds character position (UTF16ToByteOffset clamps to end)
 	// When position is beyond line length, it should append at end
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 100}, // Way beyond line length
 				End:   protocol.Position{Line: 0, Character: 100},
 			},
@@ -490,9 +489,8 @@ func TestDocumentManagerStaleVersionRejection(t *testing.T) {
 
 	// Try to update with version 3 (older)
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: nil, // Full update
-			Text:  "stale update",
+		&protocol.TextDocumentContentChangeWholeDocument{
+			Text: "stale update",
 		},
 	}
 
@@ -517,8 +515,8 @@ func TestDocumentManagerLineBoundsError(t *testing.T) {
 
 	// Try to edit at line 10 (way beyond document)
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 10, Character: 0},
 				End:   protocol.Position{Line: 10, Character: 0},
 			},
@@ -547,8 +545,8 @@ func TestDocumentManagerInvalidUTF8(t *testing.T) {
 
 	// Try to edit - should handle gracefully
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 5},
 				End:   protocol.Position{Line: 0, Character: 6},
 			},
@@ -577,8 +575,8 @@ func TestDocumentManagerEndLineBoundsError(t *testing.T) {
 
 	// Try to edit with end line beyond document (start is valid, end is not)
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 0},
 				End:   protocol.Position{Line: 10, Character: 0}, // Way beyond document
 			},
@@ -608,8 +606,8 @@ func TestDocumentManagerEOFInsertionEmptyDocument(t *testing.T) {
 	// Insert at EOF position on empty document
 	// This triggers the special case: len(lines) == 1 with lines[0] == ""
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 1, Character: 0}, // EOF: line == len(lines) == 1
 				End:   protocol.Position{Line: 1, Character: 0},
 			},
@@ -637,8 +635,8 @@ func TestDocumentManagerStartCharClamp(t *testing.T) {
 	// Manually construct a change with negative character position
 	// (This shouldn't happen from a real LSP client, but we test the guard)
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 0},
 				End:   protocol.Position{Line: 0, Character: 5},
 			},
@@ -666,8 +664,8 @@ func TestDocumentManagerStartLineBeyondDocument(t *testing.T) {
 
 	// Start line 3 is beyond EOF (len(lines) == 2, so line 3 > len(lines))
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 3, Character: 0},
 				End:   protocol.Position{Line: 3, Character: 0},
 			},
@@ -692,8 +690,8 @@ func TestDocumentManagerEndLineOnlyBeyondDocument(t *testing.T) {
 	// Start line valid (1), end line out-of-bounds after normalization
 	// Line 5 > len(lines)==3, so it fails the initial > check
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 1, Character: 0},
 				End:   protocol.Position{Line: 5, Character: 0},
 			},
@@ -717,8 +715,8 @@ func TestDocumentManagerCharBeyondLineLength(t *testing.T) {
 	// Character position way beyond line length gets clamped by UTF16ToByteOffset
 	// The bounds check at line 146-149 validates that the clamped value is still valid
 	changes := []protocol.TextDocumentContentChangeEvent{
-		{
-			Range: &protocol.Range{
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
 				Start: protocol.Position{Line: 0, Character: 1000},
 				End:   protocol.Position{Line: 0, Character: 1000},
 			},

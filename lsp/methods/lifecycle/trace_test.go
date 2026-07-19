@@ -1,20 +1,19 @@
 package lifecycle
 
 import (
+	"context"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/testutil"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/bennypowers/glsp"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 func TestSetTrace(t *testing.T) {
 	t.Run("handles off trace level", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		params := &protocol.SetTraceParams{
 			Value: "off",
@@ -26,8 +25,7 @@ func TestSetTrace(t *testing.T) {
 
 	t.Run("handles messages trace level", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		params := &protocol.SetTraceParams{
 			Value: "messages",
@@ -39,8 +37,7 @@ func TestSetTrace(t *testing.T) {
 
 	t.Run("handles verbose trace level", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		params := &protocol.SetTraceParams{
 			Value: "verbose",
@@ -52,8 +49,7 @@ func TestSetTrace(t *testing.T) {
 
 	t.Run("handles invalid trace level gracefully", func(t *testing.T) {
 		ctx := testutil.NewMockServerContext()
-		glspCtx := &glsp.Context{}
-		req := types.NewRequestContext(ctx, glspCtx)
+		req := types.NewRequestContext(ctx, context.Background())
 
 		params := &protocol.SetTraceParams{
 			Value: "invalid",

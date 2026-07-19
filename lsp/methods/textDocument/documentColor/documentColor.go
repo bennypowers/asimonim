@@ -8,12 +8,12 @@ import (
 	"bennypowers.dev/asimonim/lsp/internal/parser"
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/mazznoer/csscolorparser"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
 )
 
 // DocumentColor handles the textDocument/documentColor request
 func DocumentColor(req *types.RequestContext, params *protocol.DocumentColorParams) ([]protocol.ColorInformation, error) {
-	uri := params.TextDocument.URI
+	uri := string(params.TextDocument.URI)
 
 	log.Info("DocumentColor requested: %s", uri)
 
@@ -127,7 +127,7 @@ func DocumentColor(req *types.RequestContext, params *protocol.DocumentColorPara
 // ColorPresentation handles the textDocument/colorPresentation request
 // Returns token names that have the same color value as the requested color
 func ColorPresentation(req *types.RequestContext, params *protocol.ColorPresentationParams) ([]protocol.ColorPresentation, error) {
-	uri := params.TextDocument.URI
+	uri := string(params.TextDocument.URI)
 	color := params.Color
 
 	log.Info("ColorPresentation requested: %s", uri)
@@ -281,9 +281,9 @@ func parseCSSColor(value string) (*protocol.Color, error) {
 	}
 
 	return &protocol.Color{
-		Red:   protocol.Decimal(parsed.R),
-		Green: protocol.Decimal(parsed.G),
-		Blue:  protocol.Decimal(parsed.B),
-		Alpha: protocol.Decimal(parsed.A),
+		Red:   parsed.R,
+		Green: parsed.G,
+		Blue:  parsed.B,
+		Alpha: parsed.A,
 	}, nil
 }

@@ -1,6 +1,7 @@
 package documentcolor
 
 import (
+	"context"
 	"testing"
 
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
@@ -8,14 +9,13 @@ import (
 	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/bennypowers/glsp"
-	protocol "github.com/bennypowers/glsp/protocol_3_17"
+	"go.lsp.dev/protocol"
+	lspuri "go.lsp.dev/uri"
 )
 
 func TestDocumentColor_ColorTokenInVar(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a color token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -29,7 +29,7 @@ func TestDocumentColor_ColorTokenInVar(t *testing.T) {
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	})
 
 	require.NoError(t, err)
@@ -37,16 +37,15 @@ func TestDocumentColor_ColorTokenInVar(t *testing.T) {
 	require.Len(t, result, 1)
 
 	// Check color value
-	assert.Equal(t, protocol.Decimal(1.0), result[0].Color.Red)
-	assert.Equal(t, protocol.Decimal(0.0), result[0].Color.Green)
-	assert.Equal(t, protocol.Decimal(0.0), result[0].Color.Blue)
-	assert.Equal(t, protocol.Decimal(1.0), result[0].Color.Alpha)
+	assert.Equal(t, float64(1.0), result[0].Color.Red)
+	assert.Equal(t, float64(0.0), result[0].Color.Green)
+	assert.Equal(t, float64(0.0), result[0].Color.Blue)
+	assert.Equal(t, float64(1.0), result[0].Color.Alpha)
 }
 
 func TestDocumentColor_ColorTokenInDeclaration(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a color token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -60,7 +59,7 @@ func TestDocumentColor_ColorTokenInDeclaration(t *testing.T) {
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	})
 
 	require.NoError(t, err)
@@ -80,8 +79,7 @@ func TestDocumentColor_ColorTokenInDeclaration(t *testing.T) {
 
 func TestDocumentColor_NonColorToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a non-color token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -95,7 +93,7 @@ func TestDocumentColor_NonColorToken(t *testing.T) {
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	})
 
 	require.NoError(t, err)
@@ -104,15 +102,14 @@ func TestDocumentColor_NonColorToken(t *testing.T) {
 
 func TestDocumentColor_NonCSSDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.json"
 	jsonContent := `{"color": {"$value": "#ff0000"}}`
 	_ = ctx.DocumentManager().DidOpen(uri, "json", 1, jsonContent)
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	})
 
 	require.NoError(t, err)
@@ -121,11 +118,10 @@ func TestDocumentColor_NonCSSDocument(t *testing.T) {
 
 func TestDocumentColor_DocumentNotFound(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///nonexistent.css"},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI("file:///nonexistent.css")},
 	})
 
 	require.NoError(t, err)
@@ -134,8 +130,7 @@ func TestDocumentColor_DocumentNotFound(t *testing.T) {
 
 func TestColorPresentation_MatchingTokens(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add multiple tokens with red color
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -156,7 +151,7 @@ func TestColorPresentation_MatchingTokens(t *testing.T) {
 
 	// Request presentations for red color
 	result, err := ColorPresentation(req, &protocol.ColorPresentationParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI("file:///test.css")},
 		Color: protocol.Color{
 			Red:   1.0,
 			Green: 0.0,
@@ -181,8 +176,7 @@ func TestColorPresentation_MatchingTokens(t *testing.T) {
 
 func TestColorPresentation_WithAlpha(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add tokens with alpha channel (using same hex value to ensure exact match)
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -204,7 +198,7 @@ func TestColorPresentation_WithAlpha(t *testing.T) {
 	// Request presentations for semi-transparent red
 	// Alpha 0.5 will be converted to #ff000080 by csscolorparser
 	result, err := ColorPresentation(req, &protocol.ColorPresentationParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI("file:///test.css")},
 		Color: protocol.Color{
 			Red:   1.0,
 			Green: 0.0,
@@ -297,7 +291,7 @@ func TestParseColor(t *testing.T) {
 				Red:   1.0,
 				Green: 0.0,
 				Blue:  0.0,
-				Alpha: protocol.Decimal(128.0 / 255.0), // ~0.502
+				Alpha: float64(128.0 / 255.0), // ~0.502
 			},
 			expectError: false,
 		},
@@ -341,7 +335,7 @@ func TestParseColor(t *testing.T) {
 				Red:   0.0,
 				Green: 0.0,
 				Blue:  1.0,
-				Alpha: protocol.Decimal(136.0 / 255.0), // 0x88 = 136
+				Alpha: float64(136.0 / 255.0), // 0x88 = 136
 			},
 			expectError: false,
 		},
@@ -360,10 +354,10 @@ func TestParseColor(t *testing.T) {
 			name:  "4-digit hex color (#RGBA) - gray with half alpha",
 			input: "#8888",
 			expected: &protocol.Color{
-				Red:   protocol.Decimal(136.0 / 255.0),
-				Green: protocol.Decimal(136.0 / 255.0),
-				Blue:  protocol.Decimal(136.0 / 255.0),
-				Alpha: protocol.Decimal(136.0 / 255.0),
+				Red:   float64(136.0 / 255.0),
+				Green: float64(136.0 / 255.0),
+				Blue:  float64(136.0 / 255.0),
+				Alpha: float64(136.0 / 255.0),
 			},
 			expectError: false,
 		},
@@ -438,9 +432,9 @@ func TestParseColor(t *testing.T) {
 			name:  "rgba() format - gray with zero alpha",
 			input: "rgba(128, 128, 128, 0)",
 			expected: &protocol.Color{
-				Red:   protocol.Decimal(128.0 / 255.0),
-				Green: protocol.Decimal(128.0 / 255.0),
-				Blue:  protocol.Decimal(128.0 / 255.0),
+				Red:   float64(128.0 / 255.0),
+				Green: float64(128.0 / 255.0),
+				Blue:  float64(128.0 / 255.0),
 				Alpha: 0.0,
 			},
 			expectError: false,
@@ -599,8 +593,7 @@ func TestParseColor(t *testing.T) {
 
 func TestDocumentColor_HTMLDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -613,7 +606,7 @@ func TestDocumentColor_HTMLDocument(t *testing.T) {
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "html", 1, content))
 
 	colors, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	})
 	require.NoError(t, err)
 	require.Len(t, colors, 1)
@@ -626,8 +619,7 @@ func TestDocumentColor_HTMLDocument(t *testing.T) {
 
 func TestDocumentColor_UnparseableColorToken(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a color token with an unparseable value
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -641,7 +633,7 @@ func TestDocumentColor_UnparseableColorToken(t *testing.T) {
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	})
 
 	// Should not error, just skip the unparseable color
@@ -653,8 +645,7 @@ func TestDocumentColor_UnparseableColorToken(t *testing.T) {
 
 func TestDocumentColor_UnparseableColorInDeclaration(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a color token with an unparseable value
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -668,7 +659,7 @@ func TestDocumentColor_UnparseableColorInDeclaration(t *testing.T) {
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	})
 
 	require.NoError(t, err)
@@ -678,8 +669,7 @@ func TestDocumentColor_UnparseableColorInDeclaration(t *testing.T) {
 
 func TestDocumentColor_NonColorTokenInDeclaration(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Add a non-color token
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
@@ -693,7 +683,7 @@ func TestDocumentColor_NonColorTokenInDeclaration(t *testing.T) {
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	})
 
 	require.NoError(t, err)
@@ -702,8 +692,7 @@ func TestDocumentColor_NonColorTokenInDeclaration(t *testing.T) {
 
 func TestDocumentColor_UnknownTokenInDeclaration(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// Don't add any tokens - --local-var is unknown
 	uri := "file:///test.css"
@@ -711,7 +700,7 @@ func TestDocumentColor_UnknownTokenInDeclaration(t *testing.T) {
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	})
 
 	require.NoError(t, err)
@@ -720,8 +709,7 @@ func TestDocumentColor_UnknownTokenInDeclaration(t *testing.T) {
 
 func TestDocumentColor_UnknownTokenInVarCall(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	// No tokens loaded
 	uri := "file:///test.css"
@@ -729,7 +717,7 @@ func TestDocumentColor_UnknownTokenInVarCall(t *testing.T) {
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	})
 
 	require.NoError(t, err)
@@ -738,8 +726,7 @@ func TestDocumentColor_UnknownTokenInVarCall(t *testing.T) {
 
 func TestDocumentColor_MultipleColorsAndNonColors(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -766,7 +753,7 @@ func TestDocumentColor_MultipleColorsAndNonColors(t *testing.T) {
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "css", 1, cssContent))
 
 	result, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	})
 
 	require.NoError(t, err)
@@ -790,8 +777,7 @@ func TestDocumentColor_MultipleColorsAndNonColors(t *testing.T) {
 
 func TestColorPresentation_NoMatchingTokens(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -801,7 +787,7 @@ func TestColorPresentation_NoMatchingTokens(t *testing.T) {
 
 	// Request presentations for green - no tokens should match
 	result, err := ColorPresentation(req, &protocol.ColorPresentationParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI("file:///test.css")},
 		Color: protocol.Color{
 			Red:   0.0,
 			Green: 1.0,
@@ -816,8 +802,7 @@ func TestColorPresentation_NoMatchingTokens(t *testing.T) {
 
 func TestColorPresentation_NonColorTokensIgnored(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "spacing.small",
@@ -826,7 +811,7 @@ func TestColorPresentation_NonColorTokensIgnored(t *testing.T) {
 	}))
 
 	result, err := ColorPresentation(req, &protocol.ColorPresentationParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI("file:///test.css")},
 		Color: protocol.Color{
 			Red:   1.0,
 			Green: 0.0,
@@ -841,8 +826,7 @@ func TestColorPresentation_NonColorTokensIgnored(t *testing.T) {
 
 func TestColorPresentation_UnparseableTokenColor(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.weird",
@@ -851,7 +835,7 @@ func TestColorPresentation_UnparseableTokenColor(t *testing.T) {
 	}))
 
 	result, err := ColorPresentation(req, &protocol.ColorPresentationParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: "file:///test.css"},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI("file:///test.css")},
 		Color: protocol.Color{
 			Red:   1.0,
 			Green: 0.0,
@@ -867,8 +851,7 @@ func TestColorPresentation_UnparseableTokenColor(t *testing.T) {
 
 func TestDocumentColor_JSDocument(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	require.NoError(t, ctx.TokenManager().Add(&tokens.Token{
 		Name:  "color.primary",
@@ -881,7 +864,7 @@ func TestDocumentColor_JSDocument(t *testing.T) {
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "javascript", 1, content))
 
 	colors, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	})
 	require.NoError(t, err)
 	require.Len(t, colors, 1)
@@ -894,15 +877,14 @@ func TestDocumentColor_JSDocument(t *testing.T) {
 
 func TestDocumentColor_HTMLNoCSS(t *testing.T) {
 	ctx := testutil.NewMockServerContext()
-	glspCtx := &glsp.Context{}
-	req := types.NewRequestContext(ctx, glspCtx)
+	req := types.NewRequestContext(ctx, context.Background())
 
 	uri := "file:///test.html"
 	content := `<p>Hello</p>`
 	require.NoError(t, ctx.DocumentManager().DidOpen(uri, "html", 1, content))
 
 	colors, err := DocumentColor(req, &protocol.DocumentColorParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		TextDocument: protocol.TextDocumentIdentifier{URI: lspuri.URI(uri)},
 	})
 	require.NoError(t, err)
 	assert.Empty(t, colors)
