@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   build:
@@ -18,14 +19,13 @@ jobs:
 
   npm:
     needs: build
-    uses: bennypowers/go-release-workflows/.github/workflows/npm-publish.yml@main
+    uses: bennypowers/go-release-workflows/.github/workflows/npm-publish.yml@v1.1
     with:
       binary-name: asimonim
       npm-package-name: "@pwrs/asimonim"
       release-tag: ${{ github.event.release.tag_name }}
       pre-main-publish-script: 'cp ../README.md . && node ../scripts/update-platform-package-versions.js'
-    secrets:
-      npm-token: ${{ secrets.NPM_TOKEN }}
+      provenance: true
 
   build-vscode:
     name: Build VSCode Extension
