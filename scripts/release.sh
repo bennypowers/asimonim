@@ -99,10 +99,6 @@ echo "✓ Release notes found: $NOTES_FILE"
 echo "✓ Release notes are current"
 echo ""
 
-# Update extension versions
-"$SCRIPT_DIR/version.sh" "$VERSION"
-write_release_notes_meta "$META_FILE" "$VERSION" "$(git rev-parse HEAD)"
-
 # Check for uncommitted changes
 if [[ $(git status --porcelain 2>/dev/null) ]]; then
   echo "Error: Working directory has uncommitted changes"
@@ -134,6 +130,11 @@ fi
 echo ""
 
 echo "Creating release $VERSION..."
+echo ""
+
+# Update extension versions
+"$SCRIPT_DIR/version.sh" "$VERSION"
+write_release_notes_meta "$META_FILE" "$VERSION" "$(git rev-parse HEAD)"
 echo ""
 
 # Push any unpushed commits first
