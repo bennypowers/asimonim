@@ -202,6 +202,16 @@ When extending for new schema versions:
 4. Update detection logic in `schema/detector.go`
 5. Add test fixtures in `testdata/fixtures/`
 
+## Release notes
+
+- `make notes <vX.Y.Z|patch|minor|major>` generates an untracked draft in
+  `docs/releases/` and opens `$EDITOR` for review.
+- Set `RELEASE_NOTES_NO_EDIT=1` for non-interactive generation. The draft is
+  still left on disk for review.
+- `make release ...` pushes and publishes. Run it only when the user
+  explicitly asks for a release.
+- Published notes live in GitHub releases; `docs/releases/` is gitignored.
+
 ## Git
 
 When commit messages mention AI agents, always use `Assisted-By`, never `Co-Authored-By`.

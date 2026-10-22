@@ -6,7 +6,9 @@ coverage.out
 .idea/
 .vscode/
 .DS_Store
+# Legacy local release notes draft, superseded by docs/releases/
 RELEASE_NOTES.md
+docs/releases/
 
 # npm package
 npm/node_modules/

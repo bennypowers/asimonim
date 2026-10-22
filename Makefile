@@ -1,4 +1,4 @@
-.PHONY: all test test-coverage lint clean install release patch minor major
+.PHONY: all test test-coverage lint lint-shell clean install notes release patch minor major test-scripts
 .PHONY: linux-x64 linux-arm64 darwin-x64 darwin-arm64 win32-x64 win32-arm64
 .PHONY: docs docs-dev
 
@@ -8,9 +8,6 @@ GO_BUILD_FLAGS := -ldflags="$(shell scripts/ldflags.sh)"
 
 # Extract version from goals if present (e.g., "make release v0.1.0" or "make release patch")
 VERSION ?= $(filter v% patch minor major,$(MAKECMDGOALS))
-
-# Optional path to release notes file for gh release create
-RELEASE_NOTES ?=
 
 # Workaround for Gentoo Linux "hole in findfunctab" error with race detector
 # See: https://bugs.gentoo.org/961618
@@ -46,6 +43,30 @@ test-coverage:
 
 lint:
 	go vet ./...
+	@if command -v shellcheck >/dev/null 2>&1; then \
+		shellcheck -x scripts/release.sh scripts/notes.sh scripts/lib/*.sh scripts/release-notes/*.sh; \
+	else \
+		echo "shellcheck not installed; skipping shell lint"; \
+	fi
+
+lint-shell:
+	shellcheck -x scripts/release.sh scripts/notes.sh scripts/lib/*.sh scripts/release-notes/*.sh
+
+test-scripts:
+	@./scripts/release-notes/test.sh
+
+## Release notes (generates an untracked draft in docs/releases/, opens $EDITOR)
+notes:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Error: VERSION or bump type is required" >&2; \
+		echo "Usage: make notes <vX.Y.Z|patch|minor|major>" >&2; \
+		echo "  make notes v0.1.0   - Notes for an explicit version" >&2; \
+		echo "  make notes patch    - Notes for the next patch version" >&2; \
+		echo "  Versions must be v-prefixed." >&2; \
+		echo "  Set RELEASE_NOTES_NO_EDIT=1 to skip the editor." >&2; \
+		exit 1; \
+	fi
+	@./scripts/notes.sh '$(VERSION)'
 
 release:
 	@if [ -z "$(VERSION)" ]; then \
@@ -57,7 +78,7 @@ release:
 		echo "  make release major   - Bump major version (x.0.0)"; \
 		exit 1; \
 	fi
-	@RELEASE_NOTES="$(RELEASE_NOTES)" ./scripts/release.sh $(VERSION)
+	@./scripts/release.sh '$(VERSION)'
 
 # Prevent make from treating version args as file targets
 patch minor major:

@@ -19,7 +19,7 @@ jobs:
 
   npm:
     needs: build
-    uses: bennypowers/go-release-workflows/.github/workflows/npm-publish.yml@v1.1
+    uses: bennypowers/go-release-workflows/.github/workflows/npm-publish.yml@v1.4
     with:
       binary-name: asimonim
       npm-package-name: "@pwrs/asimonim"
