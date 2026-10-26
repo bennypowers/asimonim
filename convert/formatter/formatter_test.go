@@ -1,7 +1,9 @@
 /*
 Copyright 2026 Benny Powers. All rights reserved.
-Use of this source code is governed by the GPLv3
-license that can be found in the LICENSE file.
+Use of this source code is governed by the GNU General Public License
+as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+See the LICENSE file for details.
 */
 
 package formatter_test

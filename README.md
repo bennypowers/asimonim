@@ -63,7 +63,7 @@ See [CONTRIBUTING.md][contributingmd]
 
 ## License
 
-GPLv3
+GPL-3.0-or-later
 
 [dtcg]: https://design-tokens.github.io/community-group/format/
 [contributingmd]: ./CONTRIBUTING.md
