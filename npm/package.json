@@ -2,6 +2,7 @@
   "name": "@pwrs/asimonim",
   "version": "0.3.3",
   "description": "CLI tool for parsing and working with DTCG design tokens",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "engines": {
     "node": ">=22.0.0"

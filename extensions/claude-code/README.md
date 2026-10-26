@@ -169,4 +169,4 @@ schema: v2025.10
 
 ## License
 
-GPL-3.0 - See [LICENSE](../../LICENSE) for details
+GPL-3.0-or-later - See [LICENSE](../../LICENSE) for details
