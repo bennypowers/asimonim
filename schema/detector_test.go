@@ -218,6 +218,13 @@ func TestNormalizeContent(t *testing.T) {
 		}
 	})
 
+	t.Run("quoted block comment in YAML string is preserved", func(t *testing.T) {
+		input := []byte("{\"header\":\"/* keep */\",\"prefix\": 2 // px\n}")
+		if got := string(schema.NormalizeContent(input)); got != string(input) {
+			t.Errorf("NormalizeContent() = %q, want unchanged %q", got, input)
+		}
+	})
+
 	t.Run("inline block comment in a value is normalized", func(t *testing.T) {
 		input := []byte(`{"theme":{"$extends": /* base */ "#/base"}}`)
 		got := schema.NormalizeContent(input)

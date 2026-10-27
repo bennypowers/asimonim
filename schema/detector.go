@@ -61,13 +61,15 @@ func NormalizeContent(content []byte) []byte {
 
 	// A YAML flow mapping starting with '{' can also be valid JSONC. Prefer
 	// YAML only when the two decoders disagree about the value and YAML did
-	// not turn a comment into a map key. Disagreement alone is ambiguous
-	// because YAML misreads a trailing "//" comment as a null-valued key.
+	// not turn a bare comment into a map key or scalar. Disagreement alone is
+	// ambiguous because YAML misreads a trailing "//" comment as a
+	// null-valued key.
 	var yamlProbe any
 	if err := yaml.Unmarshal(content, &yamlProbe); err == nil {
 		switch yamlProbe.(type) {
 		case map[string]any, map[any]any, []any:
-			if hasCommentArtifact(yamlProbe) {
+			line, block := hasBareCommentMarker(content)
+			if hasCommentArtifact(yamlProbe, line, block) {
 				return normalized
 			}
 			var jsonProbe any
@@ -81,33 +83,75 @@ func NormalizeContent(content []byte) []byte {
 	return normalized
 }
 
+// hasBareCommentMarker reports whether content contains "//" or "/*" outside
+// a double-quoted string. Comment markers inside quoted YAML or JSON strings
+// are data, not comments.
+func hasBareCommentMarker(content []byte) (line, block bool) {
+	inString := false
+	escaped := false
+	for i := 0; i < len(content); i++ {
+		c := content[i]
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			switch c {
+			case '\\':
+				escaped = true
+			case '"':
+				inString = false
+			}
+			continue
+		}
+		if c == '"' {
+			inString = true
+			continue
+		}
+		if c == '/' && i+1 < len(content) {
+			switch content[i+1] {
+			case '/':
+				line = true
+			case '*':
+				block = true
+			}
+		}
+	}
+	return line, block
+}
+
 // hasCommentArtifact reports whether a YAML decode contains a key or scalar
-// value that looks like a JSONC comment consumed as data. YAML has no "//" or
-// "/* */" comment syntax, so a map key that starts with one, or a value that
-// starts with "//" or contains "/*", means YAML misread a JSONC comment.
-func hasCommentArtifact(v any) bool {
+// value that looks like a bare JSONC comment consumed as data. YAML has no
+// "//" or "/* */" comment syntax, so a map key that starts with one, or a
+// value that starts with a line comment or contains a block comment, means
+// YAML misread a JSONC comment. The line and block flags come from the raw
+// content so quoted strings are not mistaken for comments.
+func hasCommentArtifact(v any, line, block bool) bool {
 	switch x := v.(type) {
 	case string:
 		trimmed := strings.TrimSpace(x)
-		return strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") || strings.Contains(trimmed, "/*")
+		return (line && strings.HasPrefix(trimmed, "//")) ||
+			(block && (strings.HasPrefix(trimmed, "/*") || strings.Contains(trimmed, "/*")))
 	case map[string]any:
 		for k, val := range x {
-			if strings.HasPrefix(k, "//") || strings.HasPrefix(k, "/*") || hasCommentArtifact(val) {
+			if (line && strings.HasPrefix(k, "//")) || (block && strings.HasPrefix(k, "/*")) || hasCommentArtifact(val, line, block) {
 				return true
 			}
 		}
 	case map[any]any:
 		for k, val := range x {
-			if key, ok := k.(string); ok && (strings.HasPrefix(key, "//") || strings.HasPrefix(key, "/*")) {
-				return true
+			if key, ok := k.(string); ok {
+				if (line && strings.HasPrefix(key, "//")) || (block && strings.HasPrefix(key, "/*")) {
+					return true
+				}
 			}
-			if hasCommentArtifact(val) {
+			if hasCommentArtifact(val, line, block) {
 				return true
 			}
 		}
 	case []any:
 		for _, val := range x {
-			if hasCommentArtifact(val) {
+			if hasCommentArtifact(val, line, block) {
 				return true
 			}
 		}
