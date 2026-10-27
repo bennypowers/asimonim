@@ -61,8 +61,10 @@ untouched. Literal values are canonicalized to the draft DTCG forms:
   preserved. When canonicalization changes any sub-value, the exact original
   shadow object is recorded in `$extensions["com.rhds.mcp"].sourceValue`.
 
-These rules are also recorded in the fixture's
-`$extensions["com.rhds.mcp"].valueNormalization`.
+The canonical forms are also recorded in the fixture's
+`$extensions["com.rhds.mcp"].valueNormalization`. The original forms of
+canonicalized values are recorded separately in
+`$extensions["com.rhds.mcp"].sourceValue`.
 
 This is a subset chosen to cover every `$type` used by RHDS, including the
 vendor `mediaQuery` type, and every structure in the normalization contract:

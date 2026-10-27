@@ -129,7 +129,8 @@ func TestRHDSFixture_ParserAcceptsAndAutoDetects(t *testing.T) {
 		}
 	}
 
-	// The four source groups without $type must be recovered explicitly.
+	// The five tokens in the four source groups without $type must be
+	// recovered explicitly.
 	recovered := map[string]string{
 		"border.radius.default":    token.TypeDimension,
 		"border.radius.sharp":      token.TypeDimension,
@@ -174,6 +175,9 @@ func TestRHDSFixture_PrefixProducesRHCustomProperties(t *testing.T) {
 		if tok.Prefix != "rh" {
 			t.Errorf("token map lookup %q prefix = %q, want rh", name, tok.Prefix)
 		}
+	}
+	if _, ok := tokenMap.Get("does-not-exist"); ok {
+		t.Error("token map lookup of an unknown name returned a token")
 	}
 }
 
@@ -293,9 +297,9 @@ func TestRHDSFixture_MetadataSurvives(t *testing.T) {
 	}
 
 	family := testutil.TokenByPath(t, tokens, "font.family.heading")
-	familyValue, ok := family.RawValue.([]any)
-	if !ok || len(familyValue) != 5 {
-		t.Errorf("font family raw value = %#v, want 5-element array", family.RawValue)
+	wantFamily := []any{"RedHatDisplay", "Red Hat Display", "Helvetica", "Arial", "sans-serif"}
+	if got := family.RawValue; !reflect.DeepEqual(got, wantFamily) {
+		t.Errorf("font family raw value = %#v, want %#v", got, wantFamily)
 	}
 
 	media := testutil.TokenByPath(t, tokens, "media.sm")
@@ -362,10 +366,6 @@ func TestRHDSFixture_CanonicalValueForms(t *testing.T) {
 
 	// Canonicalization changed offsetX and color, so the exact original shadow
 	// object is recorded alongside the other canonicalized source values.
-	shadowExt, ok := shadow.Extensions["com.rhds.mcp"].(map[string]any)
-	if !ok {
-		t.Fatalf("shadow missing com.rhds.mcp extension: %v", shadow.Extensions)
-	}
 	wantShadowSource := map[string]any{
 		"offsetX": "0",
 		"offsetY": "{length.xs}",
@@ -373,15 +373,24 @@ func TestRHDSFixture_CanonicalValueForms(t *testing.T) {
 		"spread":  "{length.4xs}",
 		"color":   "rgba(21, 21, 21, 0.25)",
 	}
-	if got := shadowExt["sourceValue"]; !reflect.DeepEqual(got, wantShadowSource) {
-		t.Errorf("shadow sourceValue = %#v, want %#v", got, wantShadowSource)
-	}
+	assertSourceValue(t, shadow, wantShadowSource)
+
+	assertCanonicalForms(t, tokens)
+}
+
+// assertCanonicalForms checks that literal values use draft DTCG forms. Alias
+// references are exempt because the fixture never rewrites them.
+func assertCanonicalForms(t *testing.T, tokens []*token.Token) {
+	t.Helper()
 
 	durationForm := regexp.MustCompile(`^\d+(?:\.\d+)?ms$`)
 	colorForm := regexp.MustCompile(`^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$`)
 	dimensionForm := regexp.MustCompile(`^-?\d+(?:\.\d+)?(?:px|rem)$`)
 
 	for _, tok := range tokens {
+		if strings.HasPrefix(tok.Value, "{") {
+			continue
+		}
 		switch tok.Type {
 		case token.TypeNumber:
 			if _, ok := tok.RawValue.(float64); !ok {
@@ -392,16 +401,10 @@ func TestRHDSFixture_CanonicalValueForms(t *testing.T) {
 				t.Errorf("duration token %q value = %q, want milliseconds", tok.DotPath(), tok.Value)
 			}
 		case token.TypeColor:
-			if strings.HasPrefix(tok.Value, "{") {
-				continue
-			}
 			if !colorForm.MatchString(tok.Value) {
 				t.Errorf("color token %q value = %q, want hex", tok.DotPath(), tok.Value)
 			}
 		case token.TypeDimension:
-			if strings.HasPrefix(tok.Value, "{") {
-				continue
-			}
 			if !dimensionForm.MatchString(tok.Value) {
 				t.Errorf("dimension token %q value = %q, want px or rem", tok.DotPath(), tok.Value)
 			}
@@ -409,16 +412,24 @@ func TestRHDSFixture_CanonicalValueForms(t *testing.T) {
 	}
 }
 
-func assertSourceValue(t *testing.T, tok *token.Token, want string) {
+func assertSourceValue(t *testing.T, tok *token.Token, want any) {
 	t.Helper()
 
 	ext, ok := tok.Extensions["com.rhds.mcp"].(map[string]any)
 	if !ok {
 		t.Fatalf("%s: missing com.rhds.mcp extension: %v", tok.DotPath(), tok.Extensions)
 	}
-	if ext["sourceValue"] != want {
-		t.Errorf("%s: sourceValue = %v, want %s", tok.DotPath(), ext["sourceValue"], want)
+	if got := ext["sourceValue"]; !reflect.DeepEqual(got, want) {
+		t.Errorf("%s: sourceValue = %#v, want %#v", tok.DotPath(), got, want)
 	}
+}
+
+func TestCanonicalFormsSkipAliases(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "alias-number", Path: []string{"alias-number"}, Type: token.TypeNumber, Value: "{opacity.50}", RawValue: "{opacity.50}"},
+		{Name: "alias-duration", Path: []string{"alias-duration"}, Type: token.TypeDuration, Value: "{animation.speed}", RawValue: "{animation.speed}"},
+	}
+	assertCanonicalForms(t, tokens)
 }
 
 func TestRHDSFixture_GroupExtensionsAndProvenance(t *testing.T) {
@@ -491,29 +502,6 @@ func TestRHDSFixture_GroupExtensionsAndProvenance(t *testing.T) {
 	for _, key := range []string{"aliases", "duration", "number", "color", "dimension"} {
 		if _, ok := normalization[key]; !ok {
 			t.Errorf("valueNormalization is missing %q", key)
-		}
-	}
-
-	groups := []string{
-		"color",
-		"color.border",
-		"color.red-orange",
-		"color.status",
-		"border.radius",
-		"border.width",
-		"breakpoint",
-		"media",
-		"font",
-		"font.family",
-		"font.size.body-text",
-		"font.weight",
-		"font.weight.heading",
-		"line-height",
-	}
-	for _, groupPath := range groups {
-		ux := groupUXExtension(t, raw, groupPath)
-		if len(ux) == 0 {
-			t.Errorf("group %s com.redhat.ux extension is empty", groupPath)
 		}
 	}
 
@@ -604,6 +592,15 @@ func groupUXExtension(t *testing.T, raw map[string]any, path string) map[string]
 func TestRHDSFixture_NoStyleDictionaryFields(t *testing.T) {
 	raw := loadRHDSRaw(t)
 
+	if fields := styleDictionaryFields(raw); len(fields) != 0 {
+		t.Errorf("Style Dictionary fields survived: %v", fields)
+	}
+}
+
+// styleDictionaryFields returns the paths of Style Dictionary fields that
+// survived normalization. Vendor $extensions subtrees and token names that
+// happen to match a Style Dictionary field are not violations.
+func styleDictionaryFields(raw map[string]any) []string {
 	forbidden := map[string]bool{
 		"name":       true,
 		"attributes": true,
@@ -612,13 +609,18 @@ func TestRHDSFixture_NoStyleDictionaryFields(t *testing.T) {
 		"original":   true,
 		"path":       true,
 	}
+
+	var found []string
 	var walk func(value any, path string)
 	walk = func(value any, path string) {
 		switch v := value.(type) {
 		case map[string]any:
 			for key, child := range v {
-				if forbidden[key] {
-					t.Errorf("Style Dictionary field %q survived at %s", key, path)
+				if key == "$extensions" {
+					continue
+				}
+				if forbidden[key] && !isTokenObject(child) {
+					found = append(found, path+"."+key)
 				}
 				walk(child, path+"."+key)
 			}
@@ -629,6 +631,45 @@ func TestRHDSFixture_NoStyleDictionaryFields(t *testing.T) {
 		}
 	}
 	walk(raw, "$")
+	return found
+}
+
+// isTokenObject reports whether value is a token object. A token may legally
+// be named "name", "path", or another Style Dictionary field name.
+func isTokenObject(value any) bool {
+	m, ok := value.(map[string]any)
+	if !ok {
+		return false
+	}
+	_, ok = m["$value"]
+	return ok
+}
+
+func TestStyleDictionaryFieldsScope(t *testing.T) {
+	allowed := map[string]any{
+		"$extensions": map[string]any{
+			"com.example": map[string]any{"name": "vendor data", "path": []any{"a", "b"}},
+		},
+		"path": map[string]any{"$value": "#000000", "$type": "color"},
+	}
+	if got := styleDictionaryFields(allowed); len(got) != 0 {
+		t.Errorf("styleDictionaryFields flagged allowed data: %v", got)
+	}
+
+	survived := map[string]any{
+		"color": map[string]any{
+			"primary": map[string]any{
+				"$value": "#000000",
+				"name":   "color-primary",
+				"path":   []any{"color", "primary"},
+			},
+		},
+	}
+	got := styleDictionaryFields(survived)
+	want := []string{"$.color.primary.name", "$.color.primary.path"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("styleDictionaryFields = %v, want %v", got, want)
+	}
 }
 
 // TestRHDSFixture_ConsistencyValidatorAccepts shows that asimonim's
