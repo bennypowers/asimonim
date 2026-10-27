@@ -10,6 +10,7 @@ import (
 	posutil "bennypowers.dev/asimonim/lsp/internal/position"
 	"bennypowers.dev/asimonim/lsp/internal/uriutil"
 	"bennypowers.dev/asimonim/lsp/types"
+	"github.com/tidwall/jsonc"
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 )
@@ -136,8 +137,14 @@ func getLineText(req *types.RequestContext, uri string, lineNum uint32) (string,
 
 // DefinitionForTokenFile handles go-to-definition for references within token files
 func DefinitionForTokenFile(req *types.RequestContext, doc *documents.Document, position protocol.Position) (protocol.DefinitionResult, error) {
-	// Find reference at the cursor position
-	tokenName := findReferenceAtPosition(doc.Content(), position)
+	// Find reference at the cursor position. For JSONC, replace comment bytes
+	// with spaces (preserving offsets) so references inside comments do not
+	// resolve.
+	content := doc.Content()
+	if doc.LanguageID() == "jsonc" {
+		content = string(jsonc.ToJSON([]byte(content)))
+	}
+	tokenName := findReferenceAtPosition(content, position)
 	if tokenName == "" {
 		return nil, nil
 	}

@@ -10,6 +10,34 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestSemanticTokens_JSONC_SkipsComments(t *testing.T) {
+	content := `// use {color.primary} here
+{
+  "color": {
+    "primary": {
+      "$type": "color",
+      "$value": "#FF0000"
+    }
+  }
+}`
+
+	mockServer := testutil.NewMockServer()
+	doc := documents.NewDocument("file:///test.jsonc", "jsonc", 1, content)
+
+	_ = mockServer.TokenManager().Add(&tokens.Token{
+		Name:  "color-primary",
+		Value: "#FF0000",
+	})
+
+	semTokens := semantictokens.GetSemanticTokensForDocument(mockServer, doc)
+
+	for _, token := range semTokens {
+		if token.Line == 0 {
+			t.Errorf("found semantic token on comment line: %+v", token)
+		}
+	}
+}
+
 func TestSemanticTokens_Draft_CurlyBraceReferences(t *testing.T) {
 	// Test that curly brace references are highlighted in draft schema
 	content := `{

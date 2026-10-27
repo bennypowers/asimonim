@@ -45,8 +45,8 @@ func (f *Formatter) Format(tokens []*token.Token, opts formatter.Options) ([]byt
 	sb.WriteString("import SwiftUI\n\n")
 
 	enumName := "DesignTokens"
-	if opts.Prefix != "" {
-		enumName = formatter.ToPascalCase(opts.Prefix) + "Tokens"
+	if prefix := token.NormalizePrefix(opts.Prefix); prefix != "" {
+		enumName = formatter.ToPascalCase(prefix) + "Tokens"
 	}
 	fmt.Fprintf(&sb, "public enum %s {\n", enumName)
 

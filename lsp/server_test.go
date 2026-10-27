@@ -393,6 +393,13 @@ func TestIsTokenFile(t *testing.T) {
 			expectedResult: true,
 		},
 		{
+			name:           "Explicit token file - uppercase JSONC",
+			path:           "/workspace/tokens.JSONC",
+			rootPath:       "/workspace",
+			configFiles:    []any{"tokens.JSONC"},
+			expectedResult: true,
+		},
+		{
 			name:           "Explicit token file - JSONC",
 			path:           "/workspace/tokens.jsonc",
 			rootPath:       "/workspace",

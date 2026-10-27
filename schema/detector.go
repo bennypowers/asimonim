@@ -81,11 +81,15 @@ func NormalizeContent(content []byte) []byte {
 	return normalized
 }
 
-// hasCommentArtifact reports whether a YAML decode contains a map key that
-// starts like a JSONC comment. YAML has no "//" comment syntax, so such a key
-// means YAML consumed a JSONC comment as data.
+// hasCommentArtifact reports whether a YAML decode contains a key or scalar
+// value that looks like a JSONC comment consumed as data. YAML has no "//" or
+// "/* */" comment syntax, so a map key that starts with one, or a value that
+// starts with "//" or contains "/*", means YAML misread a JSONC comment.
 func hasCommentArtifact(v any) bool {
 	switch x := v.(type) {
+	case string:
+		trimmed := strings.TrimSpace(x)
+		return strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") || strings.Contains(trimmed, "/*")
 	case map[string]any:
 		for k, val := range x {
 			if strings.HasPrefix(k, "//") || strings.HasPrefix(k, "/*") || hasCommentArtifact(val) {

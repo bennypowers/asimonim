@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"bennypowers.dev/asimonim/lsp/internal/documents"
@@ -404,7 +405,7 @@ func (s *Server) NotifyDiagnosticRefresh() {
 // IsTokenFile checks if a file path is one of our token files
 func (s *Server) IsTokenFile(path string) bool {
 	// Check if it's a JSON or YAML file
-	ext := filepath.Ext(path)
+	ext := strings.ToLower(filepath.Ext(path))
 	if ext != ".json" && ext != ".jsonc" && ext != ".yaml" && ext != ".yml" {
 		return false
 	}

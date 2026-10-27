@@ -218,6 +218,17 @@ func TestNormalizeContent(t *testing.T) {
 		}
 	})
 
+	t.Run("inline block comment in a value is normalized", func(t *testing.T) {
+		input := []byte(`{"theme":{"$extends": /* base */ "#/base"}}`)
+		got := schema.NormalizeContent(input)
+		if !json.Valid(got) {
+			t.Errorf("NormalizeContent() = %q, want valid JSON", got)
+		}
+		if strings.Contains(string(got), "/*") {
+			t.Errorf("NormalizeContent() = %q, want block comment removed", got)
+		}
+	})
+
 	t.Run("JSONC comments are removed", func(t *testing.T) {
 		input := []byte("// header\n{\"color\": {\"$value\": \"#fff\"}}")
 		got := string(schema.NormalizeContent(input))
@@ -318,6 +329,11 @@ func TestDetectVersion(t *testing.T) {
 		{
 			name:     "JSONC with line and block comments",
 			content:  "// leading comment\n{\n  \"color\": {\"$value\": {\"$ref\": \"#/other\"}} /* trailing */\n}\n",
+			expected: schema.V2025_10,
+		},
+		{
+			name:     "JSONC with inline block comment after $schema",
+			content:  `{"$schema": /* DTCG 2025.10 */ "https://www.designtokens.org/schemas/2025.10.json"}`,
 			expected: schema.V2025_10,
 		},
 		{
