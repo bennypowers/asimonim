@@ -6,7 +6,6 @@ License, or (at your option) any later version.
 See the LICENSE file for details.
 */
 
-// Package load provides a high-level API for loading design tokens.
 package load
 
 import (
@@ -45,6 +44,7 @@ type Options struct {
 	FS fs.FileSystem
 
 	// Prefix is the CSS variable prefix for tokens.
+	// It is stored on each token and used by the returned token.Map.
 	// Takes precedence over config file if set.
 	Prefix string
 
@@ -53,6 +53,8 @@ type Options struct {
 	GroupMarkers []string
 
 	// SchemaVersion overrides auto-detection from file content.
+	// The zero value, schema.Unknown, auto-detects from the config file
+	// and then from the document contents.
 	// Takes precedence over config file if set.
 	SchemaVersion schema.Version
 

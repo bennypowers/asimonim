@@ -28,5 +28,5 @@ comment:
 ignore:
   - "**/*_test.go"
   - "cmd/**/*"
-  - "internal/version/**/*"
+  - "version/**/*"
   - "testutil/**/*"

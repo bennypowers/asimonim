@@ -6,7 +6,6 @@ License, or (at your option) any later version.
 See the LICENSE file for details.
 */
 
-// Package resolver provides token reference resolution.
 package resolver
 
 import (

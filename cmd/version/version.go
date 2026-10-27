@@ -15,7 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"bennypowers.dev/asimonim/internal/version"
+	"bennypowers.dev/asimonim/version"
 )
 
 // Cmd is the version cobra command that prints version and build information.

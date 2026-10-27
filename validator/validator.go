@@ -6,7 +6,6 @@ License, or (at your option) any later version.
 See the LICENSE file for details.
 */
 
-// Package validator provides schema consistency validation for DTCG token files.
 package validator
 
 import (

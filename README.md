@@ -57,6 +57,60 @@ Full documentation is available at **[bennypowers.dev/asimonim](https://bennypow
 - [CLI Reference](https://bennypowers.dev/asimonim/docs/reference/commands/)
 - [Schema Versions](https://bennypowers.dev/asimonim/docs/reference/schemas/)
 
+## Go library
+
+The module is `bennypowers.dev/asimonim`. The public packages are:
+
+| Package | Purpose |
+| --- | --- |
+| `parser` | Parse DTCG JSON and YAML into tokens |
+| `resolver` | Resolve aliases and `$extends` relationships |
+| `token` | Core token types and prefix-aware lookup |
+| `schema` | Schema version detection and conversion |
+| `validator` | Schema consistency checks |
+| `convert` | Serialize tokens to CSS, SCSS, JS, Swift, Android XML, and other formats |
+| `load` | High-level loading from paths and package specifiers |
+| `fs` | Filesystem abstraction |
+| `config` | Configuration loading |
+| `version` | Build and version information |
+
+Run `go doc bennypowers.dev/asimonim/parser` (or the name of any package
+above) for the full API and examples.
+
+### Version information
+
+```go
+import "bennypowers.dev/asimonim/version"
+
+fmt.Println(version.Get())
+fmt.Println(version.Info()["gitCommit"])
+```
+
+`Get` returns the injected or detected version, `Info` returns a structured
+map for diagnostics, and `Full` includes the Git commit when available.
+
+### Compatibility policy
+
+The module is pre-1.0 (`0.x`). While it remains at `0.x`:
+
+- Minor releases can include breaking changes to public package APIs. We call
+  out such changes in the release notes.
+- Patch releases are backwards compatible within the same minor version.
+- Pin exact versions, for example `go get bennypowers.dev/asimonim@v0.3.3`.
+  Do not rely on floating ranges or on compatibility across minor versions.
+- Once the module reaches `1.0`, we will follow semantic versioning and make
+  breaking changes only in major releases.
+
+Everything under `internal/` is not public API.
+
+### Input formats
+
+Asimonim parses [DTCG][dtcg] documents. Style Dictionary JSON is not DTCG.
+Its `value` and `type` keys, category nesting, and reference syntax differ
+from DTCG's `$value`, `$type`, and `{group.token}` forms. Normalize Style
+Dictionary output into DTCG before passing it to asimonim. The parser does
+not translate Style Dictionary files.
+
 ## Contributing
 
 See [CONTRIBUTING.md][contributingmd]

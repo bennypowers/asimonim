@@ -6,7 +6,6 @@ License, or (at your option) any later version.
 See the LICENSE file for details.
 */
 
-// Package token provides DTCG design token types.
 package token
 
 import (
@@ -111,6 +110,8 @@ type Map struct {
 
 // NewMap creates a Map from tokens with optional prefix for lookups.
 // Tokens are indexed by their CSSVariableName for efficient lookup.
+// A non-empty prefix is applied to a copy of each token that does not
+// already have one, so the input slice is not mutated.
 func NewMap(tokens []*Token, prefix string) *Map {
 	m := &Map{
 		prefix: strings.TrimLeft(prefix, "-"),

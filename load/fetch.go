@@ -18,7 +18,7 @@ import (
 
 	"github.com/gregjones/httpcache"
 
-	"bennypowers.dev/asimonim/internal/version"
+	"bennypowers.dev/asimonim/version"
 )
 
 const (

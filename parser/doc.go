@@ -1,0 +1,58 @@
+/*
+Copyright 2026 Benny Powers. All rights reserved.
+Use of this source code is governed by the GNU General Public License
+as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+See the LICENSE file for details.
+*/
+
+// Package parser parses DTCG design token files in JSON or YAML.
+//
+// JSONParser extracts tokens from DTCG-formatted input. The parser accepts
+// JSON with comments and trailing commas via jsonc, as well as YAML. Both
+// the editor's draft and the stable 2025.10 schema are supported; see the
+// schema package for detection and version handling.
+//
+// # Schema detection
+//
+// Options.SchemaVersion has the zero value schema.Unknown. When it is left
+// at the zero value, Parse inspects the document for a $schema field,
+// unambiguous 2025.10 features such as $ref, $extends, resolutionOrder, and
+// structured color values, and otherwise falls back to schema.Draft. Set
+// SchemaVersion explicitly to override detection, for example when parsing
+// fragment files without a $schema declaration.
+//
+// # Options
+//
+// Prefix sets Token.Prefix so consumers can derive CSS custom property
+// names such as --rh-color-primary. It does not rename tokens or change
+// Token.Name; see token.Token.CSSVariableName and token.NewMap.
+//
+// SkipSort disables the default alphabetical sort of token names. The
+// default yields deterministic output, which is usually what you want for
+// generated files and golden tests. Set SkipSort when order does not matter
+// and parsing speed is critical.
+//
+// SkipPositions disables the second pass that records Line and Character on
+// each token. Position data is needed for editor features such as
+// go-to-definition. Set SkipPositions for batch tools that do not need it.
+//
+// # Style Dictionary
+//
+// Style Dictionary JSON is not DTCG. Its "value" and "type" keys, category
+// nesting, and reference syntax differ from DTCG's "$value", "$type", and
+// "{group.token}" forms. Normalize Style Dictionary input into DTCG before
+// passing it to this package. The parser does not translate Style
+// Dictionary files.
+//
+// # Example
+//
+//	p := parser.NewJSONParser()
+//	tokens, err := p.Parse(data, parser.Options{SkipPositions: true})
+//	if err != nil {
+//		return err
+//	}
+//	for _, tok := range tokens {
+//		fmt.Println(tok.Name, tok.Value)
+//	}
+package parser
