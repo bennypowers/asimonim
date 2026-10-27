@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/tidwall/jsonc"
 	"gopkg.in/yaml.v3"
@@ -80,6 +81,76 @@ func NormalizeContent(content []byte) []byte {
 		}
 	}
 	return normalized
+}
+
+// MaskJSONCComments replaces JSONC comment text with spaces while preserving
+// line breaks and one character per comment rune. Byte offsets can shrink for
+// multibyte comments, but rune and UTF-16 columns stay aligned with the
+// original document, which is what LSP positions use.
+func MaskJSONCComments(content []byte) []byte {
+	var out bytes.Buffer
+	out.Grow(len(content))
+	inString := false
+	escaped := false
+	for i := 0; i < len(content); {
+		c := content[i]
+		if inString {
+			if escaped {
+				escaped = false
+				out.WriteByte(c)
+				i++
+				continue
+			}
+			switch c {
+			case '\\':
+				escaped = true
+			case '"':
+				inString = false
+			}
+			out.WriteByte(c)
+			i++
+			continue
+		}
+		if c == '"' {
+			inString = true
+			out.WriteByte(c)
+			i++
+			continue
+		}
+		if c == '/' && i+1 < len(content) && content[i+1] == '/' {
+			out.WriteString("  ")
+			i += 2
+			for i < len(content) && content[i] != '\n' {
+				_, size := utf8.DecodeRune(content[i:])
+				out.WriteByte(' ')
+				i += size
+			}
+			continue
+		}
+		if c == '/' && i+1 < len(content) && content[i+1] == '*' {
+			out.WriteString("  ")
+			i += 2
+			for i < len(content) {
+				if content[i] == '*' && i+1 < len(content) && content[i+1] == '/' {
+					out.WriteString("  ")
+					i += 2
+					break
+				}
+				if content[i] == '\n' {
+					out.WriteByte('\n')
+					i++
+					continue
+				}
+				_, size := utf8.DecodeRune(content[i:])
+				out.WriteByte(' ')
+				i += size
+			}
+			continue
+		}
+		out.WriteByte(c)
+		i++
+	}
+	return out.Bytes()
 }
 
 // hasCommentArtifact reports whether a YAML decode contains a key or scalar

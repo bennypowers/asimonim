@@ -178,6 +178,29 @@ func TestDetectVersion_StructuredColors(t *testing.T) {
 	}
 }
 
+func TestMaskJSONCComments(t *testing.T) {
+	input := []byte("/* héllo */ {\"color\": \"#fff\"} // tail")
+	got := schema.MaskJSONCComments(input)
+
+	if strings.Contains(string(got), "héllo") || strings.Contains(string(got), "tail") {
+		t.Errorf("MaskJSONCComments() = %q, want comment text masked", got)
+	}
+	if !strings.Contains(string(got), `{"color": "#fff"}`) {
+		t.Errorf("MaskJSONCComments() = %q, want JSON body preserved", got)
+	}
+
+	origKey := strings.Index(string(input), `{"color"`)
+	maskedKey := strings.Index(string(got), `{"color"`)
+	if origKey < 0 || maskedKey < 0 {
+		t.Fatal("expected JSON body in input and output")
+	}
+	origRunes := len([]rune(string(input[:origKey])))
+	maskedRunes := len([]rune(string(got[:maskedKey])))
+	if origRunes != maskedRunes {
+		t.Errorf("comment mask shifted columns: original rune offset %d, masked %d", origRunes, maskedRunes)
+	}
+}
+
 func TestNormalizeContent(t *testing.T) {
 	t.Run("YAML flow mapping keeps // as text", func(t *testing.T) {
 		input := []byte(`{"$value": 2 // px}`)
