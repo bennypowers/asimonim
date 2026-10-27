@@ -25,7 +25,7 @@ func DidOpen(req *types.RequestContext, params *protocol.DidOpenTextDocumentPara
 	// Auto-load tokens from files that look like DTCG token files
 	// This enables semantic tokens and other features for token files not in config
 	content := params.TextDocument.Text
-	if (languageID == "json" || languageID == "yaml") &&
+	if (languageID == "json" || languageID == "jsonc" || languageID == "yaml") &&
 		(documents.IsDesignTokensSchema(content) || documents.LooksLikeDTCGContent(content)) {
 		if err := req.Server.LoadTokensFromDocumentContent(
 			uri,

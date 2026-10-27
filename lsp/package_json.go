@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"slices"
 
-	"bennypowers.dev/asimonim/specifier"
 	"bennypowers.dev/asimonim/lsp/internal/log"
 	"bennypowers.dev/asimonim/lsp/types"
+	"bennypowers.dev/asimonim/schema"
+	"bennypowers.dev/asimonim/specifier"
 	"github.com/bmatcuk/doublestar/v4"
-	"github.com/tidwall/jsonc"
 )
 
 // readPackageJsonFile reads and parses package.json from the given root path.
@@ -30,8 +30,8 @@ func readPackageJsonFile(rootPath string) (map[string]any, error) {
 		return nil, fmt.Errorf("failed to read package.json: %w", err)
 	}
 
-	// Parse as JSONC (allows comments)
-	data = jsonc.ToJSON(data)
+	// Parse as JSONC (allows comments and a UTF-8 BOM)
+	data = schema.NormalizeContent(data)
 
 	// Parse JSON
 	var pkgJSON map[string]any

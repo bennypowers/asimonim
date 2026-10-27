@@ -348,7 +348,7 @@ func Hover(req *types.RequestContext, params *protocol.HoverParams) (*protocol.H
 	}
 
 	// Handle JSON/YAML token files (design token references)
-	if isTokenFile(languageID) || strings.HasSuffix(string(uri), ".json") || strings.HasSuffix(string(uri), ".yaml") || strings.HasSuffix(string(uri), ".yml") {
+	if isTokenFile(languageID) || strings.HasSuffix(string(uri), ".json") || strings.HasSuffix(string(uri), ".jsonc") || strings.HasSuffix(string(uri), ".yaml") || strings.HasSuffix(string(uri), ".yml") {
 		return handleTokenFileHover(req, doc, position)
 	}
 

@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"bennypowers.dev/asimonim/token"
 )
@@ -90,7 +91,25 @@ func ApplyPrefixCamel(name, prefix string) string {
 	if name == "" {
 		return ToCamelCase(prefix)
 	}
-	return ToCamelCase(prefix) + strings.ToUpper(name[:1]) + name[1:]
+	return ToCamelCase(prefix) + upperFirst(name)
+}
+
+// capitalize uppercases the first rune of s and lowercases the rest.
+func capitalize(s string) string {
+	if s == "" {
+		return ""
+	}
+	r, size := utf8.DecodeRuneInString(s)
+	return string(unicode.ToUpper(r)) + strings.ToLower(s[size:])
+}
+
+// upperFirst uppercases the first rune of s and leaves the rest unchanged.
+func upperFirst(s string) string {
+	if s == "" {
+		return ""
+	}
+	r, size := utf8.DecodeRuneInString(s)
+	return string(unicode.ToUpper(r)) + s[size:]
 }
 
 // ToCamelCase converts a string to camelCase.
@@ -102,9 +121,7 @@ func ToCamelCase(s string) string {
 
 	result := strings.ToLower(words[0])
 	for i := 1; i < len(words); i++ {
-		if len(words[i]) > 0 {
-			result += strings.ToUpper(words[i][:1]) + strings.ToLower(words[i][1:])
-		}
+		result += capitalize(words[i])
 	}
 	return result
 }
@@ -114,9 +131,7 @@ func ToPascalCase(s string) string {
 	words := SplitIntoWords(s)
 	var result string
 	for _, word := range words {
-		if len(word) > 0 {
-			result += strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
-		}
+		result += capitalize(word)
 	}
 	return result
 }
@@ -137,9 +152,7 @@ func ToKebabCase(s string) string {
 func ToTitleCase(s string) string {
 	words := SplitIntoWords(s)
 	for i, word := range words {
-		if len(word) > 0 {
-			words[i] = strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
-		}
+		words[i] = capitalize(word)
 	}
 	return strings.Join(words, " ")
 }

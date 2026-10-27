@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 
 	asimfs "bennypowers.dev/asimonim/fs"
-	"github.com/tidwall/jsonc"
+	"bennypowers.dev/asimonim/schema"
 )
 
 // configKeys are the package.json keys to check, in priority order.
@@ -41,7 +41,7 @@ func LoadFromPackageJSON(filesystem asimfs.FileSystem, rootDir string) (*Config,
 		return nil, fmt.Errorf("failed to read package.json: %w", err)
 	}
 
-	data = jsonc.ToJSON(data)
+	data = schema.NormalizeContent(data)
 
 	var pkgJSON map[string]json.RawMessage
 	if err := json.Unmarshal(data, &pkgJSON); err != nil {

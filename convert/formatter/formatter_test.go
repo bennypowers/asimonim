@@ -202,6 +202,8 @@ func TestApplyPrefixCamel(t *testing.T) {
 		{"colorPrimary", "my-app", "myAppColorPrimary"},
 		// leading dashes are not part of the prefix
 		{"colorPrimary", "--rh", "rhColorPrimary"},
+		// non-ASCII first runes are uppercased as a whole rune
+		{"échellePrimary", "rh", "rhÉchellePrimary"},
 	}
 
 	for _, tt := range tests {

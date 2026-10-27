@@ -215,8 +215,12 @@ func TestNormalizePrefix(t *testing.T) {
 		{"--rh", "rh"},
 		{"---rh", "rh"},
 		{"--", ""},
+		{"rh-", "rh"},
+		{"--rh-", "rh"},
+		{"rh.", "rh"},
 		{"rh.theme", "rh-theme"},
 		{"--rh.theme", "rh-theme"},
+		{"--rh.theme--", "rh-theme"},
 	} {
 		if got := token.NormalizePrefix(tt.in); got != tt.want {
 			t.Errorf("NormalizePrefix(%q) = %q, want %q", tt.in, got, tt.want)

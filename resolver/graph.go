@@ -71,17 +71,22 @@ func extractDependencies(tok *token.Token, fallback schema.Version) []string {
 	}
 
 	// Check for JSON Pointer references ($ref field)
-	effectiveVersion := tok.SchemaVersion
-	if effectiveVersion == schema.Unknown {
-		effectiveVersion = fallback
-	}
-	if effectiveVersion != schema.Draft && strings.HasPrefix(tok.Value, "#/") {
+	if effectiveVersion(tok, fallback) != schema.Draft && strings.HasPrefix(tok.Value, "#/") {
 		path := strings.TrimPrefix(tok.Value, "#/")
 		tokenName := strings.ReplaceAll(path, "/", "-")
 		deps = append(deps, tokenName)
 	}
 
 	return deps
+}
+
+// effectiveVersion returns the token's own schema version, falling back to
+// the caller-provided version when the token has none.
+func effectiveVersion(tok *token.Token, fallback schema.Version) schema.Version {
+	if tok.SchemaVersion != schema.Unknown {
+		return tok.SchemaVersion
+	}
+	return fallback
 }
 
 // extractCurlyBraceRefs extracts token paths from curly brace references.

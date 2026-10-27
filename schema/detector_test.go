@@ -9,6 +9,7 @@ See the LICENSE file for details.
 package schema_test
 
 import (
+	"strings"
 	"testing"
 
 	"bennypowers.dev/asimonim/schema"
@@ -174,6 +175,26 @@ func TestDetectVersion_StructuredColors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNormalizeContent(t *testing.T) {
+	t.Run("YAML flow mapping keeps // as text", func(t *testing.T) {
+		input := []byte(`{"$value": 2 // px}`)
+		if got := string(schema.NormalizeContent(input)); got != string(input) {
+			t.Errorf("NormalizeContent() = %q, want unchanged %q", got, input)
+		}
+	})
+
+	t.Run("JSONC comments are removed", func(t *testing.T) {
+		input := []byte("// header\n{\"color\": {\"$value\": \"#fff\"}}")
+		got := string(schema.NormalizeContent(input))
+		if strings.Contains(got, "//") {
+			t.Errorf("NormalizeContent() = %q, want comments removed", got)
+		}
+		if !strings.Contains(got, `"color"`) {
+			t.Errorf("NormalizeContent() = %q, want color key preserved", got)
+		}
+	})
 }
 
 func TestDetectVersion(t *testing.T) {

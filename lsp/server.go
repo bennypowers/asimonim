@@ -37,22 +37,22 @@ func WithVersion(v string) Option {
 
 // Server represents the Design Tokens Language Server
 type Server struct {
-	documents          *documents.Manager
-	tokens             *tokens.Manager
-	client             protocol.Client
-	conn               jsonrpc2.Conn
-	ctx                context.Context
-	version                     string                                // Server version string
-	rootURI                     string                                // Workspace root URI
-	rootPath                    string                                // Workspace root path (file system)
-	config                      types.ServerConfig                    // Server configuration
-	configMu                    sync.RWMutex                          // Protects config, context, clientDiagnosticCapability, clientCapabilities, and usePullDiagnostics from concurrent access
-	loadedFiles                 map[string]*TokenFileOptions          // Track loaded files: filepath -> options (prefix, groupMarkers)
-	loadedFilesMu               sync.RWMutex                          // Protects loadedFiles from concurrent access
-	clientDiagnosticCapability  *bool                                 // Client's diagnostic capability detected from raw initialize params (nil = not detected yet)
-	clientCapabilities          *protocol.ClientCapabilities          // Full client capabilities stored during initialize
-	usePullDiagnostics          bool                                  // Whether to use pull diagnostics (LSP 3.17) vs push (LSP 3.0)
-	semanticTokenCache          *semantictokens.TokenCache            // Cache for semantic tokens delta support
+	documents                  *documents.Manager
+	tokens                     *tokens.Manager
+	client                     protocol.Client
+	conn                       jsonrpc2.Conn
+	ctx                        context.Context
+	version                    string                       // Server version string
+	rootURI                    string                       // Workspace root URI
+	rootPath                   string                       // Workspace root path (file system)
+	config                     types.ServerConfig           // Server configuration
+	configMu                   sync.RWMutex                 // Protects config, context, clientDiagnosticCapability, clientCapabilities, and usePullDiagnostics from concurrent access
+	loadedFiles                map[string]*TokenFileOptions // Track loaded files: filepath -> options (prefix, groupMarkers)
+	loadedFilesMu              sync.RWMutex                 // Protects loadedFiles from concurrent access
+	clientDiagnosticCapability *bool                        // Client's diagnostic capability detected from raw initialize params (nil = not detected yet)
+	clientCapabilities         *protocol.ClientCapabilities // Full client capabilities stored during initialize
+	usePullDiagnostics         bool                         // Whether to use pull diagnostics (LSP 3.17) vs push (LSP 3.0)
+	semanticTokenCache         *semantictokens.TokenCache   // Cache for semantic tokens delta support
 }
 
 // NewServer creates a new Design Tokens LSP server
@@ -97,7 +97,7 @@ func (s *Server) RunStdio() error {
 // used by protocol.NewServer.
 type protocolCodec struct{}
 
-func (protocolCodec) Marshal(v any) ([]byte, error)     { return protocol.Marshal(v) }
+func (protocolCodec) Marshal(v any) ([]byte, error)      { return protocol.Marshal(v) }
 func (protocolCodec) Unmarshal(data []byte, v any) error { return protocol.Unmarshal(data, v) }
 
 // Close releases server resources including the CSS, HTML, and JS parser pools.
@@ -405,7 +405,7 @@ func (s *Server) NotifyDiagnosticRefresh() {
 func (s *Server) IsTokenFile(path string) bool {
 	// Check if it's a JSON or YAML file
 	ext := filepath.Ext(path)
-	if ext != ".json" && ext != ".yaml" && ext != ".yml" {
+	if ext != ".json" && ext != ".jsonc" && ext != ".yaml" && ext != ".yml" {
 		return false
 	}
 

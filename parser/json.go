@@ -42,16 +42,10 @@ func NewJSONParser() *JSONParser {
 func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 	var raw map[string]any
 	var positionData []byte
-	// detectionData is the normalized document passed to schema detection.
-	// JSONC comments are stripped before detection because the detector uses
-	// a YAML decoder, which cannot parse JSONC comments.
-	detectionData := data
-
 	// Detect format: JSON typically starts with '{' or whitespace then '{'
 	// YAML uses indentation-based structure
 	looksJSON, skippedBlockComment := isLikelyJSON(data)
 	parsedJSON := false
-	bomStripped := false
 	var jsonErr error
 	if looksJSON {
 		// JSON path: strip a UTF-8 BOM, then strip comments and parse.
@@ -59,9 +53,7 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 		cleanJSON := jsonc.ToJSON(jsonData)
 		if err := json.Unmarshal(cleanJSON, &raw); err == nil {
 			positionData = cleanJSON
-			detectionData = cleanJSON
 			parsedJSON = true
-			bomStripped = len(jsonData) != len(data)
 		} else if !skippedBlockComment {
 			return nil, fmt.Errorf("failed to parse JSON: %w", err)
 		} else {
@@ -92,7 +84,7 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 
 	// Auto-detect schema version if not explicitly set
 	if opts.SchemaVersion == schema.Unknown {
-		if detected, err := schema.DetectVersion(detectionData, nil); err == nil {
+		if detected, err := schema.DetectVersion(positionData, nil); err == nil {
 			opts.SchemaVersion = detected
 		} else {
 			opts.SchemaVersion = schema.Draft
@@ -107,15 +99,6 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 	if !opts.SkipPositions {
 		if err := p.addPositions(positionData, result); err != nil {
 			return nil, err
-		}
-		// Position data excludes the BOM, but clients count it as one
-		// UTF-16 code unit at the start of line 0.
-		if bomStripped {
-			for _, tok := range result {
-				if tok.Line == 0 {
-					tok.Character++
-				}
-			}
 		}
 	}
 
@@ -335,7 +318,7 @@ func (p *JSONParser) createToken(key, path string, valueMap map[string]any, json
 	t := &token.Token{
 		Name:          name,
 		Value:         value,
-		Prefix:        opts.Prefix,
+		Prefix:        token.NormalizePrefix(opts.Prefix),
 		Path:          jsonPath,
 		Reference:     reference,
 		Line:          0, // Filled in by addPositions if needed

@@ -27,6 +27,19 @@ var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
 // because that decoder cannot parse JSONC comments.
 func NormalizeContent(content []byte) []byte {
 	content = bytes.TrimPrefix(content, utf8BOM)
+	if json.Valid(content) {
+		return content
+	}
+	// A document that YAML decodes to a map or sequence is a YAML document,
+	// including flow mappings that start with '{' or '['. Do not rewrite it
+	// as JSONC: in YAML, "//" is ordinary text, not a comment.
+	var probe any
+	if err := yaml.Unmarshal(content, &probe); err == nil {
+		switch probe.(type) {
+		case map[string]any, map[any]any, []any:
+			return content
+		}
+	}
 	if !looksLikeJSON(content) {
 		return content
 	}

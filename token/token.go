@@ -146,11 +146,11 @@ func NewMap(tokens []*Token, prefix string) *Map {
 }
 
 // NormalizePrefix converts a CSS variable prefix to its canonical spelling:
-// leading dashes are stripped and dots become dashes, so "rh", "--rh", and
-// "--rh.theme" produce "rh" and "rh-theme". This matches the spelling used in
-// CSS variable names.
+// leading and trailing dashes and dots are stripped and remaining dots become
+// dashes, so "rh", "--rh", "rh-" and "--rh.theme" produce "rh" and
+// "rh-theme". This matches the spelling used in CSS variable names.
 func NormalizePrefix(prefix string) string {
-	return strings.ReplaceAll(strings.TrimLeft(prefix, "-"), ".", "-")
+	return strings.ReplaceAll(strings.Trim(prefix, "-."), ".", "-")
 }
 
 // Get returns the Token for the given name, prepending the prefix if needed.

@@ -393,6 +393,13 @@ func TestIsTokenFile(t *testing.T) {
 			expectedResult: true,
 		},
 		{
+			name:           "Explicit token file - JSONC",
+			path:           "/workspace/tokens.jsonc",
+			rootPath:       "/workspace",
+			configFiles:    []any{"tokens.jsonc"},
+			expectedResult: true,
+		},
+		{
 			name:           "Explicit token file - absolute path",
 			path:           "/workspace/design-system/tokens.json",
 			rootPath:       "/workspace",
@@ -878,8 +885,8 @@ func TestServer_BuildFileWatcherPatterns(t *testing.T) {
 
 		s.rootPath = "/workspace"
 		s.config.TokensFiles = []any{
-			"",                            // empty string
-			map[string]any{"path": ""},    // empty path in object
+			"",                             // empty string
+			map[string]any{"path": ""},     // empty path in object
 			map[string]any{"prefix": "ds"}, // no path key at all
 		}
 

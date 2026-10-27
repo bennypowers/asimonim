@@ -26,6 +26,11 @@ func TestIsResolverDocument(t *testing.T) {
 		assert.False(t, isResolverDocument(data))
 	})
 
+	t.Run("detects JSONC resolver document with BOM", func(t *testing.T) {
+		data := []byte("\xEF\xBB\xBF// resolver\n{\"resolutionOrder\": [{\"$ref\": \"#/sets/base\"}]}")
+		assert.True(t, isResolverDocument(data))
+	})
+
 	t.Run("rejects invalid JSON", func(t *testing.T) {
 		assert.False(t, isResolverDocument([]byte(`{invalid`)))
 	})

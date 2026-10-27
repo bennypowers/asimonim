@@ -417,6 +417,21 @@ func TestLoadAll_NoFiles(t *testing.T) {
 	}
 }
 
+func TestLoad_JSONCResolverDocument(t *testing.T) {
+	// Resolver document detection uses encoding/json directly. JSONC comments
+	// and a BOM must not make it fall through to token parsing and return an
+	// empty map.
+	tokenMap, err := load.Load(t.Context(), "resolver-jsonc.jsonc", load.Options{
+		Root: testdataDir(),
+	})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if tokenMap.Len() != 3 {
+		t.Errorf("expected 3 tokens from JSONC resolver document, got %d", tokenMap.Len())
+	}
+}
+
 func TestLoad_ResolverDocument(t *testing.T) {
 	root := testdataDir()
 	tokenMap, err := load.Load(t.Context(), "resolver.json", load.Options{

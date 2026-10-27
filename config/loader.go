@@ -18,6 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	asimfs "bennypowers.dev/asimonim/fs"
+	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/specifier"
 )
 
@@ -43,6 +44,7 @@ func Load(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
+		data = schema.NormalizeContent(data)
 
 		cfg := &Config{}
 		switch ext {

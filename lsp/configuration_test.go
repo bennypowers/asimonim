@@ -824,6 +824,18 @@ func TestLoadTokensFromDocumentContent(t *testing.T) {
 		assert.Equal(t, 1, server.TokenCount())
 	})
 
+	t.Run("loads JSONC content", func(t *testing.T) {
+		server, err := NewServer()
+		require.NoError(t, err)
+		defer func() { _ = server.Close() }()
+
+		content := "// tokens\n{\"color\": {\"primary\": {\"$value\": \"#ff0000\", \"$type\": \"color\"}}}"
+		err = server.LoadTokensFromDocumentContent("file:///tmp/tokens.jsonc", "jsonc", content)
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, server.TokenCount())
+	})
+
 	t.Run("skips unsupported language", func(t *testing.T) {
 		server, err := NewServer()
 		require.NoError(t, err)

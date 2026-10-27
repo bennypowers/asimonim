@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	asimfs "bennypowers.dev/asimonim/fs"
+	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/specifier"
 )
 
@@ -216,7 +217,7 @@ func readPackageJSON(filesystem asimfs.FileSystem, path string) (*packageJSON, e
 		return nil, err
 	}
 	var pkg packageJSON
-	if err := json.Unmarshal(data, &pkg); err != nil {
+	if err := json.Unmarshal(schema.NormalizeContent(data), &pkg); err != nil {
 		return nil, err
 	}
 	return &pkg, nil
