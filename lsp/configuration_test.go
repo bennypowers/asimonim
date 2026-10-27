@@ -991,3 +991,27 @@ func TestParseAndAddTokens(t *testing.T) {
 		assert.Equal(t, 1, count)
 	})
 }
+
+func TestLoadTokensFromConfig_DropsStaleFileTracking(t *testing.T) {
+	dir := t.TempDir()
+	fileA := filepath.Join(dir, "a.json")
+	fileB := filepath.Join(dir, "b.json")
+	body := `{"color":{"primary":{"$type":"color","$value":"#ff0000"}}}`
+	require.NoError(t, os.WriteFile(fileA, []byte(body), 0o644))
+	require.NoError(t, os.WriteFile(fileB, []byte(body), 0o644))
+
+	server, err := NewServer()
+	require.NoError(t, err)
+	defer func() { _ = server.Close() }()
+	server.SetRootPath(dir)
+
+	server.SetConfig(types.ServerConfig{TokensFiles: []any{fileA}})
+	require.NoError(t, server.LoadTokensFromConfig())
+	require.True(t, server.IsTokenFile(fileA))
+
+	server.SetConfig(types.ServerConfig{TokensFiles: []any{fileB}})
+	require.NoError(t, server.LoadTokensFromConfig())
+
+	assert.False(t, server.IsTokenFile(fileA), "stale file should no longer be tracked")
+	assert.True(t, server.IsTokenFile(fileB), "current config file should be tracked")
+}

@@ -467,3 +467,33 @@ func TestJSONParser_ParseUTF8BOM(t *testing.T) {
 		}
 	})
 }
+
+func TestJSONParser_AutoDetectSchemaFromTrailingBlockComment(t *testing.T) {
+	// A block comment after a value must not hide 2025.10 features from
+	// schema detection: the parser passes the comment-stripped document to
+	// DetectVersion.
+	data := []byte(`{
+		"color": {
+			"primary": {"$type": "color", "$value": "#ff0000"},
+			"alias": {"$type": "color", "$ref": "#/color/primary"}
+		}
+	} /* trailing comment */`)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var found bool
+	for _, tok := range tokens {
+		if tok.Name == "color-alias" {
+			found = true
+			if tok.SchemaVersion != schema.V2025_10 {
+				t.Errorf("color-alias schema = %s, want %s", tok.SchemaVersion, schema.V2025_10)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("color-alias token not found")
+	}
+}
