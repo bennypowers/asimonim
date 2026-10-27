@@ -307,3 +307,34 @@ func TestJSONParser_SkipPositions(t *testing.T) {
 		}
 	}
 }
+
+func TestJSONParser_AutoDetectSchemaFromJSONC(t *testing.T) {
+	// The block comment makes this invalid YAML, but valid JSONC. Schema
+	// detection must inspect the normalized JSON so the 2025.10 $ref is
+	// recognized instead of falling back to Draft.
+	data := []byte(`{
+		/* 2025.10 $ref tokens require schema detection */
+		"color": {
+			"primary": {"$type": "color", "$value": "#ff0000"},
+			"alias": {"$type": "color", "$ref": "#/color/primary"}
+		}
+	}`)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var aliasFound bool
+	for _, tok := range tokens {
+		if tok.Name == "color-alias" {
+			aliasFound = true
+			if tok.SchemaVersion != schema.V2025_10 {
+				t.Errorf("color-alias schema = %s, want %s", tok.SchemaVersion, schema.V2025_10)
+			}
+		}
+	}
+	if !aliasFound {
+		t.Fatal("color-alias token not found; schema auto-detection failed for JSONC input")
+	}
+}

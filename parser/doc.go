@@ -28,10 +28,12 @@ See the LICENSE file for details.
 // names such as --rh-color-primary. It does not rename tokens or change
 // Token.Name; see token.Token.CSSVariableName and token.NewMap.
 //
-// SkipSort disables the default alphabetical sort of token names. The
-// default yields deterministic output, which is usually what you want for
-// generated files and golden tests. Set SkipSort when order does not matter
-// and parsing speed is critical.
+// SkipSort disables the default sorting of keys within each group. The
+// default yields deterministic traversal order, which is usually what you
+// want for generated files and golden tests. The resulting token list is
+// not globally alphabetical: keys are sorted within each group as the
+// parser walks the tree. Set SkipSort when order does not matter and
+// parsing speed is critical.
 //
 // SkipPositions disables the second pass that records Line and Character on
 // each token. Position data is needed for editor features such as

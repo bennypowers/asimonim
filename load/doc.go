@@ -10,8 +10,12 @@ See the LICENSE file for details.
 //
 // Load resolves a local path, npm: specifier, or jsr: specifier, reads and
 // parses the file, resolves $extends relationships and aliases, and returns
-// a token.Map. LoadAll does the same for several sources and resolves
-// aliases across all of them.
+// a token.Map.
+//
+// LoadAll loads several sources, returns a *Result that groups tokens by
+// source, and resolves aliases across all sources. Unlike Load, LoadAll does
+// not call ResolveGroupExtensions, so tokens inherited through $extends are
+// not materialized.
 //
 // # Configuration
 //
@@ -42,6 +46,7 @@ See the LICENSE file for details.
 //	if err != nil {
 //		return err
 //	}
-//	tok, _ := m.Get("color.primary")
-//	fmt.Println(tok.CSSVariableName())
+//	if tok, ok := m.Get("color.primary"); ok {
+//		fmt.Println(tok.CSSVariableName())
+//	}
 package load

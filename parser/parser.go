@@ -30,9 +30,10 @@ type Options struct {
 	// GroupMarkers are token names that can be both tokens and groups (draft only).
 	GroupMarkers []string
 
-	// SkipSort disables alphabetical sorting of tokens for better performance.
-	// When false (default), tokens are sorted by name for deterministic
-	// output order, which is desirable for generated files and golden tests.
+	// SkipSort disables the default sorting of keys within each group for
+	// better performance. When false (default), keys are sorted within each
+	// group, which produces deterministic traversal order. The final token
+	// list is not globally alphabetical.
 	SkipSort bool
 
 	// SkipPositions disables position tracking for better performance.

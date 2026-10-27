@@ -80,7 +80,11 @@ above) for the full API and examples.
 ### Version information
 
 ```go
-import "bennypowers.dev/asimonim/version"
+import (
+	"fmt"
+
+	"bennypowers.dev/asimonim/version"
+)
 
 fmt.Println(version.Get())
 fmt.Println(version.Info()["gitCommit"])

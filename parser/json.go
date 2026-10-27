@@ -38,6 +38,10 @@ func NewJSONParser() *JSONParser {
 func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 	var raw map[string]any
 	var positionData []byte
+	// detectionData is the normalized document passed to schema detection.
+	// JSONC comments are stripped before detection because the detector uses
+	// a YAML decoder, which cannot parse JSONC comments.
+	detectionData := data
 
 	// Detect format: JSON typically starts with '{' or whitespace then '{'
 	// YAML uses indentation-based structure
@@ -48,6 +52,7 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 			return nil, fmt.Errorf("failed to parse JSON: %w", err)
 		}
 		positionData = cleanJSON
+		detectionData = cleanJSON
 	} else {
 		// YAML path: parse directly with yaml.v3
 		var yamlRaw any
@@ -66,7 +71,7 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 
 	// Auto-detect schema version if not explicitly set
 	if opts.SchemaVersion == schema.Unknown {
-		if detected, err := schema.DetectVersion(data, nil); err == nil {
+		if detected, err := schema.DetectVersion(detectionData, nil); err == nil {
 			opts.SchemaVersion = detected
 		} else {
 			opts.SchemaVersion = schema.Draft

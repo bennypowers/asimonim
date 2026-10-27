@@ -20,10 +20,10 @@ import (
 func ExampleJSONParser_Parse() {
 	data := []byte(`{
 		"$schema": "https://www.designtokens.org/schemas/2025.10.json",
-		"color": {
-			"primary": {
-				"$type": "color",
-				"$value": "#ff0000"
+		"spacing": {
+			"small": {
+				"$type": "number",
+				"$value": 4
 			}
 		}
 	}`)
@@ -37,5 +37,5 @@ func ExampleJSONParser_Parse() {
 	for _, tok := range tokens {
 		fmt.Printf("%s = %s (%s)\n", tok.Name, tok.Value, tok.SchemaVersion)
 	}
-	// Output: color-primary = #ff0000 (v2025.10)
+	// Output: spacing-small = 4 (v2025.10)
 }

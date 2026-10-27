@@ -25,7 +25,7 @@ See the LICENSE file for details.
 //
 // # Example
 //
-//	tokens, err := parser.Parse(data, parser.Options{})
+//	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{})
 //	if err != nil {
 //		return err
 //	}
