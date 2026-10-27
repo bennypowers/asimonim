@@ -111,6 +111,7 @@ export async function activate(context: ExtensionContext) {
       { scheme: "file", language: "typescript" },
       { scheme: "file", language: "typescriptreact" },
       { scheme: "file", language: "json" },
+      { scheme: "file", language: "jsonc" },
       { scheme: "file", language: "yaml" },
     ],
   };

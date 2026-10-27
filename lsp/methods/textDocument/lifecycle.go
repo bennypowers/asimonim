@@ -3,6 +3,7 @@ package textDocument
 import (
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/internal/log"
+	"bennypowers.dev/asimonim/lsp/internal/uriutil"
 
 	"bennypowers.dev/asimonim/lsp/types"
 	"go.lsp.dev/protocol"
@@ -23,9 +24,12 @@ func DidOpen(req *types.RequestContext, params *protocol.DidOpenTextDocumentPara
 	}
 
 	// Auto-load tokens from files that look like DTCG token files
-	// This enables semantic tokens and other features for token files not in config
+	// This enables semantic tokens and other features for token files not in config.
+	// Files that are already configured or loaded keep their configured options
+	// (such as a per-file prefix), so do not reload them here.
 	content := params.TextDocument.Text
-	if (languageID == "json" || languageID == "jsonc" || languageID == "yaml") &&
+	if !req.Server.IsTokenFile(uriutil.URIToPath(uri)) &&
+		(languageID == "json" || languageID == "jsonc" || languageID == "yaml") &&
 		(documents.IsDesignTokensSchema(content) || documents.LooksLikeDTCGContent(content)) {
 		if err := req.Server.LoadTokensFromDocumentContent(
 			uri,

@@ -32,6 +32,7 @@
     "onLanguage:typescript",
     "onLanguage:typescriptreact",
     "onLanguage:json",
+    "onLanguage:jsonc",
     "onLanguage:yaml"
   ],
   "main": "./client/out/extension",
