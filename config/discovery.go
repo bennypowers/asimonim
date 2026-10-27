@@ -217,7 +217,7 @@ func readPackageJSON(filesystem asimfs.FileSystem, path string) (*packageJSON, e
 		return nil, err
 	}
 	var pkg packageJSON
-	if err := json.Unmarshal(schema.NormalizeContent(data), &pkg); err != nil {
+	if err := json.Unmarshal(schema.NormalizeJSON(data), &pkg); err != nil {
 		return nil, err
 	}
 	return &pkg, nil

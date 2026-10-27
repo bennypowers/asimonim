@@ -31,7 +31,7 @@ func readPackageJsonFile(rootPath string) (map[string]any, error) {
 	}
 
 	// Parse as JSONC (allows comments and a UTF-8 BOM)
-	data = schema.NormalizeContent(data)
+	data = schema.NormalizeJSON(data)
 
 	// Parse JSON
 	var pkgJSON map[string]any

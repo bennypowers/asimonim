@@ -12,6 +12,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
 
 	"github.com/tidwall/jsonc"
 	"gopkg.in/yaml.v3"
@@ -20,25 +22,14 @@ import (
 // utf8BOM is the UTF-8 byte order mark.
 var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
 
-// NormalizeContent strips a UTF-8 BOM and JSONC comments from content that
-// begins as a JSON object or array. Content that is not valid JSON after
-// comment removal, including YAML flow mappings, is returned unchanged.
-// Callers that parse content with a YAML decoder should normalize first,
-// because that decoder cannot parse JSONC comments.
-func NormalizeContent(content []byte) []byte {
+// NormalizeJSON strips a UTF-8 BOM and JSONC comments and trailing commas
+// from JSON content. Callers that decode the result with encoding/json should
+// use this function; it never preserves a YAML interpretation. Content that
+// does not become valid JSON is returned unchanged.
+func NormalizeJSON(content []byte) []byte {
 	content = bytes.TrimPrefix(content, utf8BOM)
 	if json.Valid(content) {
 		return content
-	}
-	// A document that YAML decodes to a map or sequence is a YAML document,
-	// including flow mappings that start with '{' or '['. Do not rewrite it
-	// as JSONC: in YAML, "//" is ordinary text, not a comment.
-	var probe any
-	if err := yaml.Unmarshal(content, &probe); err == nil {
-		switch probe.(type) {
-		case map[string]any, map[any]any, []any:
-			return content
-		}
 	}
 	if !looksLikeJSON(content) {
 		return content
@@ -48,6 +39,109 @@ func NormalizeContent(content []byte) []byte {
 		return content
 	}
 	return normalized
+}
+
+// NormalizeContent strips a UTF-8 BOM and JSONC comments and trailing commas
+// from content that begins as a JSON object or array. YAML documents are
+// returned unchanged, including flow mappings whose scalar values contain
+// "//". Callers that parse content with a YAML decoder should use this
+// function, because that decoder cannot parse JSONC comments.
+func NormalizeContent(content []byte) []byte {
+	content = bytes.TrimPrefix(content, utf8BOM)
+	if json.Valid(content) {
+		return content
+	}
+	if !looksLikeJSON(content) {
+		return content
+	}
+	normalized := jsonc.ToJSON(content)
+	if !json.Valid(normalized) {
+		return content
+	}
+
+	// A YAML flow mapping starting with '{' can also be valid JSONC. Prefer
+	// YAML only when the two decoders disagree about the value and YAML did
+	// not turn a comment into a map key. Disagreement alone is ambiguous
+	// because YAML misreads a trailing "//" comment as a null-valued key.
+	var yamlProbe any
+	if err := yaml.Unmarshal(content, &yamlProbe); err == nil {
+		switch yamlProbe.(type) {
+		case map[string]any, map[any]any, []any:
+			if hasCommentArtifact(yamlProbe) {
+				return normalized
+			}
+			var jsonProbe any
+			if err := json.Unmarshal(normalized, &jsonProbe); err == nil &&
+				reflect.DeepEqual(normalizeProbe(yamlProbe), jsonProbe) {
+				return normalized
+			}
+			return content
+		}
+	}
+	return normalized
+}
+
+// hasCommentArtifact reports whether a YAML decode contains a map key that
+// starts like a JSONC comment. YAML has no "//" comment syntax, so such a key
+// means YAML consumed a JSONC comment as data.
+func hasCommentArtifact(v any) bool {
+	switch x := v.(type) {
+	case map[string]any:
+		for k, val := range x {
+			if strings.HasPrefix(k, "//") || strings.HasPrefix(k, "/*") || hasCommentArtifact(val) {
+				return true
+			}
+		}
+	case map[any]any:
+		for k, val := range x {
+			if key, ok := k.(string); ok && (strings.HasPrefix(key, "//") || strings.HasPrefix(key, "/*")) {
+				return true
+			}
+			if hasCommentArtifact(val) {
+				return true
+			}
+		}
+	case []any:
+		for _, val := range x {
+			if hasCommentArtifact(val) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// normalizeProbe converts YAML and JSON decode shapes to a common form so
+// they can be compared with reflect.DeepEqual.
+func normalizeProbe(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		m := make(map[string]any, len(x))
+		for k, val := range x {
+			m[k] = normalizeProbe(val)
+		}
+		return m
+	case map[any]any:
+		m := make(map[string]any, len(x))
+		for k, val := range x {
+			m[fmt.Sprint(k)] = normalizeProbe(val)
+		}
+		return m
+	case []any:
+		s := make([]any, len(x))
+		for i, val := range x {
+			s[i] = normalizeProbe(val)
+		}
+		return s
+	case int:
+		return float64(x)
+	case int64:
+		return float64(x)
+	case uint64:
+		return float64(x)
+	default:
+		return v
+	}
 }
 
 // looksLikeJSON reports whether content begins with a JSON object or array,

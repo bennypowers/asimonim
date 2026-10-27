@@ -310,7 +310,7 @@ func readPackageJSON(packageDir string) (*PackageJSON, error) {
 	}
 
 	var pkg PackageJSON
-	if err := json.Unmarshal(schema.NormalizeContent(data), &pkg); err != nil {
+	if err := json.Unmarshal(schema.NormalizeJSON(data), &pkg); err != nil {
 		return nil, fmt.Errorf("failed to parse package.json: %w", err)
 	}
 

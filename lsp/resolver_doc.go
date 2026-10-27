@@ -18,7 +18,7 @@ import (
 // by looking for the "resolutionOrder" field at the root.
 func isResolverDocument(data []byte) bool {
 	var doc map[string]json.RawMessage
-	if err := json.Unmarshal(schema.NormalizeContent(data), &doc); err != nil {
+	if err := json.Unmarshal(schema.NormalizeJSON(data), &doc); err != nil {
 		return false
 	}
 	_, hasResolutionOrder := doc["resolutionOrder"]

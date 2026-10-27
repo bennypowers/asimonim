@@ -41,7 +41,7 @@ func LoadFromPackageJSON(filesystem asimfs.FileSystem, rootDir string) (*Config,
 		return nil, fmt.Errorf("failed to read package.json: %w", err)
 	}
 
-	data = schema.NormalizeContent(data)
+	data = schema.NormalizeJSON(data)
 
 	var pkgJSON map[string]json.RawMessage
 	if err := json.Unmarshal(data, &pkgJSON); err != nil {

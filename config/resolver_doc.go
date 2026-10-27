@@ -86,7 +86,7 @@ func (c *Config) ResolveResolverSources(resolver specifier.Resolver, filesystem 
 // that have already read the resolver document (e.g., the LSP server).
 func ExtractSourcePaths(data []byte, resolverDir string) ([]string, error) {
 	var doc resolverDocument
-	if err := json.Unmarshal(schema.NormalizeContent(data), &doc); err != nil {
+	if err := json.Unmarshal(schema.NormalizeJSON(data), &doc); err != nil {
 		return nil, fmt.Errorf("failed to parse resolver document: %w", err)
 	}
 

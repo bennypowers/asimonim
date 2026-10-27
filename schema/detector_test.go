@@ -9,6 +9,7 @@ See the LICENSE file for details.
 package schema_test
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -185,6 +186,38 @@ func TestNormalizeContent(t *testing.T) {
 		}
 	})
 
+	t.Run("multi-line YAML flow mapping keeps // as text", func(t *testing.T) {
+		input := []byte("{\"$value\": 2 // px\n}")
+		if got := string(schema.NormalizeContent(input)); got != string(input) {
+			t.Errorf("NormalizeContent() = %q, want unchanged %q", got, input)
+		}
+	})
+
+	t.Run("trailing comment after nested object is normalized", func(t *testing.T) {
+		input := []byte(`{"name":"p","asimonim":{"prefix":"rh"}, // note
+}`)
+		got := schema.NormalizeContent(input)
+		if !json.Valid(got) {
+			t.Errorf("NormalizeContent() = %q, want valid JSON", got)
+		}
+	})
+
+	t.Run("JSONC trailing comma is normalized", func(t *testing.T) {
+		input := []byte(`{"asimonim":{"prefix":"rh",},}`)
+		got := schema.NormalizeContent(input)
+		if !json.Valid(got) {
+			t.Errorf("NormalizeContent() = %q, want valid JSON", got)
+		}
+	})
+
+	t.Run("numeric JSONC trailing comma is normalized", func(t *testing.T) {
+		input := []byte(`{"count": 1,}`)
+		got := schema.NormalizeContent(input)
+		if !json.Valid(got) {
+			t.Errorf("NormalizeContent() = %q, want valid JSON", got)
+		}
+	})
+
 	t.Run("JSONC comments are removed", func(t *testing.T) {
 		input := []byte("// header\n{\"color\": {\"$value\": \"#fff\"}}")
 		got := string(schema.NormalizeContent(input))
@@ -193,6 +226,25 @@ func TestNormalizeContent(t *testing.T) {
 		}
 		if !strings.Contains(got, `"color"`) {
 			t.Errorf("NormalizeContent() = %q, want color key preserved", got)
+		}
+	})
+}
+
+func TestNormalizeJSON(t *testing.T) {
+	t.Run("trailing comment and comma are normalized", func(t *testing.T) {
+		input := []byte(`{"name":"p","asimonim":{"prefix":"rh"}, // note
+}`)
+		got := schema.NormalizeJSON(input)
+		if !json.Valid(got) {
+			t.Errorf("NormalizeJSON() = %q, want valid JSON", got)
+		}
+	})
+
+	t.Run("leading comment is removed", func(t *testing.T) {
+		input := []byte("// header\n{\"a\": 1}")
+		got := schema.NormalizeJSON(input)
+		if !json.Valid(got) || strings.Contains(string(got), "//") {
+			t.Errorf("NormalizeJSON() = %q, want valid JSON without comments", got)
 		}
 	})
 }

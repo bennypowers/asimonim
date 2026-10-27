@@ -327,7 +327,7 @@ func BuildHierarchy(rows []Row) *HierarchyNode {
 // Returns a map keyed by dot-separated path (e.g., "color.brand").
 func ExtractGroupMeta(data []byte) (map[string]GroupMeta, error) {
 	var raw map[string]any
-	if err := json.Unmarshal(schema.NormalizeContent(data), &raw); err != nil {
+	if err := json.Unmarshal(schema.NormalizeJSON(data), &raw); err != nil {
 		return nil, err
 	}
 

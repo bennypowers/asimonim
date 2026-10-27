@@ -44,16 +44,14 @@ func Load(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
-		data = schema.NormalizeContent(data)
-
 		cfg := &Config{}
 		switch ext {
 		case ".yaml", ".yml":
-			if err := yaml.Unmarshal(data, cfg); err != nil {
+			if err := yaml.Unmarshal(schema.NormalizeContent(data), cfg); err != nil {
 				return nil, err
 			}
 		case ".json":
-			if err := json.Unmarshal(data, cfg); err != nil {
+			if err := json.Unmarshal(schema.NormalizeJSON(data), cfg); err != nil {
 				return nil, err
 			}
 		}
