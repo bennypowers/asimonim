@@ -95,5 +95,6 @@ The published 3.2.0 document has 547 tokens.
   not DTCG color values. 56 are theme composites whose source form is an
   array of two per-theme aliases; `color.surface._` is a six-element palette
   of surface aliases. They are excluded from this DTCG fixture, hence
-  `excludedLightDark: 57`. The `@rhds/mcp` data generator keeps them in
-  separate computed theme and palette maps.
+  `excludedLightDark: 57`. The `@rhds/mcp` data generator records the 56
+  theme composites in a separate computed theme map and omits the
+  `color.surface._` palette composite.

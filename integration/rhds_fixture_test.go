@@ -35,8 +35,8 @@ See the LICENSE file for details.
 //   - 57 light-dark(var(...)) composite tokens are excluded. 56 original
 //     values are arrays of two per-theme aliases; color.surface._ is a
 //     six-element palette of surface aliases. Neither is a DTCG color value.
-//     The @rhds/mcp generator keeps them in separate computed theme and
-//     palette maps instead.
+//     The @rhds/mcp generator records theme composites in a separate computed
+//     theme map and omits the palette composite.
 //
 // The fixture carries the same counts in its root $extensions so the
 // contract is inspectable without this test file.
