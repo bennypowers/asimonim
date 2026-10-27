@@ -23,9 +23,10 @@ See the LICENSE file for details.
 //
 // Prefix is applied to a copy of each token that did not already have one.
 // A parser-provided prefix is normalized on a copy too, so leading dashes
-// ("--rh") still produce --rh-* names and map keys. A token whose prefix is
-// explicitly different from the requested prefix keeps it; only its dash
-// spelling is normalized. Building a Map does not mutate the input slice.
+// ("--rh") and dots ("rh.theme") produce --rh-* and --rh-theme-* names and
+// map keys. A token whose prefix is explicitly different from the requested
+// prefix keeps it; only its dash and dot spelling is normalized. Building a
+// Map does not mutate the input slice.
 //
 // # Example
 //

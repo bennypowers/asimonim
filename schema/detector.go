@@ -9,10 +9,64 @@ See the LICENSE file for details.
 package schema
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 
+	"github.com/tidwall/jsonc"
 	"gopkg.in/yaml.v3"
 )
+
+// utf8BOM is the UTF-8 byte order mark.
+var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
+
+// NormalizeContent strips a UTF-8 BOM and JSONC comments from content that
+// begins as a JSON object or array. Content that is not valid JSON after
+// comment removal, including YAML flow mappings, is returned unchanged.
+// Callers that parse content with a YAML decoder should normalize first,
+// because that decoder cannot parse JSONC comments.
+func NormalizeContent(content []byte) []byte {
+	content = bytes.TrimPrefix(content, utf8BOM)
+	if !looksLikeJSON(content) {
+		return content
+	}
+	normalized := jsonc.ToJSON(content)
+	if !json.Valid(normalized) {
+		return content
+	}
+	return normalized
+}
+
+// looksLikeJSON reports whether content begins with a JSON object or array,
+// skipping leading whitespace and JSONC comments.
+func looksLikeJSON(content []byte) bool {
+	for i := 0; i < len(content); {
+		switch content[i] {
+		case ' ', '\t', '\n', '\r':
+			i++
+		case '/':
+			switch {
+			case i+1 < len(content) && content[i+1] == '/':
+				for i < len(content) && content[i] != '\n' {
+					i++
+				}
+			case i+1 < len(content) && content[i+1] == '*':
+				end := bytes.Index(content[i+2:], []byte("*/"))
+				if end < 0 {
+					return false
+				}
+				i += 2 + end + 2
+			default:
+				return false
+			}
+		case '{', '[':
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
 
 // DetectionConfig provides configuration for schema version detection.
 type DetectionConfig struct {
@@ -27,6 +81,8 @@ type DetectionConfig struct {
 // 3. Duck typing (detect reserved fields/structured formats)
 // 4. Default to draft (backward compatibility)
 func DetectVersion(content []byte, config *DetectionConfig) (Version, error) {
+	content = NormalizeContent(content)
+
 	var data map[string]any
 	if err := yaml.Unmarshal(content, &data); err != nil {
 		return Unknown, fmt.Errorf("invalid YAML/JSON: %w", err)

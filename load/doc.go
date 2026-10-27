@@ -19,10 +19,13 @@ See the LICENSE file for details.
 //
 // # Configuration
 //
-// Options are merged with an optional .config/design-tokens.yaml file.
-// Values set in Options take precedence over values from the config file.
-// Network access is off by default. Set Options.Fetcher to opt into a CDN
-// fallback for package specifiers that cannot be resolved from the local
+// Load reads an optional .config/design-tokens.{yaml,yml,json} file from
+// Options.Root and merges it with Options; values set in Options take
+// precedence. Network access is off by default; set Options.Fetcher to opt
+// Load into a CDN fallback for package specifiers that cannot be resolved
+// from the local filesystem. LoadAll uses the *config.Config supplied by the
+// caller, does not read a config file, and does not use Options.Fetcher, so
+// non-local package specifiers in LoadAll must resolve through the local
 // filesystem.
 //
 // # Schema detection
@@ -33,9 +36,11 @@ See the LICENSE file for details.
 //
 // # Prefix
 //
-// Options.Prefix is the CSS variable prefix applied to loaded tokens, and
-// also the prefix used by the returned token.Map. When empty, the prefix
-// from the config file is used.
+// Options.Prefix is the CSS variable prefix applied to loaded tokens. For
+// Load it is also the prefix used by the returned token.Map; for LoadAll it
+// is stored on the tokens in the returned *Result. Load falls back to the
+// Prefix in the config file when Options.Prefix is empty; LoadAll uses only
+// the supplied config.
 //
 // # Example
 //

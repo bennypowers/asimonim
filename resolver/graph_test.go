@@ -16,6 +16,28 @@ import (
 	"bennypowers.dev/asimonim/token"
 )
 
+func TestResolveAliases_FallbackVersionAppliesToGraph(t *testing.T) {
+	// Tokens without their own SchemaVersion must use the caller-provided
+	// fallback for JSON Pointer detection, both when resolving and when
+	// building the dependency graph. Otherwise a draft document gets a
+	// false cycle from a "#/..." value that is a literal under draft.
+	tokens := []*token.Token{
+		{Name: "a", Value: "#/b"},
+		{Name: "b", Value: "{a}"},
+	}
+
+	if err := resolver.ResolveAliases(tokens, schema.Draft); err != nil {
+		t.Fatalf("ResolveAliases() error = %v", err)
+	}
+
+	if tokens[0].ResolvedValue != "#/b" {
+		t.Errorf("a.ResolvedValue = %v, want %q", tokens[0].ResolvedValue, "#/b")
+	}
+	if tokens[1].ResolvedValue != "#/b" {
+		t.Errorf("b.ResolvedValue = %v, want %q", tokens[1].ResolvedValue, "#/b")
+	}
+}
+
 func TestDependencyGraph_NoCycle(t *testing.T) {
 	tokens := []*token.Token{
 		{Name: "a", Value: "1"},

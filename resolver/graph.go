@@ -25,7 +25,15 @@ type DependencyGraph struct {
 }
 
 // BuildDependencyGraph builds a dependency graph from a list of tokens.
+// Tokens without their own SchemaVersion are treated as non-draft; use
+// ResolveAliases to apply a fallback schema version.
 func BuildDependencyGraph(tokens []*token.Token) *DependencyGraph {
+	return buildDependencyGraph(tokens, schema.Unknown)
+}
+
+// buildDependencyGraph builds a dependency graph, using fallback for tokens
+// that do not carry their own schema version.
+func buildDependencyGraph(tokens []*token.Token, fallback schema.Version) *DependencyGraph {
 	graph := &DependencyGraph{
 		dependencies: make(map[string][]string),
 		dependents:   make(map[string][]string),
@@ -37,7 +45,7 @@ func BuildDependencyGraph(tokens []*token.Token) *DependencyGraph {
 	}
 
 	for _, tok := range tokens {
-		deps := extractDependencies(tok)
+		deps := extractDependencies(tok, fallback)
 		if len(deps) > 0 {
 			graph.dependencies[tok.Name] = deps
 			for _, dep := range deps {
@@ -50,7 +58,7 @@ func BuildDependencyGraph(tokens []*token.Token) *DependencyGraph {
 }
 
 // extractDependencies extracts token names that this token depends on.
-func extractDependencies(tok *token.Token) []string {
+func extractDependencies(tok *token.Token, fallback schema.Version) []string {
 	deps := []string{}
 
 	// Check for curly brace references in Value
@@ -63,7 +71,11 @@ func extractDependencies(tok *token.Token) []string {
 	}
 
 	// Check for JSON Pointer references ($ref field)
-	if tok.SchemaVersion != schema.Draft && strings.HasPrefix(tok.Value, "#/") {
+	effectiveVersion := tok.SchemaVersion
+	if effectiveVersion == schema.Unknown {
+		effectiveVersion = fallback
+	}
+	if effectiveVersion != schema.Draft && strings.HasPrefix(tok.Value, "#/") {
 		path := strings.TrimPrefix(tok.Value, "#/")
 		tokenName := strings.ReplaceAll(path, "/", "-")
 		deps = append(deps, tokenName)

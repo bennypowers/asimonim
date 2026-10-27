@@ -51,6 +51,8 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 	// YAML uses indentation-based structure
 	looksJSON, skippedBlockComment := isLikelyJSON(data)
 	parsedJSON := false
+	bomStripped := false
+	var jsonErr error
 	if looksJSON {
 		// JSON path: strip a UTF-8 BOM, then strip comments and parse.
 		jsonData := bytes.TrimPrefix(data, utf8BOM)
@@ -59,14 +61,20 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 			positionData = cleanJSON
 			detectionData = cleanJSON
 			parsedJSON = true
+			bomStripped = len(jsonData) != len(data)
 		} else if !skippedBlockComment {
 			return nil, fmt.Errorf("failed to parse JSON: %w", err)
+		} else {
+			jsonErr = err
 		}
 	}
 	if !parsedJSON {
 		// YAML path: parse directly with yaml.v3
 		var yamlRaw any
 		if err := yaml.Unmarshal(data, &yamlRaw); err != nil {
+			if jsonErr != nil {
+				return nil, fmt.Errorf("failed to parse JSON: %w (YAML fallback also failed: %v)", jsonErr, err)
+			}
 			return nil, fmt.Errorf("failed to parse YAML: %w", err)
 		}
 		// Normalize map types (YAML numeric keys create map[any]any)
@@ -74,6 +82,9 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 		var ok bool
 		raw, ok = normalized.(map[string]any)
 		if !ok {
+			if jsonErr != nil {
+				return nil, fmt.Errorf("failed to parse JSON: %w (YAML fallback did not produce an object)", jsonErr)
+			}
 			return nil, fmt.Errorf("YAML root must be an object")
 		}
 		positionData = data
@@ -96,6 +107,15 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 	if !opts.SkipPositions {
 		if err := p.addPositions(positionData, result); err != nil {
 			return nil, err
+		}
+		// Position data excludes the BOM, but clients count it as one
+		// UTF-16 code unit at the start of line 0.
+		if bomStripped {
+			for _, tok := range result {
+				if tok.Line == 0 {
+					tok.Character++
+				}
+			}
 		}
 	}
 
@@ -469,4 +489,3 @@ func (p *JSONParser) ParseFile(filesystem fs.FileSystem, path string, opts Optio
 
 	return tokens, nil
 }
-

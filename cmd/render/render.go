@@ -116,7 +116,7 @@ var refPattern = regexp.MustCompile(`\{[^}]+\}`)
 // NameToCSSVar converts a token name to a CSS variable name.
 // e.g., "color-primary" with prefix "rh" → "--rh-color-primary"
 func NameToCSSVar(name, prefix string) string {
-	if prefix != "" {
+	if prefix = token.NormalizePrefix(prefix); prefix != "" {
 		return "--" + prefix + "-" + name
 	}
 	return "--" + name

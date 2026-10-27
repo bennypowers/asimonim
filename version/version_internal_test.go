@@ -81,6 +81,16 @@ func TestGetPrefersInjectedVersion(t *testing.T) {
 	}
 }
 
+func TestGetFallsBackWhenInjectedVersionIsEmpty(t *testing.T) {
+	got := get("", "unknown", "unknown", "", buildInfo(debug.Module{
+		Path:    modulePath,
+		Version: "v1.2.3",
+	}))
+	if got != "v1.2.3" {
+		t.Fatalf("get() = %q, want fallback version %q", got, "v1.2.3")
+	}
+}
+
 func TestModuleVersionSkipsLocalPathReplacement(t *testing.T) {
 	info := &debug.BuildInfo{
 		Main: debug.Module{Path: "example.com/host", Version: "v9.9.9"},

@@ -74,6 +74,7 @@ func GroupByType(tokens []*token.Token) map[string][]*token.Token {
 
 // ApplyPrefix adds a prefix to a name with the given delimiter.
 func ApplyPrefix(name, prefix, delimiter string) string {
+	prefix = token.NormalizePrefix(prefix)
 	if prefix == "" {
 		return name
 	}
@@ -82,6 +83,7 @@ func ApplyPrefix(name, prefix, delimiter string) string {
 
 // ApplyPrefixCamel applies a prefix in camelCase style.
 func ApplyPrefixCamel(name, prefix string) string {
+	prefix = token.NormalizePrefix(prefix)
 	if prefix == "" {
 		return name
 	}

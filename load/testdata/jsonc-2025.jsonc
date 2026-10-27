@@ -1,0 +1,13 @@
+// A 2025.10 document with JSONC comments.
+{
+  "base": {
+    "color": {
+      "$type": "color",
+      "red": { "$value": "#FF0000" }
+    }
+  },
+  "theme": {
+    "$extends": "#/base/color", /* inherit base colors */
+    "blue": { "$type": "color", "$value": "#0000FF" }
+  }
+}

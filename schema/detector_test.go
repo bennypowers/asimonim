@@ -243,6 +243,21 @@ func TestDetectVersion(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:     "JSONC with line and block comments",
+			content:  "// leading comment\n{\n  \"color\": {\"$value\": {\"$ref\": \"#/other\"}} /* trailing */\n}\n",
+			expected: schema.V2025_10,
+		},
+		{
+			name:     "JSONC with UTF-8 BOM",
+			content:  "\xEF\xBB\xBF// leading comment\n{\"color\": {\"$value\": {\"$ref\": \"#/other\"}}}",
+			expected: schema.V2025_10,
+		},
+		{
+			name:     "YAML flow mapping",
+			content:  `{color: {"$value": "#fff"}}`,
+			expected: schema.Draft,
+		},
+		{
 			name:     "YAML format",
 			content:  "color:\n  $value: '#fff'\n",
 			expected: schema.Draft,

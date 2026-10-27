@@ -70,7 +70,7 @@ func Get() string {
 // get implements Get with its inputs supplied explicitly so the version
 // resolution logic can be tested without build-time injection.
 func get(version, gitCommit, gitTag, gitDirty string, read func() (*debug.BuildInfo, bool)) string {
-	if version != "dev" {
+	if version != "" && version != "dev" {
 		return version
 	}
 

@@ -147,6 +147,8 @@ func TestApplyPrefix(t *testing.T) {
 		{"color-primary", "", "-", "color-primary"},
 		{"color-primary", "rh", "-", "rh-color-primary"},
 		{"color_primary", "rh", "_", "rh_color_primary"},
+		{"color-primary", "--rh", "-", "rh-color-primary"},
+		{"color-primary", "---rh", "-", "rh-color-primary"},
 	}
 
 	for _, tt := range tests {
@@ -198,6 +200,8 @@ func TestApplyPrefixCamel(t *testing.T) {
 		{"colorPrimary", "rh", "rhColorPrimary"},
 		// hyphenated prefix
 		{"colorPrimary", "my-app", "myAppColorPrimary"},
+		// leading dashes are not part of the prefix
+		{"colorPrimary", "--rh", "rhColorPrimary"},
 	}
 
 	for _, tt := range tests {

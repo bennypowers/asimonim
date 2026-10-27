@@ -104,7 +104,7 @@ func isResolverDocument(data []byte) bool {
 // resolution will fall back to fetching from a CDN (configurable via Options.CDN).
 //
 // The loading process:
-//  1. Optionally loads config from .config/design-tokens.yaml
+//  1. Optionally loads config from .config/design-tokens.{yaml,yml,json}
 //  2. Applies Options values (they take precedence over config)
 //  3. Resolves specifier to file content via filesystem (with optional CDN fallback)
 //  4. Detects schema version (if not specified)

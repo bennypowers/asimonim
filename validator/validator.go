@@ -61,7 +61,7 @@ func ValidateConsistency(content []byte, version schema.Version) []ValidationErr
 // ValidateConsistencyWithPath validates content and includes file path in errors.
 func ValidateConsistencyWithPath(content []byte, version schema.Version, filePath string) []ValidationError {
 	var data map[string]any
-	if err := yaml.Unmarshal(content, &data); err != nil {
+	if err := yaml.Unmarshal(schema.NormalizeContent(content), &data); err != nil {
 		return []ValidationError{{
 			FilePath: filePath,
 			Message:  fmt.Sprintf("failed to parse content: %v", err),

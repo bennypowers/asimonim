@@ -9,6 +9,7 @@ See the LICENSE file for details.
 package parser_test
 
 import (
+	"strings"
 	"testing"
 
 	"bennypowers.dev/asimonim/parser"
@@ -394,6 +395,45 @@ func TestJSONParser_ParseYAMLFlowMapping(t *testing.T) {
 	}
 	if tokens[0].Value != "#fff" {
 		t.Errorf("token value = %q, want %q", tokens[0].Value, "#fff")
+	}
+}
+
+func TestJSONParser_ParseInvalidBlockCommentDocument(t *testing.T) {
+	// A block comment makes the parser try the YAML fallback. Input that is
+	// neither valid JSONC nor valid YAML must return an error rather than
+	// silently producing tokens, and the error must mention the JSON failure.
+	_, err := parser.NewJSONParser().Parse([]byte(`/* c */ {invalid`), parser.Options{})
+	if err == nil {
+		t.Fatal("expected an error for input that is neither JSONC nor YAML")
+	}
+	if !strings.Contains(err.Error(), "failed to parse JSON") {
+		t.Errorf("error = %v, want it to mention the JSON parse failure", err)
+	}
+}
+
+func TestJSONParser_ParseUTF8BOMReportsRawPositions(t *testing.T) {
+	// Positions are reported against the document text the client sent. A
+	// UTF-8 BOM is one UTF-16 code unit on line 0, so stripping it before
+	// position tracking must not shift columns on that line.
+	bom := []byte{0xEF, 0xBB, 0xBF}
+	payload := []byte(`{"spacing":{"small":{"$type":"number","$value":4}}}`)
+	data := append(append([]byte{}, bom...), payload...)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(tokens) != 1 {
+		t.Fatalf("got %d tokens, want 1", len(tokens))
+	}
+
+	keyStart := strings.Index(string(payload), `"small"`)
+	wantChar := uint32(keyStart + 1) // BOM occupies one UTF-16 code unit
+	if tokens[0].Line != 0 {
+		t.Errorf("token.Line = %d, want 0", tokens[0].Line)
+	}
+	if tokens[0].Character != wantChar {
+		t.Errorf("token.Character = %d, want %d", tokens[0].Character, wantChar)
 	}
 }
 

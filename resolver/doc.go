@@ -32,5 +32,7 @@ See the LICENSE file for details.
 //	if err := resolver.ResolveAliases(tokens, schema.Draft); err != nil {
 //		return err
 //	}
-//	fmt.Println(tokens[0].ResolvedValue)
+//	if len(tokens) > 0 {
+//		fmt.Println(tokens[0].ResolvedValue)
+//	}
 package resolver

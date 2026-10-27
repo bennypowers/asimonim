@@ -52,7 +52,7 @@ func ResolveGroupExtensions(tokens []*token.Token, data []byte) ([]*token.Token,
 
 	// Parse raw data to find $extends relationships
 	var raw map[string]any
-	if err := yaml.Unmarshal(data, &raw); err != nil {
+	if err := yaml.Unmarshal(schema.NormalizeContent(data), &raw); err != nil {
 		return nil, fmt.Errorf("failed to parse data for extends resolution: %w", err)
 	}
 

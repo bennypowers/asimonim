@@ -27,6 +27,21 @@ func readTestdata(t *testing.T, name string) []byte {
 	return data
 }
 
+func TestValidateConsistencyWithPath_JSONC(t *testing.T) {
+	// JSONC comments and a UTF-8 BOM are valid parser input, so consistency
+	// validation must not report a parse failure for them.
+	data := []byte("\xEF\xBB\xBF// leading comment\n" + `{
+		"color": { "$type": "color", "$value": { "$ref": "#/base/red" } } /* trailing */
+	}`)
+
+	errors := validator.ValidateConsistencyWithPath(data, schema.V2025_10, "tokens.jsonc")
+	for _, err := range errors {
+		if strings.Contains(err.Message, "failed to parse content") {
+			t.Fatalf("unexpected parse failure for JSONC: %v", err)
+		}
+	}
+}
+
 func TestValidateConsistency_ValidDraft(t *testing.T) {
 	data := readTestdata(t, "valid-draft.json")
 	errors := validator.ValidateConsistency(data, schema.Draft)

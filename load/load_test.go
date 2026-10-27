@@ -92,6 +92,49 @@ func TestLoad_WithPrefix(t *testing.T) {
 	}
 }
 
+func TestLoad_JSONC2025(t *testing.T) {
+	// JSONC comments and BOM must work through the whole Load pipeline,
+	// including schema detection and $extends resolution.
+	tokenMap, err := load.Load(t.Context(), "jsonc-2025.jsonc", load.Options{
+		Root: testdataDir(),
+	})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if _, ok := tokenMap.Get("theme-red"); !ok {
+		t.Error("expected inherited token theme-red")
+	}
+	if _, ok := tokenMap.Get("theme-blue"); !ok {
+		t.Error("expected token theme-blue")
+	}
+}
+
+func TestLoadAll_JSONC(t *testing.T) {
+	// LoadAll detects the schema itself, before parsing. JSONC comments and a
+	// BOM must not break detection.
+	result, err := load.LoadAll(t.Context(), &config.Config{}, []string{"jsonc-2025.jsonc"}, load.Options{
+		Root: testdataDir(),
+	})
+	if err != nil {
+		t.Fatalf("LoadAll() error = %v", err)
+	}
+	if result.Version != schema.V2025_10 {
+		t.Errorf("result.Version = %v, want %v", result.Version, schema.V2025_10)
+	}
+
+	names := make(map[string]bool, len(result.All))
+	for _, tok := range result.All {
+		names[tok.Name] = true
+	}
+	if !names["base-color-red"] {
+		t.Error("expected token base-color-red")
+	}
+	if !names["theme-blue"] {
+		t.Error("expected token theme-blue")
+	}
+}
+
 func TestLoad_WithDashedPrefixNormalizesKeys(t *testing.T) {
 	// load.Load passes the prefix to the parser, which stores it on every
 	// token before NewMap builds the lookup keys. A prefix with leading
@@ -329,14 +372,12 @@ func TestLoadAll_WithDashedPrefixNormalizesCSSNames(t *testing.T) {
 			found := false
 			for _, tok := range result.All {
 				got := tok.CSSVariableName()
-				if strings.Contains(got, "----") {
-					t.Errorf("CSSVariableName() = %q, dashes in prefix were not normalized", got)
+				want := "--rh-" + strings.ReplaceAll(tok.Name, ".", "-")
+				if got != want {
+					t.Errorf("CSSVariableName() = %q, want %q", got, want)
 				}
 				if tok.Name == "color-primary" {
 					found = true
-					if got != "--rh-color-primary" {
-						t.Errorf("CSSVariableName() = %q, want %q", got, "--rh-color-primary")
-					}
 				}
 			}
 			if !found {

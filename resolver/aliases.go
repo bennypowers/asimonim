@@ -19,7 +19,7 @@ import (
 // ResolveAliases resolves all alias references in the token list.
 // Updates ResolvedValue and IsResolved fields on each token.
 func ResolveAliases(tokens []*token.Token, version schema.Version) error {
-	graph := BuildDependencyGraph(tokens)
+	graph := buildDependencyGraph(tokens, version)
 
 	if graph.HasCycle() {
 		cycle := graph.FindCycle()

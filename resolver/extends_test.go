@@ -413,6 +413,32 @@ func TestResolveGroupExtensions_NilExtensions(t *testing.T) {
 	}
 }
 
+func TestResolveGroupExtensions_JSONC(t *testing.T) {
+	// ResolveGroupExtensions re-parses the source document. JSONC comments
+	// must not make that second parse fail for 2025.10 documents.
+	data := []byte("// leading comment\n" + `{
+		"base": { "color": { "$type": "color", "$value": "#FF0000" } },
+		"theme": { "$extends": "#/base", "bg": { "$type": "color", "$value": "#00FF00" } } /* trailing */
+	}`)
+
+	p := parser.NewJSONParser()
+	tokens, err := p.Parse(data, parser.Options{})
+	if err != nil {
+		t.Fatalf("failed to parse: %v", err)
+	}
+
+	result, err := resolver.ResolveGroupExtensions(tokens, data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := []string{"base-color", "theme-bg", "theme-color"}
+	names := extractNames(result)
+	if !slices.Equal(names, expected) {
+		t.Errorf("expected tokens %v, got %v", expected, names)
+	}
+}
+
 // extractNames returns sorted token names from the result.
 func extractNames(tokens []*token.Token) []string {
 	names := make([]string, len(tokens))
