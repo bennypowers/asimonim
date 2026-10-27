@@ -582,3 +582,55 @@ func TestJSONParser_ParseUTF8BOMPositionsAreBOMLess(t *testing.T) {
 		t.Errorf("token.Character = %d, want BOM-less UTF-16 offset %d", tokens[0].Character, want)
 	}
 }
+
+func TestJSONParser_PositionsWithCROnlyLineEndings(t *testing.T) {
+	data := []byte("{\r  \"color\": {\r    \"primary\": {\"$type\":\"color\",\"$value\":\"#fff\"}}}")
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var tok *token.Token
+	for _, candidate := range tokens {
+		if candidate.Name == "color-primary" {
+			tok = candidate
+			break
+		}
+	}
+	if tok == nil {
+		t.Fatal("color-primary token not found")
+	}
+	if tok.Line != 2 {
+		t.Errorf("token.Line = %d, want 2", tok.Line)
+	}
+	if tok.Character != 4 {
+		t.Errorf("token.Character = %d, want 4", tok.Character)
+	}
+}
+
+func TestJSONParser_PositionsWithCRLFLineEndings(t *testing.T) {
+	data := []byte("{\r\n  \"color\": {\r\n    \"primary\": {\"$type\":\"color\",\"$value\":\"#fff\"}}}")
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var tok *token.Token
+	for _, candidate := range tokens {
+		if candidate.Name == "color-primary" {
+			tok = candidate
+			break
+		}
+	}
+	if tok == nil {
+		t.Fatal("color-primary token not found")
+	}
+	if tok.Line != 2 {
+		t.Errorf("token.Line = %d, want 2", tok.Line)
+	}
+	if tok.Character != 4 {
+		t.Errorf("token.Character = %d, want 4", tok.Character)
+	}
+}

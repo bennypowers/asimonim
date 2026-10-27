@@ -395,38 +395,50 @@ func (p *JSONParser) addPositions(data []byte, tokens []*token.Token) error {
 		return fmt.Errorf("failed to parse JSON for positions: %w", err)
 	}
 
+	// Build line starts once so each token scans only its own line.
+	lineStarts := lineStartOffsets(data)
+
 	// Walk the AST and update token positions
 	if len(root.Content) > 0 {
-		p.walkForPositions(data, root.Content[0], []string{}, tokenByPath)
+		p.walkForPositions(data, lineStarts, root.Content[0], []string{}, tokenByPath)
 	}
 
 	return nil
 }
 
-// utf16Column converts a 1-based YAML rune column on a line of data to a
-// 0-based UTF-16 offset, which is what LSP positions use.
-func utf16Column(data []byte, line, column int) uint32 {
-	if line < 1 || column < 1 {
+// lineStartOffsets returns the byte offset of each line start. Line breaks
+// are CRLF, CR, or LF, matching yaml.v3.
+func lineStartOffsets(data []byte) []int {
+	starts := []int{0}
+	for i := 0; i < len(data); {
+		switch data[i] {
+		case '\r':
+			if i+1 < len(data) && data[i+1] == '\n' {
+				i += 2
+			} else {
+				i++
+			}
+			starts = append(starts, i)
+		case '\n':
+			i++
+			starts = append(starts, i)
+		default:
+			i++
+		}
+	}
+	return starts
+}
+
+// utf16Column converts a 1-based YAML rune column within a line to a 0-based
+// UTF-16 offset, which is what LSP positions use.
+func utf16Column(line []byte, column int) uint32 {
+	if column < 1 {
 		return 0
 	}
-	start := 0
-	for l := 1; l < line; l++ {
-		idx := bytes.IndexByte(data[start:], '\n')
-		if idx < 0 {
-			return 0
-		}
-		start += idx + 1
-	}
-	end := bytes.IndexByte(data[start:], '\n')
-	if end < 0 {
-		end = len(data) - start
-	}
-	lineBytes := data[start : start+end]
-
 	remaining := column - 1
 	col := 0
-	for b := 0; b < len(lineBytes) && remaining > 0; {
-		r, size := utf8.DecodeRune(lineBytes[b:])
+	for b := 0; b < len(line) && remaining > 0; {
+		r, size := utf8.DecodeRune(line[b:])
 		width := utf16.RuneLen(r)
 		if width < 1 {
 			width = 1
@@ -441,8 +453,25 @@ func utf16Column(data []byte, line, column int) uint32 {
 	return uint32(col)
 }
 
+// utf16ColumnAt converts a 1-based YAML rune column on the given line to a
+// 0-based UTF-16 offset. Out-of-range lines return 0.
+func utf16ColumnAt(data []byte, lineStarts []int, line, column int) uint32 {
+	if line < 1 || line > len(lineStarts) {
+		return 0
+	}
+	start := lineStarts[line-1]
+	end := len(data)
+	if line < len(lineStarts) {
+		end = lineStarts[line]
+	}
+	for end > start && (data[end-1] == '\n' || data[end-1] == '\r') {
+		end--
+	}
+	return utf16Column(data[start:end], column)
+}
+
 // walkForPositions walks the yaml AST to find token positions.
-func (p *JSONParser) walkForPositions(data []byte, node *yaml.Node, jsonPath []string, tokenByPath map[string]*token.Token) {
+func (p *JSONParser) walkForPositions(data []byte, lineStarts []int, node *yaml.Node, jsonPath []string, tokenByPath map[string]*token.Token) {
 	if node.Kind != yaml.MappingNode {
 		return
 	}
@@ -481,12 +510,12 @@ func (p *JSONParser) walkForPositions(data []byte, node *yaml.Node, jsonPath []s
 				}
 			}
 			if keyNode.Column > 0 {
-				t.Character = utf16Column(data, keyNode.Line, keyNode.Column)
+				t.Character = utf16ColumnAt(data, lineStarts, keyNode.Line, keyNode.Column)
 			}
 		}
 
 		// Recurse into children
-		p.walkForPositions(data, valueNode, currentPath, tokenByPath)
+		p.walkForPositions(data, lineStarts, valueNode, currentPath, tokenByPath)
 	}
 }
 
