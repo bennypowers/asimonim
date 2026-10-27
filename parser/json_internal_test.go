@@ -68,11 +68,21 @@ func TestIsLikelyJSON(t *testing.T) {
 			input:    []byte("# comment\nkey: value"),
 			expected: false,
 		},
+		{
+			name:     "leading line comment",
+			input:    []byte("// comment\n{\"key\": \"value\"}"),
+			expected: true,
+		},
+		{
+			name:     "leading block comment",
+			input:    []byte("/* comment */ {\"key\": \"value\"}"),
+			expected: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := isLikelyJSON(tt.input)
+			got, _ := isLikelyJSON(tt.input)
 			if got != tt.expected {
 				t.Errorf("isLikelyJSON(%q) = %v, want %v", string(tt.input), got, tt.expected)
 			}

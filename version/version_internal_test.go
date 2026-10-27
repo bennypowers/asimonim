@@ -80,3 +80,17 @@ func TestGetPrefersInjectedVersion(t *testing.T) {
 		t.Fatalf("get() = %q, want %q", got, "v2.0.0")
 	}
 }
+
+func TestModuleVersionSkipsLocalPathReplacement(t *testing.T) {
+	info := &debug.BuildInfo{
+		Main: debug.Module{Path: "example.com/host", Version: "v9.9.9"},
+		Deps: []*debug.Module{{
+			Path:    modulePath,
+			Version: "v0.3.3",
+			Replace: &debug.Module{Path: "/local/asimonim", Version: "v0.5.0"},
+		}},
+	}
+	if got := moduleVersion(info); got != "" {
+		t.Fatalf("moduleVersion() = %q, want empty for local path replacement", got)
+	}
+}

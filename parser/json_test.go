@@ -364,3 +364,71 @@ func TestJSONParser_ParseJSONCWithLeadingComment(t *testing.T) {
 		t.Errorf("schema = %s, want %s", tokens[0].SchemaVersion, schema.V2025_10)
 	}
 }
+
+func TestJSONParser_ParseBlockCommentYAMLFallback(t *testing.T) {
+	// This is valid YAML but not valid JSON. It must not be reclassified as
+	// JSON merely because a leading block comment is skipped.
+	data := []byte(`/* c */ {foo: bar}`)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(tokens) != 0 {
+		t.Errorf("got %d tokens, want 0", len(tokens))
+	}
+}
+
+func TestJSONParser_ParseYAMLFlowMapping(t *testing.T) {
+	data := []byte("color:\n  primary: {$type: color, $value: '#fff'}\n")
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(tokens) != 1 {
+		t.Fatalf("got %d tokens, want 1", len(tokens))
+	}
+	if tokens[0].Name != "color-primary" {
+		t.Errorf("token name = %q, want %q", tokens[0].Name, "color-primary")
+	}
+	if tokens[0].Value != "#fff" {
+		t.Errorf("token value = %q, want %q", tokens[0].Value, "#fff")
+	}
+}
+
+func TestJSONParser_ParseUTF8BOM(t *testing.T) {
+	bom := []byte{0xEF, 0xBB, 0xBF}
+
+	t.Run("plain JSON", func(t *testing.T) {
+		payload := []byte(`{"spacing":{"small":{"$type":"number","$value":4}}}`)
+		data := append(append([]byte{}, bom...), payload...)
+
+		tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(tokens) != 1 {
+			t.Fatalf("got %d tokens, want 1", len(tokens))
+		}
+		if tokens[0].Name != "spacing-small" {
+			t.Errorf("token name = %q, want %q", tokens[0].Name, "spacing-small")
+		}
+	})
+
+	t.Run("JSONC with leading comment", func(t *testing.T) {
+		payload := []byte("// comment\n{\"spacing\":{\"small\":{\"$type\":\"number\",\"$value\":4}}}")
+		data := append(append([]byte{}, bom...), payload...)
+
+		tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(tokens) != 1 {
+			t.Fatalf("got %d tokens, want 1", len(tokens))
+		}
+		if tokens[0].Name != "spacing-small" {
+			t.Errorf("token name = %q, want %q", tokens[0].Name, "spacing-small")
+		}
+	})
+}

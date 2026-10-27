@@ -9,6 +9,7 @@ See the LICENSE file for details.
 package parser
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -25,6 +26,9 @@ import (
 	"github.com/tidwall/jsonc"
 	"gopkg.in/yaml.v3"
 )
+
+// utf8BOM is the UTF-8 byte order mark.
+var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
 
 // JSONParser parses DTCG-compliant JSON token files.
 type JSONParser struct{}
@@ -45,15 +49,21 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 
 	// Detect format: JSON typically starts with '{' or whitespace then '{'
 	// YAML uses indentation-based structure
-	if isLikelyJSON(data) {
-		// JSON path: strip comments and parse
-		cleanJSON := jsonc.ToJSON(data)
-		if err := json.Unmarshal(cleanJSON, &raw); err != nil {
+	looksJSON, skippedBlockComment := isLikelyJSON(data)
+	parsedJSON := false
+	if looksJSON {
+		// JSON path: strip a UTF-8 BOM, then strip comments and parse.
+		jsonData := bytes.TrimPrefix(data, utf8BOM)
+		cleanJSON := jsonc.ToJSON(jsonData)
+		if err := json.Unmarshal(cleanJSON, &raw); err == nil {
+			positionData = cleanJSON
+			detectionData = cleanJSON
+			parsedJSON = true
+		} else if !skippedBlockComment {
 			return nil, fmt.Errorf("failed to parse JSON: %w", err)
 		}
-		positionData = cleanJSON
-		detectionData = cleanJSON
-	} else {
+	}
+	if !parsedJSON {
 		// YAML path: parse directly with yaml.v3
 		var yamlRaw any
 		if err := yaml.Unmarshal(data, &yamlRaw); err != nil {
@@ -95,8 +105,10 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 // isLikelyJSON checks if data appears to be JSON rather than YAML.
 // JSON typically starts with '{', optionally preceded by whitespace, a BOM,
 // or JSONC comments. Leading comments are skipped so a document that begins
-// with // or /* is still recognized as JSONC.
-func isLikelyJSON(data []byte) bool {
+// with // or /* is still recognized as JSONC. The second return value reports
+// whether a block comment was skipped, which lets Parse fall back to YAML when
+// a commented document is valid YAML but not valid JSON.
+func isLikelyJSON(data []byte) (likely bool, skippedBlockComment bool) {
 	for i := 0; i < len(data); {
 		switch data[i] {
 		case ' ', '\t', '\n', '\r':
@@ -106,10 +118,10 @@ func isLikelyJSON(data []byte) bool {
 			i++
 			continue
 		case '{':
-			return true
+			return true, skippedBlockComment
 		case '/':
 			if i+1 >= len(data) {
-				return false
+				return false, skippedBlockComment
 			}
 			switch data[i+1] {
 			case '/':
@@ -120,22 +132,23 @@ func isLikelyJSON(data []byte) bool {
 				}
 			case '*':
 				// Block comment: skip through the closing */.
+				skippedBlockComment = true
 				i += 2
 				for i+1 < len(data) && (data[i] != '*' || data[i+1] != '/') {
 					i++
 				}
 				if i+1 >= len(data) {
-					return false
+					return false, skippedBlockComment
 				}
 				i += 2
 			default:
-				return false
+				return false, skippedBlockComment
 			}
 		default:
-			return false
+			return false, skippedBlockComment
 		}
 	}
-	return false
+	return false, skippedBlockComment
 }
 
 // normalizeMap recursively converts map[interface{}]interface{} to map[string]any.
