@@ -91,8 +91,9 @@ The published 3.2.0 document has 547 tokens.
   variants, `60-rgb` and `60-hsl`, as aliases. The provenance records the
   published-source count as `generatedColorAliases: 160` and the retained
   paths in `retainedGeneratedAliases`.
-- 57 `light-dark(var(...))` composite theme tokens are generated CSS
-  expressions, not DTCG color values. Their source form is an array of two
-  per-theme aliases. They are excluded from this DTCG fixture, hence
-  `excludedLightDark: 57`. The `@rhds/mcp` data generator keeps them in a
-  separate computed theme map.
+- 57 `light-dark(var(...))` composite tokens are generated CSS expressions,
+  not DTCG color values. 56 are theme composites whose source form is an
+  array of two per-theme aliases; `color.surface._` is a six-element palette
+  of surface aliases. They are excluded from this DTCG fixture, hence
+  `excludedLightDark: 57`. The `@rhds/mcp` data generator keeps them in
+  separate computed theme and palette maps.

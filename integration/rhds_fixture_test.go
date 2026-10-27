@@ -32,10 +32,11 @@ See the LICENSE file for details.
 //     fixture retains two representative aliases, color.red-orange.60-rgb and
 //     color.red-orange.60-hsl. Their original values alias the base color, so
 //     the normalized tokens resolve through those aliases.
-//   - 57 light-dark(var(...)) composite theme tokens are excluded. Their
-//     original values are arrays of per-theme aliases, which is not a DTCG
-//     color value. The @rhds/mcp generator keeps them in a separate computed
-//     theme map instead.
+//   - 57 light-dark(var(...)) composite tokens are excluded. 56 original
+//     values are arrays of two per-theme aliases; color.surface._ is a
+//     six-element palette of surface aliases. Neither is a DTCG color value.
+//     The @rhds/mcp generator keeps them in separate computed theme and
+//     palette maps instead.
 //
 // The fixture carries the same counts in its root $extensions so the
 // contract is inspectable without this test file.
@@ -45,6 +46,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -63,6 +65,12 @@ const (
 
 	// rhdsFixtureTokenCount is the number of curated tokens in the fixture.
 	rhdsFixtureTokenCount = 25
+)
+
+var (
+	rhdsDurationForm  = regexp.MustCompile(`^\d+(?:\.\d+)?ms$`)
+	rhdsColorForm     = regexp.MustCompile(`^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$`)
+	rhdsDimensionForm = regexp.MustCompile(`^-?\d+(?:\.\d+)?(?:px|rem)$`)
 )
 
 // parseRHDS parses the fixture without an explicit schema version, so the
@@ -292,8 +300,9 @@ func TestRHDSFixture_MetadataSurvives(t *testing.T) {
 	if !deprecated.Deprecated {
 		t.Error("hsl variant should be deprecated")
 	}
-	if !strings.Contains(deprecated.DeprecationMessage, "Use color transforms instead") {
-		t.Errorf("deprecation message = %q", deprecated.DeprecationMessage)
+	wantDeprecation := "Use color transforms instead e.g. hsla(from var(--rh-color-red-orange-60) h s l / 10%)"
+	if deprecated.DeprecationMessage != wantDeprecation {
+		t.Errorf("deprecation message = %q, want %q", deprecated.DeprecationMessage, wantDeprecation)
 	}
 
 	family := testutil.TokenByPath(t, tokens, "font.family.heading")
@@ -360,6 +369,12 @@ func TestRHDSFixture_CanonicalValueForms(t *testing.T) {
 	if shadowMap["offsetY"] != "{length.xs}" {
 		t.Errorf("shadow offsetY = %v, alias should be preserved", shadowMap["offsetY"])
 	}
+	if shadowMap["blur"] != "{length.sm}" {
+		t.Errorf("shadow blur = %v, alias should be preserved", shadowMap["blur"])
+	}
+	if shadowMap["spread"] != "{length.4xs}" {
+		t.Errorf("shadow spread = %v, alias should be preserved", shadowMap["spread"])
+	}
 	if shadowMap["color"] != "#15151540" {
 		t.Errorf("shadow color = %v, want #15151540", shadowMap["color"])
 	}
@@ -383,12 +398,8 @@ func TestRHDSFixture_CanonicalValueForms(t *testing.T) {
 func assertCanonicalForms(t *testing.T, tokens []*token.Token) {
 	t.Helper()
 
-	durationForm := regexp.MustCompile(`^\d+(?:\.\d+)?ms$`)
-	colorForm := regexp.MustCompile(`^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$`)
-	dimensionForm := regexp.MustCompile(`^-?\d+(?:\.\d+)?(?:px|rem)$`)
-
 	for _, tok := range tokens {
-		if strings.HasPrefix(tok.Value, "{") {
+		if token.IsCurlyBraceRef(tok.Value) {
 			continue
 		}
 		switch tok.Type {
@@ -397,15 +408,15 @@ func assertCanonicalForms(t *testing.T, tokens []*token.Token) {
 				t.Errorf("number token %q has non-numeric value %#v", tok.DotPath(), tok.RawValue)
 			}
 		case token.TypeDuration:
-			if !durationForm.MatchString(tok.Value) {
+			if !rhdsDurationForm.MatchString(tok.Value) {
 				t.Errorf("duration token %q value = %q, want milliseconds", tok.DotPath(), tok.Value)
 			}
 		case token.TypeColor:
-			if !colorForm.MatchString(tok.Value) {
+			if !rhdsColorForm.MatchString(tok.Value) {
 				t.Errorf("color token %q value = %q, want hex", tok.DotPath(), tok.Value)
 			}
 		case token.TypeDimension:
-			if !dimensionForm.MatchString(tok.Value) {
+			if !rhdsDimensionForm.MatchString(tok.Value) {
 				t.Errorf("dimension token %q value = %q, want px or rem", tok.DotPath(), tok.Value)
 			}
 		}
@@ -598,28 +609,31 @@ func TestRHDSFixture_NoStyleDictionaryFields(t *testing.T) {
 }
 
 // styleDictionaryFields returns the paths of Style Dictionary fields that
-// survived normalization. Vendor $extensions subtrees and token names that
-// happen to match a Style Dictionary field are not violations.
+// survived normalization. Vendor $extensions subtrees, composite $value
+// members, and token or group names that happen to match a field name are not
+// violations. A com.style-dictionary namespace under $extensions is reported
+// because the fixture contract requires those fields to be dropped, not moved.
 func styleDictionaryFields(raw map[string]any) []string {
-	forbidden := map[string]bool{
-		"name":       true,
-		"attributes": true,
-		"filePath":   true,
-		"isSource":   true,
-		"original":   true,
-		"path":       true,
-	}
-
 	var found []string
 	var walk func(value any, path string)
 	walk = func(value any, path string) {
 		switch v := value.(type) {
 		case map[string]any:
+			_, parentIsToken := v["$value"]
 			for key, child := range v {
-				if key == "$extensions" {
+				switch key {
+				case "$value":
+					continue
+				case "$extensions":
+					if ext, ok := child.(map[string]any); ok {
+						if _, moved := ext["com.style-dictionary"]; moved {
+							found = append(found, path+".$extensions.com.style-dictionary")
+						}
+					}
 					continue
 				}
-				if forbidden[key] && !isTokenObject(child) {
+				_, childIsObject := child.(map[string]any)
+				if isStyleDictionaryField(key) && (parentIsToken || !childIsObject) {
 					found = append(found, path+"."+key)
 				}
 				walk(child, path+"."+key)
@@ -631,18 +645,17 @@ func styleDictionaryFields(raw map[string]any) []string {
 		}
 	}
 	walk(raw, "$")
+	slices.Sort(found)
 	return found
 }
 
-// isTokenObject reports whether value is a token object. A token may legally
-// be named "name", "path", or another Style Dictionary field name.
-func isTokenObject(value any) bool {
-	m, ok := value.(map[string]any)
-	if !ok {
+func isStyleDictionaryField(key string) bool {
+	switch key {
+	case "name", "attributes", "filePath", "isSource", "original", "path":
+		return true
+	default:
 		return false
 	}
-	_, ok = m["$value"]
-	return ok
 }
 
 func TestStyleDictionaryFieldsScope(t *testing.T) {
@@ -651,6 +664,13 @@ func TestStyleDictionaryFieldsScope(t *testing.T) {
 			"com.example": map[string]any{"name": "vendor data", "path": []any{"a", "b"}},
 		},
 		"path": map[string]any{"$value": "#000000", "$type": "color"},
+		"name": map[string]any{"$value": "#ffffff", "$type": "color"},
+		"media": map[string]any{
+			"sm": map[string]any{
+				"$value": map[string]any{"name": "sm", "min-width": "768px"},
+				"$type":  "mediaQuery",
+			},
+		},
 	}
 	if got := styleDictionaryFields(allowed); len(got) != 0 {
 		t.Errorf("styleDictionaryFields flagged allowed data: %v", got)
@@ -659,16 +679,31 @@ func TestStyleDictionaryFieldsScope(t *testing.T) {
 	survived := map[string]any{
 		"color": map[string]any{
 			"primary": map[string]any{
-				"$value": "#000000",
-				"name":   "color-primary",
-				"path":   []any{"color", "primary"},
+				"$value":   "#000000",
+				"name":     "color-primary",
+				"path":     []any{"color", "primary"},
+				"original": map[string]any{"$value": "#000000", "$type": "color"},
 			},
 		},
 	}
 	got := styleDictionaryFields(survived)
-	want := []string{"$.color.primary.name", "$.color.primary.path"}
+	want := []string{"$.color.primary.name", "$.color.primary.original", "$.color.primary.path"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("styleDictionaryFields = %v, want %v", got, want)
+	}
+
+	moved := map[string]any{
+		"color": map[string]any{
+			"primary": map[string]any{
+				"$value": "#000000",
+				"$extensions": map[string]any{
+					"com.style-dictionary": map[string]any{"name": "color-primary"},
+				},
+			},
+		},
+	}
+	if got := styleDictionaryFields(moved); !reflect.DeepEqual(got, []string{"$.color.primary.$extensions.com.style-dictionary"}) {
+		t.Errorf("styleDictionaryFields moved = %v, want com.style-dictionary path", got)
 	}
 }
 
