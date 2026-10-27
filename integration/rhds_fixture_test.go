@@ -44,6 +44,7 @@ package integration_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"regexp"
 	"slices"
@@ -68,6 +69,7 @@ const (
 )
 
 var (
+	rhdsAliasForm     = regexp.MustCompile(`^\{[^}]+\}$`)
 	rhdsDurationForm  = regexp.MustCompile(`^\d+(?:\.\d+)?ms$`)
 	rhdsColorForm     = regexp.MustCompile(`^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$`)
 	rhdsDimensionForm = regexp.MustCompile(`^-?\d+(?:\.\d+)?(?:px|rem)$`)
@@ -174,11 +176,15 @@ func TestRHDSFixture_PrefixProducesRHCustomProperties(t *testing.T) {
 	if got := tokenMap.Len(); got != len(tokens) {
 		t.Errorf("token map length = %d, want %d", got, len(tokens))
 	}
+	want := testutil.TokenByPath(t, tokens, "color.red-orange.60")
 	for _, name := range []string{"color-red-orange-60", "color.red-orange.60", "--rh-color-red-orange-60"} {
 		tok, ok := tokenMap.Get(name)
 		if !ok {
 			t.Errorf("token map lookup %q missed", name)
 			continue
+		}
+		if tok.DotPath() != want.DotPath() {
+			t.Errorf("token map lookup %q returned %q, want %q", name, tok.DotPath(), want.DotPath())
 		}
 		if tok.Prefix != "rh" {
 			t.Errorf("token map lookup %q prefix = %q, want rh", name, tok.Prefix)
@@ -398,29 +404,39 @@ func TestRHDSFixture_CanonicalValueForms(t *testing.T) {
 func assertCanonicalForms(t *testing.T, tokens []*token.Token) {
 	t.Helper()
 
+	for _, problem := range canonicalFormProblems(tokens) {
+		t.Error(problem)
+	}
+}
+
+// canonicalFormProblems returns the canonical-form violations in tokens. A
+// whole-value alias is exempt; a literal that merely embeds a reference is not.
+func canonicalFormProblems(tokens []*token.Token) []string {
+	var problems []string
 	for _, tok := range tokens {
-		if token.IsCurlyBraceRef(tok.Value) {
+		if rhdsAliasForm.MatchString(tok.Value) {
 			continue
 		}
 		switch tok.Type {
 		case token.TypeNumber:
 			if _, ok := tok.RawValue.(float64); !ok {
-				t.Errorf("number token %q has non-numeric value %#v", tok.DotPath(), tok.RawValue)
+				problems = append(problems, fmt.Sprintf("number token %q has non-numeric value %#v", tok.DotPath(), tok.RawValue))
 			}
 		case token.TypeDuration:
 			if !rhdsDurationForm.MatchString(tok.Value) {
-				t.Errorf("duration token %q value = %q, want milliseconds", tok.DotPath(), tok.Value)
+				problems = append(problems, fmt.Sprintf("duration token %q value = %q, want milliseconds", tok.DotPath(), tok.Value))
 			}
 		case token.TypeColor:
 			if !rhdsColorForm.MatchString(tok.Value) {
-				t.Errorf("color token %q value = %q, want hex", tok.DotPath(), tok.Value)
+				problems = append(problems, fmt.Sprintf("color token %q value = %q, want hex", tok.DotPath(), tok.Value))
 			}
 		case token.TypeDimension:
 			if !rhdsDimensionForm.MatchString(tok.Value) {
-				t.Errorf("dimension token %q value = %q, want px or rem", tok.DotPath(), tok.Value)
+				problems = append(problems, fmt.Sprintf("dimension token %q value = %q, want px or rem", tok.DotPath(), tok.Value))
 			}
 		}
 	}
+	return problems
 }
 
 func assertSourceValue(t *testing.T, tok *token.Token, want any) {
@@ -440,11 +456,27 @@ func TestCanonicalFormsSkipAliases(t *testing.T) {
 		{Name: "alias-number", Path: []string{"alias-number"}, Type: token.TypeNumber, Value: "{opacity.50}", RawValue: "{opacity.50}"},
 		{Name: "alias-duration", Path: []string{"alias-duration"}, Type: token.TypeDuration, Value: "{animation.speed}", RawValue: "{animation.speed}"},
 	}
-	assertCanonicalForms(t, tokens)
+	if problems := canonicalFormProblems(tokens); len(problems) != 0 {
+		t.Errorf("whole-value aliases produced problems: %v", problems)
+	}
+}
+
+func TestCanonicalFormsRejectBraceContainingLiterals(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "bad-dimension", Path: []string{"bad-dimension"}, Type: token.TypeDimension, Value: "calc({length.xs})", RawValue: "calc({length.xs})"},
+		{Name: "bad-duration", Path: []string{"bad-duration"}, Type: token.TypeDuration, Value: "calc({animation.speed})", RawValue: "calc({animation.speed})"},
+	}
+	if problems := canonicalFormProblems(tokens); len(problems) != 2 {
+		t.Errorf("brace-embedded literals produced %d problems, want 2: %v", len(problems), problems)
+	}
 }
 
 func TestRHDSFixture_GroupExtensionsAndProvenance(t *testing.T) {
 	raw := loadRHDSRaw(t)
+
+	if _, ok := raw["$schema"]; ok {
+		t.Error("fixture must omit $schema so the parser auto-detects the draft schema")
+	}
 
 	provenance, ok := raw["$extensions"].(map[string]any)
 	if !ok {
@@ -651,7 +683,7 @@ func styleDictionaryFields(raw map[string]any) []string {
 
 func isStyleDictionaryField(key string) bool {
 	switch key {
-	case "name", "attributes", "filePath", "isSource", "original", "path":
+	case "name", "attributes", "filePath", "isSource", "original", "path", "value", "comment":
 		return true
 	default:
 		return false
@@ -682,12 +714,20 @@ func TestStyleDictionaryFieldsScope(t *testing.T) {
 				"$value":   "#000000",
 				"name":     "color-primary",
 				"path":     []any{"color", "primary"},
+				"value":    "177 56 11",
+				"comment":  "Style Dictionary metadata",
 				"original": map[string]any{"$value": "#000000", "$type": "color"},
 			},
 		},
 	}
 	got := styleDictionaryFields(survived)
-	want := []string{"$.color.primary.name", "$.color.primary.original", "$.color.primary.path"}
+	want := []string{
+		"$.color.primary.comment",
+		"$.color.primary.name",
+		"$.color.primary.original",
+		"$.color.primary.path",
+		"$.color.primary.value",
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("styleDictionaryFields = %v, want %v", got, want)
 	}
