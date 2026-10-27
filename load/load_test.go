@@ -91,6 +91,38 @@ func TestLoad_WithPrefix(t *testing.T) {
 	}
 }
 
+func TestLoad_WithDashedPrefixNormalizesKeys(t *testing.T) {
+	// load.Load passes the prefix to the parser, which stores it on every
+	// token before NewMap builds the lookup keys. A prefix with leading
+	// dashes must still produce normalized --rh-* names and keys.
+	for _, prefix := range []string{"rh", "--rh", "---rh"} {
+		t.Run(prefix, func(t *testing.T) {
+			root := testdataDir()
+			tokenMap, err := load.Load(t.Context(), "simple.json", load.Options{
+				Root:   root,
+				Prefix: prefix,
+			})
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+
+			tok, ok := tokenMap.Get("color-primary")
+			if !ok {
+				t.Fatal("expected to find token by short name")
+			}
+			if tok.Prefix != "rh" {
+				t.Errorf("tok.Prefix = %q, want %q", tok.Prefix, "rh")
+			}
+			if got := tok.CSSVariableName(); got != "--rh-color-primary" {
+				t.Errorf("CSSVariableName() = %q, want %q", got, "--rh-color-primary")
+			}
+			if _, ok := tokenMap.Get("--rh-color-primary"); !ok {
+				t.Error("expected to find token by full CSS name")
+			}
+		})
+	}
+}
+
 func TestLoad_WithSchemaVersion(t *testing.T) {
 	root := testdataDir()
 	tokenMap, err := load.Load(t.Context(), "simple.json", load.Options{

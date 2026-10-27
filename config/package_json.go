@@ -22,7 +22,10 @@ var configKeys = []string{"asimonim", "designTokensLanguageServer", "design-toke
 
 // LoadFromPackageJSON reads design tokens configuration from package.json.
 // Checks "asimonim", "designTokensLanguageServer", and "design-tokens-language-server"
-// keys in priority order. Returns nil if no config found (not an error).
+// keys in priority order. It reads only prefix, cdn, schema, groupMarkers,
+// resolvers, and tokensFiles/files; other Config fields such as header and
+// outputs are ignored when loading from package.json. Returns nil if no
+// config found (not an error).
 func LoadFromPackageJSON(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
 	if rootDir == "" {
 		return nil, nil

@@ -111,9 +111,11 @@ type Map struct {
 // NewMap creates a Map from tokens with optional prefix for lookups.
 // Tokens are indexed by their CSSVariableName for efficient lookup.
 // Leading dashes in prefix are stripped before use, so "rh", "--rh", and
-// "---rh" all produce the same --rh-* names. A non-empty prefix is applied
-// to a copy of each token that does not already have one, so the input slice
-// is not mutated.
+// "---rh" all produce the same --rh-* names. The prefix stored on a token
+// (for example by the parser, which receives the same prefix from load.Load)
+// is normalized the same way on a copy, so keys match lookups. A token whose
+// prefix is explicitly different from the requested prefix keeps it
+// unchanged. The input slice is never mutated.
 func NewMap(tokens []*Token, prefix string) *Map {
 	normalizedPrefix := strings.TrimLeft(prefix, "-")
 	m := &Map{
@@ -121,10 +123,19 @@ func NewMap(tokens []*Token, prefix string) *Map {
 		tokens: make(map[string]*Token, len(tokens)),
 	}
 	for _, t := range tokens {
-		// Apply prefix to token if not already set
 		tok := t
-		if tok.Prefix == "" && normalizedPrefix != "" {
-			// Create a copy with prefix set
+		// Trimmed the same way as the requested prefix, so "rh" and "--rh"
+		// are treated as the same prefix rather than as an override.
+		tokPrefix := strings.TrimLeft(tok.Prefix, "-")
+		switch {
+		case tokPrefix == "" && normalizedPrefix != "":
+			// Apply the requested prefix to a copy.
+			copy := *t
+			copy.Prefix = normalizedPrefix
+			tok = &copy
+		case tokPrefix == normalizedPrefix && tok.Prefix != normalizedPrefix:
+			// Normalize a prefix the parser stored on a copy, preserving
+			// the caller's token.
 			copy := *t
 			copy.Prefix = normalizedPrefix
 			tok = &copy

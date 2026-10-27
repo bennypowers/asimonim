@@ -63,6 +63,9 @@ func Load(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
 }
 
 // LoadOrDefault returns config or defaults if not found.
+// It returns Default when configuration is missing or when loading fails,
+// including malformed or unreadable configuration; the error is not
+// returned to the caller.
 func LoadOrDefault(filesystem asimfs.FileSystem, rootDir string) *Config {
 	cfg, err := Load(filesystem, rootDir)
 	if err != nil || cfg == nil {
@@ -72,7 +75,9 @@ func LoadOrDefault(filesystem asimfs.FileSystem, rootDir string) *Config {
 }
 
 // LoadFull reads config from package.json first, then merges with
-// .config/design-tokens.{yaml,yml,json}. Package.json takes precedence.
+// .config/design-tokens.{yaml,yml,json}. Package.json takes precedence: when
+// both sources set the same field, the package.json value wins, and the
+// config file fills only fields that are unset in package.json.
 // Returns nil if neither source exists (not an error).
 func LoadFull(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
 	pkgCfg, err := LoadFromPackageJSON(filesystem, rootDir)
@@ -97,6 +102,9 @@ func LoadFull(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
 }
 
 // LoadFullOrDefault returns config from all sources or defaults if not found.
+// It returns Default when configuration is missing or when loading fails,
+// including malformed or unreadable configuration; the error is not
+// returned to the caller.
 func LoadFullOrDefault(filesystem asimfs.FileSystem, rootDir string) *Config {
 	cfg, err := LoadFull(filesystem, rootDir)
 	if err != nil || cfg == nil {
