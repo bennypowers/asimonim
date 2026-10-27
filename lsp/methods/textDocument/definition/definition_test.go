@@ -2,7 +2,9 @@ package definition
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"bennypowers.dev/asimonim/lsp/internal/parser/css"
 	"bennypowers.dev/asimonim/lsp/internal/tokens"
@@ -532,4 +534,39 @@ func TestDefinition_HTMLNoCSS(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Nil(t, result)
+}
+
+func TestDefinitionForTokenFile_UsesUTF16Character(t *testing.T) {
+	ctx := testutil.NewMockServerContext()
+	req := types.NewRequestContext(ctx, context.Background())
+
+	definitionLine := `{"é": "x", "color": {"primary": {"$value": "#fff"}}}`
+	byteIdx := strings.Index(definitionLine, `"primary"`)
+	char := uint32(len(utf16.Encode([]rune(definitionLine[:byteIdx]))))
+
+	_ = ctx.TokenManager().Add(&tokens.Token{
+		Name:          "color-primary",
+		Value:         "#fff",
+		DefinitionURI: "file:///tokens.json",
+		Path:          []string{"color", "primary"},
+		Line:          0,
+		Character:     char,
+	})
+	_ = ctx.DocumentManager().DidOpen("file:///tokens.json", "json", 1, definitionLine)
+
+	refContent := `{"$value": "{color.primary}"}`
+	_ = ctx.DocumentManager().DidOpen("file:///ref.json", "json", 1, refContent)
+	doc := ctx.DocumentManager().Get("file:///ref.json")
+	require.NotNil(t, doc)
+
+	result, err := DefinitionForTokenFile(req, doc, protocol.Position{
+		Line:      0,
+		Character: uint32(strings.Index(refContent, "color")),
+	})
+	require.NoError(t, err)
+
+	locations, ok := result.(protocol.LocationSlice)
+	require.True(t, ok)
+	require.Len(t, locations, 1)
+	assert.Equal(t, char, locations[0].Range.Start.Character)
 }

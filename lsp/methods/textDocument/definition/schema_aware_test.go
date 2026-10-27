@@ -421,9 +421,9 @@ func TestDefinition_TokenFile_GetLineTextOutOfBounds(t *testing.T) {
 	assert.Equal(t, uint32(0), locations[0].Range.Start.Character, "Should fallback to 0 when line is out of bounds")
 }
 
-func TestDefinition_TokenFile_GetLineTextFromDisk(t *testing.T) {
-	// Test the getLineText disk fallback path by having the token definition
-	// in a URI that's NOT in the document manager (not opened)
+func TestDefinition_TokenFile_ClosedDefinitionFileUsesStoredPosition(t *testing.T) {
+	// The definition file is not open and does not exist on disk. Positions
+	// are stored as UTF-16 offsets on the token, so no file read is needed.
 	content := `{
   "color": {
     "secondary": {
@@ -436,8 +436,6 @@ func TestDefinition_TokenFile_GetLineTextFromDisk(t *testing.T) {
 	doc := documents.NewDocument("file:///source.json", "json", 1, content)
 	mockServer.AddDocument(doc)
 
-	// Token definition is in a different file that's NOT opened in the editor
-	// The file doesn't exist on disk, so getLineText will error and fall back
 	_ = mockServer.TokenManager().Add(&tokens.Token{
 		Name:          "color-primary",
 		Value:         "#FF0000",
@@ -463,13 +461,13 @@ func TestDefinition_TokenFile_GetLineTextFromDisk(t *testing.T) {
 	result, err := definition.Definition(req, params)
 	require.NoError(t, err)
 
-	// Should fall back to zero-width range when file can't be read from disk
 	locations, ok := result.(protocol.LocationSlice)
 	require.True(t, ok)
 	require.Len(t, locations, 1)
 	assert.Equal(t, "file:///nonexistent-definition-file.json", string(locations[0].URI))
 	assert.Equal(t, uint32(5), locations[0].Range.Start.Line)
-	assert.Equal(t, uint32(0), locations[0].Range.Start.Character, "Should fallback to 0 when file is unreadable")
+	assert.Equal(t, uint32(4), locations[0].Range.Start.Character)
+	assert.Equal(t, uint32(4+len("color-primary")), locations[0].Range.End.Character)
 }
 
 func TestDefinition_NoReferenceCursor(t *testing.T) {

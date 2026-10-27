@@ -18,6 +18,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 
 	"bennypowers.dev/asimonim/fs"
 	"bennypowers.dev/asimonim/parser/common"
@@ -52,7 +54,7 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 		jsonData := bytes.TrimPrefix(data, utf8BOM)
 		cleanJSON := jsonc.ToJSON(jsonData)
 		if err := json.Unmarshal(cleanJSON, &raw); err == nil {
-			positionData = cleanJSON
+			positionData = schema.MaskJSONCComments(jsonData)
 			parsedJSON = true
 		} else if !skippedBlockComment {
 			return nil, fmt.Errorf("failed to parse JSON: %w", err)
@@ -79,7 +81,7 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 			}
 			return nil, fmt.Errorf("YAML root must be an object")
 		}
-		positionData = data
+		positionData = bytes.TrimPrefix(data, utf8BOM)
 	}
 
 	// Auto-detect schema version if not explicitly set
@@ -395,14 +397,52 @@ func (p *JSONParser) addPositions(data []byte, tokens []*token.Token) error {
 
 	// Walk the AST and update token positions
 	if len(root.Content) > 0 {
-		p.walkForPositions(root.Content[0], []string{}, tokenByPath)
+		p.walkForPositions(data, root.Content[0], []string{}, tokenByPath)
 	}
 
 	return nil
 }
 
+// utf16Column converts a 1-based YAML rune column on a line of data to a
+// 0-based UTF-16 offset, which is what LSP positions use.
+func utf16Column(data []byte, line, column int) uint32 {
+	if line < 1 || column < 1 {
+		return 0
+	}
+	start := 0
+	for l := 1; l < line; l++ {
+		idx := bytes.IndexByte(data[start:], '\n')
+		if idx < 0 {
+			return 0
+		}
+		start += idx + 1
+	}
+	end := bytes.IndexByte(data[start:], '\n')
+	if end < 0 {
+		end = len(data) - start
+	}
+	lineBytes := data[start : start+end]
+
+	remaining := column - 1
+	col := 0
+	for b := 0; b < len(lineBytes) && remaining > 0; {
+		r, size := utf8.DecodeRune(lineBytes[b:])
+		width := utf16.RuneLen(r)
+		if width < 1 {
+			width = 1
+		}
+		col += width
+		b += size
+		remaining--
+	}
+	if col > math.MaxUint32 {
+		return math.MaxUint32
+	}
+	return uint32(col)
+}
+
 // walkForPositions walks the yaml AST to find token positions.
-func (p *JSONParser) walkForPositions(node *yaml.Node, jsonPath []string, tokenByPath map[string]*token.Token) {
+func (p *JSONParser) walkForPositions(data []byte, node *yaml.Node, jsonPath []string, tokenByPath map[string]*token.Token) {
 	if node.Kind != yaml.MappingNode {
 		return
 	}
@@ -441,15 +481,12 @@ func (p *JSONParser) walkForPositions(node *yaml.Node, jsonPath []string, tokenB
 				}
 			}
 			if keyNode.Column > 0 {
-				colVal := keyNode.Column - 1
-				if colVal >= 0 && colVal <= math.MaxUint32 {
-					t.Character = uint32(colVal)
-				}
+				t.Character = utf16Column(data, keyNode.Line, keyNode.Column)
 			}
 		}
 
 		// Recurse into children
-		p.walkForPositions(valueNode, currentPath, tokenByPath)
+		p.walkForPositions(data, valueNode, currentPath, tokenByPath)
 	}
 }
 

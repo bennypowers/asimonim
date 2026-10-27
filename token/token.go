@@ -76,7 +76,8 @@ type Token struct {
 	// Line is the 0-based line number where this token is defined.
 	Line uint32 `json:"-"`
 
-	// Character is the 0-based character offset where this token is defined.
+	// Character is the 0-based UTF-16 offset where this token is defined.
+	// LSP positions use the same unit.
 	Character uint32 `json:"-"`
 
 	// Reference is the original reference format (e.g., "{color.primary}").

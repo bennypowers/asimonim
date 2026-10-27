@@ -11,10 +11,12 @@ package parser_test
 import (
 	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"bennypowers.dev/asimonim/parser"
 	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/testutil"
+	"bennypowers.dev/asimonim/token"
 )
 
 func TestJSONParser_Parse(t *testing.T) {
@@ -468,6 +470,37 @@ func TestJSONParser_ParseUTF8BOM(t *testing.T) {
 	})
 }
 
+func TestJSONParser_PositionsUseUTF16Columns(t *testing.T) {
+	// A non-BMP character before the key occupies two UTF-16 code units but
+	// one rune. Token.Character must be the UTF-16 offset used by LSP.
+	data := []byte(`{"😀": "x", "color": {"primary": {"$type": "color", "$value": "#fff"}}}`)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var tok *token.Token
+	for _, candidate := range tokens {
+		if candidate.Name == "color-primary" {
+			tok = candidate
+			break
+		}
+	}
+	if tok == nil {
+		t.Fatal("color-primary token not found")
+	}
+
+	byteIdx := strings.Index(string(data), `"primary"`)
+	want := uint32(len(utf16.Encode([]rune(string(data[:byteIdx])))))
+	if tok.Line != 0 {
+		t.Errorf("token.Line = %d, want 0", tok.Line)
+	}
+	if tok.Character != want {
+		t.Errorf("token.Character = %d, want UTF-16 offset %d", tok.Character, want)
+	}
+}
+
 func TestJSONParser_AutoDetectSchemaFromTrailingBlockComment(t *testing.T) {
 	// A block comment after a value must not hide 2025.10 features from
 	// schema detection: the parser passes the comment-stripped document to
@@ -495,5 +528,57 @@ func TestJSONParser_AutoDetectSchemaFromTrailingBlockComment(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("color-alias token not found")
+	}
+}
+
+func TestJSONParser_JSONCCommentDoesNotShiftPositions(t *testing.T) {
+	// A multibyte comment on the same line as a token must not shift the
+	// token's UTF-16 column; positions are tracked on a comment mask that
+	// preserves UTF-16 width.
+	data := []byte(`/* 😀 */ {"spacing":{"small":{"$type":"number","$value":4}}}`)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var tok *token.Token
+	for _, candidate := range tokens {
+		if candidate.Name == "spacing-small" {
+			tok = candidate
+			break
+		}
+	}
+	if tok == nil {
+		t.Fatal("spacing-small token not found")
+	}
+
+	byteIdx := strings.Index(string(data), `"small"`)
+	want := uint32(len(utf16.Encode([]rune(string(data[:byteIdx])))))
+	if tok.Character != want {
+		t.Errorf("token.Character = %d, want UTF-16 offset %d", tok.Character, want)
+	}
+}
+
+func TestJSONParser_ParseUTF8BOMPositionsAreBOMLess(t *testing.T) {
+	// yaml.v3 ignores a leading BOM when computing columns, and LSP clients
+	// strip it from document text. Positions therefore use the BOM-less
+	// column, matching the text clients send.
+	bom := []byte{0xEF, 0xBB, 0xBF}
+	payload := []byte(`{"spacing":{"small":{"$type":"number","$value":4}}}`)
+	data := append(append([]byte{}, bom...), payload...)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(tokens) != 1 {
+		t.Fatalf("got %d tokens, want 1", len(tokens))
+	}
+
+	byteIdx := strings.Index(string(payload), `"small"`)
+	want := uint32(len(utf16.Encode([]rune(string(payload[:byteIdx])))))
+	if tokens[0].Character != want {
+		t.Errorf("token.Character = %d, want BOM-less UTF-16 offset %d", tokens[0].Character, want)
 	}
 }
