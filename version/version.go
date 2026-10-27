@@ -18,8 +18,11 @@ See the LICENSE file for details.
 //
 //	go build -ldflags "-X bennypowers.dev/asimonim/version.Version=v0.3.3"
 //
-// When no metadata is injected, Get falls back to the module version
-// recorded by the Go toolchain, then to "dev".
+// When no metadata is injected, Get reads the Go build information. If
+// asimonim is the main module, it uses that module's version. If asimonim is
+// embedded as a dependency, it reports the asimonim dependency version rather
+// than the host program's version. If no version is available, Get returns
+// "dev".
 package version
 
 import (
@@ -28,9 +31,13 @@ import (
 	"strings"
 )
 
+// modulePath is the import path recorded in Go build information.
+const modulePath = "bennypowers.dev/asimonim"
+
 var (
-	// Version is the semantic version, set at build time via ldflags.
-	// It is "dev" when the binary was built without version metadata.
+	// Version is the version string, set at build time via ldflags.
+	// It may be a release tag such as "v0.3.3", git-describe output, or
+	// "dev" when the binary was built without version metadata.
 	Version = "dev"
 
 	// GitCommit is the Git commit hash, set at build time via ldflags.
@@ -47,39 +54,89 @@ var (
 	GitDirty = ""
 )
 
+// readBuildInfo is indirected so tests can inject build information.
+var readBuildInfo = debug.ReadBuildInfo
+
 // Get returns the version string for the application.
 //
-// It prefers the Version injected at build time, then the module version
-// reported by the Go toolchain, then Git metadata, and finally "dev".
+// It prefers the Version injected at build time, then a usable version from
+// Go build information, then Git metadata, and finally "dev". When asimonim
+// is embedded as a dependency, the build information lookup returns the
+// asimonim module version rather than the host program's version.
 func Get() string {
-	if Version != "dev" {
-		return Version
-	}
+	return get(Version, GitCommit, GitTag, GitDirty, readBuildInfo)
+}
 
-	if info, ok := debug.ReadBuildInfo(); ok {
-		if info.Main.Version != "(devel)" && info.Main.Version != "" {
-			return info.Main.Version
-		}
-	}
-
-	if GitTag != "unknown" && GitCommit != "unknown" {
-		version := GitTag
-		if GitCommit != "" {
-			commitSuffix := GitCommit
-			if len(GitCommit) > 7 {
-				commitSuffix = GitCommit[:7]
-			}
-			if !strings.HasSuffix(GitTag, commitSuffix) {
-				version = fmt.Sprintf("%s-%s", GitTag, commitSuffix)
-			}
-		}
-		if GitDirty == "dirty" {
-			version += "-dirty"
-		}
+// get implements Get with its inputs supplied explicitly so the version
+// resolution logic can be tested without build-time injection.
+func get(version, gitCommit, gitTag, gitDirty string, read func() (*debug.BuildInfo, bool)) string {
+	if version != "dev" {
 		return version
 	}
 
+	if read != nil {
+		if info, ok := read(); ok {
+			if v := moduleVersion(info); v != "" {
+				return v
+			}
+		}
+	}
+
+	if gitTag != "unknown" && gitCommit != "unknown" {
+		v := gitTag
+		if gitCommit != "" {
+			commitSuffix := gitCommit
+			if len(gitCommit) > 7 {
+				commitSuffix = gitCommit[:7]
+			}
+			if !strings.HasSuffix(gitTag, commitSuffix) {
+				v = fmt.Sprintf("%s-%s", gitTag, commitSuffix)
+			}
+		}
+		if gitDirty == "dirty" {
+			v += "-dirty"
+		}
+		return v
+	}
+
 	return "dev"
+}
+
+// moduleVersion returns the asimonim module version recorded in build info.
+// It reports the main module version only when asimonim is the main module;
+// otherwise it scans dependencies so embedders report the asimonim version,
+// not the host program's version.
+func moduleVersion(info *debug.BuildInfo) string {
+	if info == nil {
+		return ""
+	}
+	if info.Main.Path == modulePath {
+		return usableVersion(info.Main.Version)
+	}
+	for _, dep := range info.Deps {
+		if dep == nil || dep.Path != modulePath {
+			continue
+		}
+		module := dep
+		if dep.Replace != nil {
+			module = dep.Replace
+		}
+		if module.Path != modulePath {
+			continue
+		}
+		if v := usableVersion(module.Version); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// usableVersion filters out versions that do not identify a release.
+func usableVersion(v string) string {
+	if v == "" || v == "(devel)" {
+		return ""
+	}
+	return v
 }
 
 // Full returns detailed version information.

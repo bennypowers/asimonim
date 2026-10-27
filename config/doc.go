@@ -9,10 +9,12 @@ See the LICENSE file for details.
 // Package config loads design tokens configuration.
 //
 // Configuration can live in .config/design-tokens.yaml, .config/
-// design-tokens.yml, .config/design-tokens.json, or the designTokens field
-// of package.json. Load reads only the config file, LoadFull merges
-// package.json with the config file, and LoadOrDefault and LoadFullOrDefault
-// return Default when no config exists.
+// design-tokens.yml, .config/design-tokens.json, or under the "asimonim",
+// "designTokensLanguageServer", or "design-tokens-language-server" key in
+// package.json. Those package.json keys are checked in that order. Load
+// reads only the config file, LoadFull merges package.json with the config
+// file, and LoadOrDefault and LoadFullOrDefault return Default when no
+// config exists.
 //
 // Prefix is the global CSS variable prefix. GroupMarkers enables the draft
 // convention where a group name can also be a token. Schema forces a schema

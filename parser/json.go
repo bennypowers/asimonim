@@ -93,16 +93,44 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 }
 
 // isLikelyJSON checks if data appears to be JSON rather than YAML.
-// JSON typically starts with '{' (optionally preceded by whitespace/BOM).
+// JSON typically starts with '{', optionally preceded by whitespace, a BOM,
+// or JSONC comments. Leading comments are skipped so a document that begins
+// with // or /* is still recognized as JSONC.
 func isLikelyJSON(data []byte) bool {
-	for _, b := range data {
-		switch b {
+	for i := 0; i < len(data); {
+		switch data[i] {
 		case ' ', '\t', '\n', '\r':
+			i++
 			continue
 		case 0xEF, 0xBB, 0xBF: // UTF-8 BOM
+			i++
 			continue
 		case '{':
 			return true
+		case '/':
+			if i+1 >= len(data) {
+				return false
+			}
+			switch data[i+1] {
+			case '/':
+				// Line comment: skip to the end of the line.
+				i += 2
+				for i < len(data) && data[i] != '\n' {
+					i++
+				}
+			case '*':
+				// Block comment: skip through the closing */.
+				i += 2
+				for i+1 < len(data) && (data[i] != '*' || data[i+1] != '/') {
+					i++
+				}
+				if i+1 >= len(data) {
+					return false
+				}
+				i += 2
+			default:
+				return false
+			}
 		default:
 			return false
 		}

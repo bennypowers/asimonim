@@ -59,7 +59,7 @@ Full documentation is available at **[bennypowers.dev/asimonim](https://bennypow
 
 ## Go library
 
-The module is `bennypowers.dev/asimonim`. The public packages are:
+The module is `bennypowers.dev/asimonim`. The main public packages are:
 
 | Package | Purpose |
 | --- | --- |
@@ -73,6 +73,9 @@ The module is `bennypowers.dev/asimonim`. The public packages are:
 | `fs` | Filesystem abstraction |
 | `config` | Configuration loading |
 | `version` | Build and version information |
+
+The module also exports `specifier`, `parser/common`, `lsp`, and `mcp`, but
+the packages above are the primary library surface.
 
 Run `go doc bennypowers.dev/asimonim/parser` (or the name of any package
 above) for the full API and examples.
@@ -110,10 +113,12 @@ Everything under `internal/` is not public API.
 ### Input formats
 
 Asimonim parses [DTCG][dtcg] documents. Style Dictionary JSON is not DTCG.
-Its `value` and `type` keys, category nesting, and reference syntax differ
-from DTCG's `$value`, `$type`, and `{group.token}` forms. Normalize Style
-Dictionary output into DTCG before passing it to asimonim. The parser does
-not translate Style Dictionary files.
+Its keys omit the `$` prefix (`value` and `type` instead of `$value` and
+`$type`), and composite values such as shadows and typography use shapes that
+differ from DTCG. References use the same `{group.token}` syntax in both
+formats, but that does not make the surrounding document DTCG. Normalize
+Style Dictionary output into DTCG before passing it to asimonim. The parser
+does not translate Style Dictionary files.
 
 ## Contributing
 

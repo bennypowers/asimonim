@@ -41,10 +41,12 @@ See the LICENSE file for details.
 //
 // # Style Dictionary
 //
-// Style Dictionary JSON is not DTCG. Its "value" and "type" keys, category
-// nesting, and reference syntax differ from DTCG's "$value", "$type", and
-// "{group.token}" forms. Normalize Style Dictionary input into DTCG before
-// passing it to this package. The parser does not translate Style
+// Style Dictionary JSON is not DTCG. Its keys omit the "$" prefix ("value"
+// and "type" instead of "$value" and "$type"), and composite values such as
+// shadows and typography use shapes that differ from DTCG. References use
+// the same {group.token} syntax in both formats, but that does not make the
+// surrounding document DTCG. Normalize Style Dictionary input into DTCG
+// before passing it to this package. The parser does not translate Style
 // Dictionary files.
 //
 // # Example

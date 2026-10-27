@@ -110,20 +110,23 @@ type Map struct {
 
 // NewMap creates a Map from tokens with optional prefix for lookups.
 // Tokens are indexed by their CSSVariableName for efficient lookup.
-// A non-empty prefix is applied to a copy of each token that does not
-// already have one, so the input slice is not mutated.
+// Leading dashes in prefix are stripped before use, so "rh", "--rh", and
+// "---rh" all produce the same --rh-* names. A non-empty prefix is applied
+// to a copy of each token that does not already have one, so the input slice
+// is not mutated.
 func NewMap(tokens []*Token, prefix string) *Map {
+	normalizedPrefix := strings.TrimLeft(prefix, "-")
 	m := &Map{
-		prefix: strings.TrimLeft(prefix, "-"),
+		prefix: normalizedPrefix,
 		tokens: make(map[string]*Token, len(tokens)),
 	}
 	for _, t := range tokens {
 		// Apply prefix to token if not already set
 		tok := t
-		if tok.Prefix == "" && prefix != "" {
+		if tok.Prefix == "" && normalizedPrefix != "" {
 			// Create a copy with prefix set
 			copy := *t
-			copy.Prefix = prefix
+			copy.Prefix = normalizedPrefix
 			tok = &copy
 		}
 		m.tokens[tok.CSSVariableName()] = tok

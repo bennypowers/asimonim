@@ -338,3 +338,29 @@ func TestJSONParser_AutoDetectSchemaFromJSONC(t *testing.T) {
 		t.Fatal("color-alias token not found; schema auto-detection failed for JSONC input")
 	}
 }
+
+func TestJSONParser_ParseJSONCWithLeadingComment(t *testing.T) {
+	// A leading // comment must not cause the document to be classified as
+	// YAML. The parser should recognize JSONC and parse it.
+	data := []byte(`// tokens for the 2025.10 schema
+{
+	"$schema": "https://www.designtokens.org/schemas/2025.10.json",
+	"spacing": {
+		"small": {"$type": "number", "$value": 4}
+	}
+}`)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+	if err != nil {
+		t.Fatalf("unexpected error parsing JSONC with leading comment: %v", err)
+	}
+	if len(tokens) != 1 {
+		t.Fatalf("got %d tokens, want 1", len(tokens))
+	}
+	if tokens[0].Name != "spacing-small" {
+		t.Errorf("token name = %q, want %q", tokens[0].Name, "spacing-small")
+	}
+	if tokens[0].SchemaVersion != schema.V2025_10 {
+		t.Errorf("schema = %s, want %s", tokens[0].SchemaVersion, schema.V2025_10)
+	}
+}

@@ -95,6 +95,28 @@ func TestNewMap(t *testing.T) {
 	})
 }
 
+func TestNewMap_NormalizesPrefixDashes(t *testing.T) {
+	for _, prefix := range []string{"rh", "--rh", "---rh"} {
+		t.Run(prefix, func(t *testing.T) {
+			tokens := []*token.Token{
+				{Name: "color-primary", Value: "#FF0000"},
+			}
+			m := token.NewMap(tokens, prefix)
+
+			tok, ok := m.Get("color.primary")
+			if !ok {
+				t.Fatal("expected to find token by dot-path")
+			}
+			if got := tok.CSSVariableName(); got != "--rh-color-primary" {
+				t.Errorf("CSSVariableName() = %q, want %q", got, "--rh-color-primary")
+			}
+			if _, ok := m.Get("--rh-color-primary"); !ok {
+				t.Error("expected to find token by full CSS name")
+			}
+		})
+	}
+}
+
 func TestMap_Get(t *testing.T) {
 	tokens := []*token.Token{
 		{Name: "color-primary", Value: "#FF0000"},
