@@ -114,35 +114,40 @@ type Map struct {
 // "---rh" all produce the same --rh-* names. The prefix stored on a token
 // (for example by the parser, which receives the same prefix from load.Load)
 // is normalized the same way on a copy, so keys match lookups. A token whose
-// prefix is explicitly different from the requested prefix keeps it
-// unchanged. The input slice is never mutated.
+// prefix differs from the requested prefix keeps that prefix; only its dash
+// spelling is normalized. The input slice is never mutated.
 func NewMap(tokens []*Token, prefix string) *Map {
-	normalizedPrefix := strings.TrimLeft(prefix, "-")
+	normalizedPrefix := normalizePrefix(prefix)
 	m := &Map{
 		prefix: normalizedPrefix,
 		tokens: make(map[string]*Token, len(tokens)),
 	}
 	for _, t := range tokens {
 		tok := t
-		// Trimmed the same way as the requested prefix, so "rh" and "--rh"
-		// are treated as the same prefix rather than as an override.
-		tokPrefix := strings.TrimLeft(tok.Prefix, "-")
+		tokPrefix := normalizePrefix(tok.Prefix)
 		switch {
-		case tokPrefix == "" && normalizedPrefix != "":
+		case tok.Prefix == "" && normalizedPrefix != "":
 			// Apply the requested prefix to a copy.
 			copy := *t
 			copy.Prefix = normalizedPrefix
 			tok = &copy
-		case tokPrefix == normalizedPrefix && tok.Prefix != normalizedPrefix:
-			// Normalize a prefix the parser stored on a copy, preserving
-			// the caller's token.
+		case tok.Prefix != "" && tok.Prefix != tokPrefix:
+			// Normalize the dash spelling on a copy. This also covers a
+			// parser-provided prefix and a deliberately different prefix
+			// without replacing the latter with the requested one.
 			copy := *t
-			copy.Prefix = normalizedPrefix
+			copy.Prefix = tokPrefix
 			tok = &copy
 		}
 		m.tokens[tok.CSSVariableName()] = tok
 	}
 	return m
+}
+
+// normalizePrefix strips leading dashes from a CSS variable prefix so that
+// "rh", "--rh", and "---rh" all name the same prefix.
+func normalizePrefix(prefix string) string {
+	return strings.TrimLeft(prefix, "-")
 }
 
 // Get returns the Token for the given name, prepending the prefix if needed.
@@ -199,8 +204,8 @@ func (t *Token) CSSVariableName() string {
 		return ""
 	}
 	name := strings.ReplaceAll(t.Name, ".", "-")
-	if t.Prefix != "" {
-		prefix := strings.ReplaceAll(t.Prefix, ".", "-")
+	prefix := normalizePrefix(strings.ReplaceAll(t.Prefix, ".", "-"))
+	if prefix != "" {
 		return "--" + prefix + "-" + name
 	}
 	return "--" + name

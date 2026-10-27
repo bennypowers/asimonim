@@ -443,7 +443,7 @@ func TestMergePackageJsonConfig(t *testing.T) {
 			Resolvers:   []string{"existing-resolver.json"},
 		}
 		pkg := &types.ServerConfig{
-			TokensFiles: []any{},   // explicit empty
+			TokensFiles: []any{},    // explicit empty
 			Resolvers:   []string{}, // explicit empty
 		}
 		mergePackageJsonConfig(current, pkg)
@@ -455,7 +455,7 @@ func TestMergePackageJsonConfig(t *testing.T) {
 	t.Run("explicit empty pkg overrides nil current", func(t *testing.T) {
 		current := &types.ServerConfig{}
 		pkg := &types.ServerConfig{
-			TokensFiles: []any{},   // explicit empty
+			TokensFiles: []any{},    // explicit empty
 			Resolvers:   []string{}, // explicit empty
 		}
 		mergePackageJsonConfig(current, pkg)
@@ -890,6 +890,20 @@ func TestParseAndAddTokens(t *testing.T) {
 		tok := server.Token("color-primary")
 		require.NotNil(t, tok, "token should exist by name")
 		assert.Equal(t, "ds", tok.Prefix, "token should have prefix set")
+	})
+
+	t.Run("normalizes dashed prefix in CSS names and lookups", func(t *testing.T) {
+		server, err := NewServer()
+		require.NoError(t, err)
+		defer func() { _ = server.Close() }()
+
+		count, err := server.parseAndAddTokens(colorPrimaryJSON, "/tmp/tokens.json", "file:///tmp/tokens.json", &TokenFileOptions{Prefix: "--ds"})
+		require.NoError(t, err)
+		assert.Equal(t, 1, count)
+
+		tok := server.Token("--ds-color-primary")
+		require.NotNil(t, tok, "token should be found by normalized CSS variable name")
+		assert.Equal(t, "--ds-color-primary", tok.CSSVariableName())
 	})
 
 	t.Run("returns error for invalid JSON", func(t *testing.T) {

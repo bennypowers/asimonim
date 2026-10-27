@@ -76,8 +76,10 @@ func LoadOrDefault(filesystem asimfs.FileSystem, rootDir string) *Config {
 
 // LoadFull reads config from package.json first, then merges with
 // .config/design-tokens.{yaml,yml,json}. Package.json takes precedence: when
-// both sources set the same field, the package.json value wins, and the
-// config file fills only fields that are unset in package.json.
+// both sources set the same field, the package.json value wins. The config
+// file fills only fields left unset in package.json. For string fields an
+// empty string counts as unset; for list fields only an absent (nil) list is
+// filled, so an explicitly empty list is preserved.
 // Returns nil if neither source exists (not an error).
 func LoadFull(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
 	pkgCfg, err := LoadFromPackageJSON(filesystem, rootDir)

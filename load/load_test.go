@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"bennypowers.dev/asimonim/config"
@@ -308,6 +309,40 @@ func TestLoadAll_MultipleFiles(t *testing.T) {
 	}
 	if len(result.All) != 3 {
 		t.Errorf("expected 3 total tokens, got %d", len(result.All))
+	}
+}
+
+func TestLoadAll_WithDashedPrefixNormalizesCSSNames(t *testing.T) {
+	// LoadAll passes the prefix straight to the parser and does not build a
+	// token.Map, so CSS names must be normalized by the token itself.
+	for _, prefix := range []string{"rh", "--rh", "---rh"} {
+		t.Run(prefix, func(t *testing.T) {
+			cfg := &config.Config{}
+			result, err := load.LoadAll(t.Context(), cfg, []string{"simple.json"}, load.Options{
+				Root:   testdataDir(),
+				Prefix: prefix,
+			})
+			if err != nil {
+				t.Fatalf("LoadAll() error = %v", err)
+			}
+
+			found := false
+			for _, tok := range result.All {
+				got := tok.CSSVariableName()
+				if strings.Contains(got, "----") {
+					t.Errorf("CSSVariableName() = %q, dashes in prefix were not normalized", got)
+				}
+				if tok.Name == "color-primary" {
+					found = true
+					if got != "--rh-color-primary" {
+						t.Errorf("CSSVariableName() = %q, want %q", got, "--rh-color-primary")
+					}
+				}
+			}
+			if !found {
+				t.Fatal("expected color-primary in LoadAll result")
+			}
+		})
 	}
 }
 

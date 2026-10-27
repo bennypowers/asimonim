@@ -161,6 +161,27 @@ func TestNewMap_PreservesDifferentTokenPrefix(t *testing.T) {
 	}
 }
 
+func TestNewMap_NormalizesDashedDifferentTokenPrefix(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "color-primary", Value: "#FF0000", Prefix: "--other"},
+	}
+	m := token.NewMap(tokens, "rh")
+
+	tok, ok := m.Get("--other-color-primary")
+	if !ok {
+		t.Fatal("expected to find token by its own prefixed CSS name")
+	}
+	if tok.Prefix != "other" {
+		t.Errorf("token.Prefix = %q, want %q (dash spelling normalized, prefix preserved)", tok.Prefix, "other")
+	}
+	if got := tok.CSSVariableName(); got != "--other-color-primary" {
+		t.Errorf("CSSVariableName() = %q, want %q", got, "--other-color-primary")
+	}
+	if tokens[0].Prefix != "--other" {
+		t.Errorf("original token was modified, Prefix = %q", tokens[0].Prefix)
+	}
+}
+
 func TestMap_Get(t *testing.T) {
 	tokens := []*token.Token{
 		{Name: "color-primary", Value: "#FF0000"},

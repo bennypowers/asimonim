@@ -21,8 +21,11 @@ See the LICENSE file for details.
 // was created with a prefix, short and dot-path lookups automatically gain
 // that prefix.
 //
-// Prefix is applied to a copy of each token that did not already have one,
-// so building a Map does not mutate the input slice.
+// Prefix is applied to a copy of each token that did not already have one.
+// A parser-provided prefix is normalized on a copy too, so leading dashes
+// ("--rh") still produce --rh-* names and map keys. A token whose prefix is
+// explicitly different from the requested prefix keeps it; only its dash
+// spelling is normalized. Building a Map does not mutate the input slice.
 //
 // # Example
 //

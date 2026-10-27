@@ -17,8 +17,10 @@ See the LICENSE file for details.
 // config exists.
 //
 // LoadFull gives package.json precedence: when both sources set the same
-// field, the package.json value wins, and the config file fills only fields
-// that are unset in package.json. LoadFromPackageJSON reads only prefix,
+// field, the package.json value wins. The config file fills only fields left
+// unset in package.json. For string fields an empty string counts as unset;
+// for list fields only an absent (nil) list is filled, so an explicitly
+// empty list is preserved. LoadFromPackageJSON reads only prefix,
 // cdn, schema, groupMarkers, resolvers, and tokensFiles/files; other Config
 // fields such as header and outputs are ignored when loading from
 // package.json.
