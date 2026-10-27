@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"bennypowers.dev/asimonim/schema"
 )
@@ -179,26 +180,44 @@ func TestDetectVersion_StructuredColors(t *testing.T) {
 }
 
 func TestMaskJSONCComments(t *testing.T) {
-	input := []byte("/* héllo */ {\"color\": \"#fff\"} // tail")
-	got := schema.MaskJSONCComments(input)
+	tests := []struct {
+		name    string
+		comment string
+	}{
+		{"BMP multibyte comment", "/* héllo */"},
+		{"emoji comment", "/* 😀 */"},
+		{"non-BMP symbol comment", "/* 𝄞 */"},
+	}
 
-	if strings.Contains(string(got), "héllo") || strings.Contains(string(got), "tail") {
-		t.Errorf("MaskJSONCComments() = %q, want comment text masked", got)
-	}
-	if !strings.Contains(string(got), `{"color": "#fff"}`) {
-		t.Errorf("MaskJSONCComments() = %q, want JSON body preserved", got)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := []byte(tt.comment + ` {"color": "#fff"} // tail`)
+			got := schema.MaskJSONCComments(input)
 
-	origKey := strings.Index(string(input), `{"color"`)
-	maskedKey := strings.Index(string(got), `{"color"`)
-	if origKey < 0 || maskedKey < 0 {
-		t.Fatal("expected JSON body in input and output")
+			if strings.Contains(string(got), "tail") || strings.Contains(string(got), strings.TrimSpace(strings.Trim(tt.comment, "/* "))) {
+				t.Errorf("MaskJSONCComments() = %q, want comment text masked", got)
+			}
+			if !strings.Contains(string(got), `{"color": "#fff"}`) {
+				t.Errorf("MaskJSONCComments() = %q, want JSON body preserved", got)
+			}
+
+			origKey := strings.Index(string(input), `{"color"`)
+			maskedKey := strings.Index(string(got), `{"color"`)
+			if origKey < 0 || maskedKey < 0 {
+				t.Fatal("expected JSON body in input and output")
+			}
+			origUnits := utf16Width(string(input[:origKey]))
+			maskedUnits := utf16Width(string(got[:maskedKey]))
+			if origUnits != maskedUnits {
+				t.Errorf("comment mask shifted UTF-16 columns: original %d, masked %d", origUnits, maskedUnits)
+			}
+		})
 	}
-	origRunes := len([]rune(string(input[:origKey])))
-	maskedRunes := len([]rune(string(got[:maskedKey])))
-	if origRunes != maskedRunes {
-		t.Errorf("comment mask shifted columns: original rune offset %d, masked %d", origRunes, maskedRunes)
-	}
+}
+
+// utf16Width returns the number of UTF-16 code units in s.
+func utf16Width(s string) int {
+	return len(utf16.Encode([]rune(s)))
 }
 
 func TestNormalizeContent(t *testing.T) {

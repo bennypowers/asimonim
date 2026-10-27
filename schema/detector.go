@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/tidwall/jsonc"
@@ -84,9 +85,9 @@ func NormalizeContent(content []byte) []byte {
 }
 
 // MaskJSONCComments replaces JSONC comment text with spaces while preserving
-// line breaks and one character per comment rune. Byte offsets can shrink for
-// multibyte comments, but rune and UTF-16 columns stay aligned with the
-// original document, which is what LSP positions use.
+// line breaks and UTF-16 column width. Byte offsets can change, but UTF-16
+// columns stay aligned with the original document, which is what LSP
+// positions use.
 func MaskJSONCComments(content []byte) []byte {
 	var out bytes.Buffer
 	out.Grow(len(content))
@@ -121,8 +122,8 @@ func MaskJSONCComments(content []byte) []byte {
 			out.WriteString("  ")
 			i += 2
 			for i < len(content) && content[i] != '\n' {
-				_, size := utf8.DecodeRune(content[i:])
-				out.WriteByte(' ')
+				r, size := utf8.DecodeRune(content[i:])
+				writeUTF16Spaces(&out, r)
 				i += size
 			}
 			continue
@@ -141,8 +142,8 @@ func MaskJSONCComments(content []byte) []byte {
 					i++
 					continue
 				}
-				_, size := utf8.DecodeRune(content[i:])
-				out.WriteByte(' ')
+				r, size := utf8.DecodeRune(content[i:])
+				writeUTF16Spaces(&out, r)
 				i += size
 			}
 			continue
@@ -151,6 +152,18 @@ func MaskJSONCComments(content []byte) []byte {
 		i++
 	}
 	return out.Bytes()
+}
+
+// writeUTF16Spaces writes one space per UTF-16 code unit occupied by r, so
+// masked comments keep the same UTF-16 column width as the original text.
+func writeUTF16Spaces(out *bytes.Buffer, r rune) {
+	n := utf16.RuneLen(r)
+	if n < 1 {
+		n = 1
+	}
+	for i := 0; i < n; i++ {
+		out.WriteByte(' ')
+	}
 }
 
 // hasCommentArtifact reports whether a YAML decode contains a key or scalar
