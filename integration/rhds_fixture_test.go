@@ -11,7 +11,8 @@ See the LICENSE file for details.
 //
 // The fixture is derived from the published @rhds/tokens@3.2.0
 // json/rhds.tokens.json Style Dictionary document. It is normalized to DTCG
-// before asimonim sees it:
+// forms before asimonim sees it, except for the RHDS vendor type
+// "mediaQuery", which no DTCG version defines:
 //
 //   - $value comes from original.$value so aliases survive
 //   - $type is recovered from attributes with an explicit mapping
@@ -21,11 +22,16 @@ See the LICENSE file for details.
 //     number percentages as unitless numbers, literal colors as hex, shadow
 //     dimensions with explicit units) while alias references are untouched
 //
+// Because "mediaQuery" is a vendor type, the fixture is not a strictly
+// DTCG-valid document. asimonim's consistency validator accepts it only
+// because that validator does not check $type membership.
+//
 // Generated tokens in the source document:
 //
-//   - 160 -rgb and -hsl color variants are kept as color tokens. Their
-//     original values are aliases to the base color, so the normalized tokens
-//     resolve through those aliases.
+//   - The source contains 160 generated -rgb and -hsl color variants; this
+//     fixture retains two representative aliases, color.red-orange.60-rgb and
+//     color.red-orange.60-hsl. Their original values alias the base color, so
+//     the normalized tokens resolve through those aliases.
 //   - 57 light-dark(var(...)) composite theme tokens are excluded. Their
 //     original values are arrays of per-theme aliases, which is not a DTCG
 //     color value. The @rhds/mcp generator keeps them in a separate computed
@@ -226,9 +232,19 @@ func TestRHDSFixture_AliasesSurviveAndResolve(t *testing.T) {
 		}
 	}
 
-	// Composite values survive as composite values. DTCG does not allow
-	// resolving nested aliases inside a shadow, so they remain references.
+	// Composite values survive as composite values. DTCG composite types do
+	// allow sub-value references, and tools must resolve them when they need
+	// the value. asimonim does not resolve sub-values inside composites; that
+	// is an asimonim limitation, not a DTCG rule. The reference therefore
+	// survives in both RawValue and ResolvedValue.
 	shadow := testutil.TokenByPath(t, tokens, "box-shadow.md")
+	rawShadow, ok := shadow.RawValue.(map[string]any)
+	if !ok {
+		t.Fatalf("shadow raw value type = %T, want map", shadow.RawValue)
+	}
+	if rawShadow["offsetY"] != "{length.xs}" {
+		t.Errorf("shadow raw offsetY = %v, want {length.xs}", rawShadow["offsetY"])
+	}
 	shadowMap, ok := shadow.ResolvedValue.(map[string]any)
 	if !ok {
 		t.Fatalf("shadow resolved value type = %T, want map", shadow.ResolvedValue)
@@ -287,8 +303,11 @@ func TestRHDSFixture_MetadataSurvives(t *testing.T) {
 	if !ok {
 		t.Fatalf("media raw value type = %T, want map", media.RawValue)
 	}
+	// mediaQuery is an RHDS vendor type. asimonim does not resolve sub-value
+	// references inside its object value; DTCG does not govern this shape. The
+	// reference is preserved for consumers to resolve.
 	if mediaValue["min-width"] != "{breakpoint.sm}" {
-		t.Errorf("media min-width = %v", mediaValue["min-width"])
+		t.Errorf("media min-width = %v, want {breakpoint.sm}", mediaValue["min-width"])
 	}
 }
 
@@ -315,6 +334,17 @@ func TestRHDSFixture_CanonicalValueForms(t *testing.T) {
 		t.Errorf("line-height raw value = %#v, want float64 1.5", lineHeight.RawValue)
 	}
 
+	weight := testutil.TokenByPath(t, tokens, "font.weight.heading.bold")
+	if got, ok := weight.RawValue.(float64); !ok || got != 700 {
+		t.Errorf("font weight raw value = %#v, want float64 700", weight.RawValue)
+	}
+
+	bezier := testutil.TokenByPath(t, tokens, "animation.timing")
+	wantBezier := []any{0.465, 0.183, 0.153, 0.946}
+	if !reflect.DeepEqual(bezier.RawValue, wantBezier) {
+		t.Errorf("cubic bezier raw value = %#v, want %#v", bezier.RawValue, wantBezier)
+	}
+
 	shadow := testutil.TokenByPath(t, tokens, "box-shadow.md")
 	shadowMap, ok := shadow.RawValue.(map[string]any)
 	if !ok {
@@ -328,6 +358,23 @@ func TestRHDSFixture_CanonicalValueForms(t *testing.T) {
 	}
 	if shadowMap["color"] != "#15151540" {
 		t.Errorf("shadow color = %v, want #15151540", shadowMap["color"])
+	}
+
+	// Canonicalization changed offsetX and color, so the exact original shadow
+	// object is recorded alongside the other canonicalized source values.
+	shadowExt, ok := shadow.Extensions["com.rhds.mcp"].(map[string]any)
+	if !ok {
+		t.Fatalf("shadow missing com.rhds.mcp extension: %v", shadow.Extensions)
+	}
+	wantShadowSource := map[string]any{
+		"offsetX": "0",
+		"offsetY": "{length.xs}",
+		"blur":    "{length.sm}",
+		"spread":  "{length.4xs}",
+		"color":   "rgba(21, 21, 21, 0.25)",
+	}
+	if got := shadowExt["sourceValue"]; !reflect.DeepEqual(got, wantShadowSource) {
+		t.Errorf("shadow sourceValue = %#v, want %#v", got, wantShadowSource)
 	}
 
 	durationForm := regexp.MustCompile(`^\d+(?:\.\d+)?ms$`)
@@ -385,10 +432,15 @@ func TestRHDSFixture_GroupExtensionsAndProvenance(t *testing.T) {
 	if !ok {
 		t.Fatalf("fixture provenance missing com.rhds.mcp: %v", provenance)
 	}
+	const wantIntegrity = "sha512-YyeRPr2ThFGclyky4PCruj9f7e15yP2xnT3ZTJeU64+k5ICb/YezaKjJs8Dc48WHDhINHCgMt+VecfM86GExuQ=="
 	wantProvenance := map[string]any{
 		"sourcePackage":         "@rhds/tokens",
 		"sourceVersion":         "3.2.0",
+		"sourceFile":            "json/rhds.tokens.json",
+		"sourceIntegrity":       wantIntegrity,
+		"publishedTokens":       float64(547),
 		"normalizedSchema":      "draft",
+		"styleDictionaryFields": "dropped",
 		"generatedColorAliases": float64(160),
 		"excludedLightDark":     float64(57),
 		"recoveredTypes":        float64(18),
@@ -398,8 +450,28 @@ func TestRHDSFixture_GroupExtensionsAndProvenance(t *testing.T) {
 			t.Errorf("provenance %s = %v, want %v", key, got, want)
 		}
 	}
-	if integrity, _ := rhds["sourceIntegrity"].(string); !strings.HasPrefix(integrity, "sha512-") {
-		t.Errorf("sourceIntegrity = %q, want sha512- prefix", integrity)
+
+	mapping, ok := rhds["typeMapping"].(map[string]any)
+	if !ok {
+		t.Fatalf("typeMapping = %v, want object", rhds["typeMapping"])
+	}
+	for key, want := range map[string]any{
+		"radius":         "dimension",
+		"letter-spacing": "dimension",
+		"line-height":    "number",
+		"opacity":        "number",
+	} {
+		if got := mapping[key]; got != want {
+			t.Errorf("typeMapping %s = %v, want %v", key, got, want)
+		}
+	}
+
+	vendorTypes, ok := rhds["vendorTypes"].(map[string]any)
+	if !ok {
+		t.Fatalf("vendorTypes = %v, want object", rhds["vendorTypes"])
+	}
+	if got, want := vendorTypes["mediaQuery"], "RHDS vendor type not defined by DTCG"; got != want {
+		t.Errorf("vendorTypes.mediaQuery = %v, want %q", got, want)
 	}
 
 	retained, ok := rhds["retainedGeneratedAliases"].([]any)
@@ -422,33 +494,118 @@ func TestRHDSFixture_GroupExtensionsAndProvenance(t *testing.T) {
 		}
 	}
 
-	groups := map[string]map[string]any{
-		"color":            raw["color"].(map[string]any),
-		"color.red-orange": raw["color"].(map[string]any)["red-orange"].(map[string]any),
-		"border.radius":    raw["border"].(map[string]any)["radius"].(map[string]any),
-		"font.family":      raw["font"].(map[string]any)["family"].(map[string]any),
+	groups := []string{
+		"color",
+		"color.border",
+		"color.red-orange",
+		"color.status",
+		"border.radius",
+		"border.width",
+		"breakpoint",
+		"media",
+		"font",
+		"font.family",
+		"font.size.body-text",
+		"font.weight",
+		"font.weight.heading",
+		"line-height",
 	}
-	for groupPath, group := range groups {
-		ext, ok := group["$extensions"].(map[string]any)
-		if !ok {
-			t.Errorf("group %s has no $extensions", groupPath)
-			continue
-		}
-		if _, ok := ext["com.redhat.ux"]; !ok {
-			t.Errorf("group %s extensions missing com.redhat.ux: %v", groupPath, ext)
+	for _, groupPath := range groups {
+		ux := groupUXExtension(t, raw, groupPath)
+		if len(ux) == 0 {
+			t.Errorf("group %s com.redhat.ux extension is empty", groupPath)
 		}
 	}
 
-	redOrangeExt := raw["color"].(map[string]any)["red-orange"].(map[string]any)["$extensions"].(map[string]any)
+	groupFields := map[string]map[string]any{
+		"color":               {"heading": "Global color"},
+		"color.border":        {"heading": "Color", "order": float64(80)},
+		"color.red-orange":    {"order": float64(301)},
+		"color.status":        {"order": float64(500)},
+		"border.radius":       {"heading": "Radius"},
+		"border.width":        {"heading": "Width"},
+		"breakpoint":          {"heading": "Breakpoints", "descriptionFile": "breakpoints.md"},
+		"media":               {"heading": "Media Queries", "descriptionFile": "media.md"},
+		"font":                {"heading": "Typography"},
+		"font.family":         {"heading": "Font family"},
+		"font.size.body-text": {"heading": "Font size (text)", "example": "Aa"},
+		"font.weight":         {"heading": "Font weights"},
+		"font.weight.heading": {"heading": "Font weights (headings)", "fontFamily": "var(--rh-font-family-heading)"},
+		"line-height":         {"heading": "Line height", "example": "Line<br/>height"},
+	}
+	for groupPath, want := range groupFields {
+		ux := groupUXExtension(t, raw, groupPath)
+		for key, wantValue := range want {
+			if got := ux[key]; got != wantValue {
+				t.Errorf("group %s com.redhat.ux %s = %v, want %v", groupPath, key, got, wantValue)
+			}
+		}
+	}
+
+	groupDescriptions := map[string]string{
+		"color":            "Color helps create consistent experiences",
+		"color.red-orange": "reserved for danger",
+		"font":             "typography page",
+		"font.family":      "Red Hat Fonts",
+	}
+	for groupPath, want := range groupDescriptions {
+		ux := groupUXExtension(t, raw, groupPath)
+		description, ok := ux["description"].(string)
+		if !ok {
+			t.Errorf("group %s com.redhat.ux description = %v, want string", groupPath, ux["description"])
+			continue
+		}
+		if !strings.Contains(description, want) {
+			t.Errorf("group %s description = %q, want substring %q", groupPath, description, want)
+		}
+	}
+
+	redOrangeExt, ok := rawGroup(t, raw, "color.red-orange")["$extensions"].(map[string]any)
+	if !ok {
+		t.Fatal("color.red-orange has no $extensions")
+	}
 	if redOrangeExt["isCrayon"] != true {
 		t.Errorf("color.red-orange isCrayon = %v, want true", redOrangeExt["isCrayon"])
 	}
+}
+
+// rawGroup returns the group at a dot-separated path, failing the test instead
+// of panicking when the fixture has an unexpected shape.
+func rawGroup(t *testing.T, raw map[string]any, path string) map[string]any {
+	t.Helper()
+
+	current := raw
+	for _, part := range strings.Split(path, ".") {
+		next, ok := current[part].(map[string]any)
+		if !ok {
+			t.Fatalf("group %s: %q is not an object", path, part)
+		}
+		current = next
+	}
+	return current
+}
+
+// groupUXExtension returns a group's com.redhat.ux extension, failing the test
+// instead of panicking when it is missing or malformed.
+func groupUXExtension(t *testing.T, raw map[string]any, path string) map[string]any {
+	t.Helper()
+
+	ext, ok := rawGroup(t, raw, path)["$extensions"].(map[string]any)
+	if !ok {
+		t.Fatalf("group %s has no $extensions", path)
+	}
+	ux, ok := ext["com.redhat.ux"].(map[string]any)
+	if !ok {
+		t.Fatalf("group %s extensions missing com.redhat.ux: %v", path, ext)
+	}
+	return ux
 }
 
 func TestRHDSFixture_NoStyleDictionaryFields(t *testing.T) {
 	raw := loadRHDSRaw(t)
 
 	forbidden := map[string]bool{
+		"name":       true,
 		"attributes": true,
 		"filePath":   true,
 		"isSource":   true,
@@ -474,7 +631,11 @@ func TestRHDSFixture_NoStyleDictionaryFields(t *testing.T) {
 	walk(raw, "$")
 }
 
-func TestRHDSFixture_ValidatorAccepts(t *testing.T) {
+// TestRHDSFixture_ConsistencyValidatorAccepts shows that asimonim's
+// consistency validator accepts the fixture. It does not prove the document is
+// DTCG-valid: the fixture contains the RHDS vendor type "mediaQuery", and the
+// validator does not check $type membership against a DTCG type registry.
+func TestRHDSFixture_ConsistencyValidatorAccepts(t *testing.T) {
 	data := testutil.LoadFixtureFile(t, rhdsFixtureFile)
 
 	detected, err := schema.DetectVersion(data, nil)

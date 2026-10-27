@@ -13,8 +13,10 @@ Dictionary output, not canonical DTCG.
   `sha512-YyeRPr2ThFGclyky4PCruj9f7e15yP2xnT3ZTJeU64+k5ICb/YezaKjJs8Dc48WHDhINHCgMt+VecfM86GExuQ==`
 - Normalized schema: draft. The document deliberately omits `$schema`, so
   asimonim auto-detects the version when `parser.Options.SchemaVersion` is the
-  zero value (`schema.Unknown`). Curly-brace aliases and string color values
-  select the draft schema.
+  zero value (`schema.Unknown`). `schema.DetectVersion` returns Draft when no
+  2025.10-only feature (`$ref`, `$extends`, `resolutionOrder`, or structured
+  color objects) is present; it does not positively select Draft from
+  curly-brace aliases or string color values.
 
 The same provenance and counts are stored in the fixture's root
 `$extensions["com.rhds.mcp"]`.
@@ -39,7 +41,9 @@ The same provenance and counts are stored in the fixture's root
   `original`, `path`) are dropped rather than moved under
   `$extensions["com.style-dictionary"]`.
 - Generated `-rgb` and `-hsl` color variants are kept as color tokens. Their
-  original values alias the base color, and they are deprecated in 3.2.0.
+  original values alias the base color. Of the 160 generated variants, 152 are
+  deprecated in 3.2.0; `color.white-{rgb,hsl}`, `color.black-{rgb,hsl}`,
+  `color.canvas.white-{rgb,hsl}`, and `color.canvas.black-{rgb,hsl}` are not.
 
 ### Value canonicalization
 
@@ -54,15 +58,27 @@ untouched. Literal values are canonicalized to the draft DTCG forms:
   `rgba(21, 21, 21, 0.25)` becomes `#15151540`.
 - Shadow offset, blur, and spread sub-values have explicit `px` or `rem`
   units, so a unitless `0` becomes `0px`. Sub-value alias references are
-  preserved.
+  preserved. When canonicalization changes any sub-value, the exact original
+  shadow object is recorded in `$extensions["com.rhds.mcp"].sourceValue`.
 
 These rules are also recorded in the fixture's
 `$extensions["com.rhds.mcp"].valueNormalization`.
 
-This is a subset chosen to cover every `$type` and every structure in the
-normalization contract: aliases, a three-hop alias chain, composite shadow,
-font family array, media query map, cubic bezier array, duration, descriptions,
-deprecations, token extensions, and group extensions.
+This is a subset chosen to cover every `$type` used by RHDS, including the
+vendor `mediaQuery` type, and every structure in the normalization contract:
+aliases, a three-hop alias chain, composite shadow, font family array, media
+query map, cubic bezier array, duration, descriptions, deprecations, token
+extensions, and group extensions.
+
+## Vendor types
+
+`mediaQuery` is an RHDS vendor type. No DTCG version defines it, so this
+fixture is **not** a strictly DTCG-valid document, even though asimonim's
+consistency validator accepts it (that validator does not check `$type`
+membership). Consumers should preserve the `$type` and its object value as
+RHDS data rather than assume DTCG semantics for either. The vendor type is
+recorded in the root
+`$extensions["com.rhds.mcp"].vendorTypes`.
 
 ## Generated tokens
 
