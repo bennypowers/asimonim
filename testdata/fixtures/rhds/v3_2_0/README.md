@@ -41,6 +41,24 @@ The same provenance and counts are stored in the fixture's root
 - Generated `-rgb` and `-hsl` color variants are kept as color tokens. Their
   original values alias the base color, and they are deprecated in 3.2.0.
 
+### Value canonicalization
+
+Alias references are never rewritten, so `original.$value` references survive
+untouched. Literal values are canonicalized to the draft DTCG forms:
+
+- Durations are strings in milliseconds, for example `0.3s` becomes `300ms`.
+- `number` tokens use JSON numbers. Percentage strings become unitless numbers,
+  for example `50%` becomes `0.5`. The original form is recorded in
+  `$extensions["com.rhds.mcp"].sourceValue`.
+- Literal colors are hex triplets or quartets, for example
+  `rgba(21, 21, 21, 0.25)` becomes `#15151540`.
+- Shadow offset, blur, and spread sub-values have explicit `px` or `rem`
+  units, so a unitless `0` becomes `0px`. Sub-value alias references are
+  preserved.
+
+These rules are also recorded in the fixture's
+`$extensions["com.rhds.mcp"].valueNormalization`.
+
 This is a subset chosen to cover every `$type` and every structure in the
 normalization contract: aliases, a three-hop alias chain, composite shadow,
 font family array, media query map, cubic bezier array, duration, descriptions,
@@ -50,9 +68,11 @@ deprecations, token extensions, and group extensions.
 
 The published 3.2.0 document has 547 tokens.
 
-- 160 `-rgb` and `-hsl` tokens are generated and do not exist in the source
-  YAML. They are retained in normalized DTCG as aliases, hence
-  `generatedColorAliases: 160` in the provenance.
+- The published document contains 160 generated `-rgb` and `-hsl` tokens that
+  do not exist in the source YAML. This fixture retains two representative
+  variants, `60-rgb` and `60-hsl`, as aliases. The provenance records the
+  published-source count as `generatedColorAliases: 160` and the retained
+  paths in `retainedGeneratedAliases`.
 - 57 `light-dark(var(...))` composite theme tokens are generated CSS
   expressions, not DTCG color values. Their source form is an array of two
   per-theme aliases. They are excluded from this DTCG fixture, hence

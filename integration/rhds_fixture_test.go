@@ -17,6 +17,9 @@ See the LICENSE file for details.
 //   - $type is recovered from attributes with an explicit mapping
 //   - $description, $deprecated, and $extensions are kept
 //   - Style Dictionary fields are dropped
+//   - literal values are canonicalized to draft DTCG forms (duration in ms,
+//     number percentages as unitless numbers, literal colors as hex, shadow
+//     dimensions with explicit units) while alias references are untouched
 //
 // Generated tokens in the source document:
 //
@@ -35,6 +38,7 @@ package integration_test
 import (
 	"encoding/json"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -232,8 +236,8 @@ func TestRHDSFixture_AliasesSurviveAndResolve(t *testing.T) {
 	if shadowMap["offsetY"] != "{length.xs}" {
 		t.Errorf("shadow offsetY = %v, want {length.xs}", shadowMap["offsetY"])
 	}
-	if shadowMap["color"] != "rgba(21, 21, 21, 0.25)" {
-		t.Errorf("shadow color = %v", shadowMap["color"])
+	if shadowMap["color"] != "#15151540" {
+		t.Errorf("shadow color = %v, want canonical #15151540", shadowMap["color"])
 	}
 }
 
@@ -288,6 +292,88 @@ func TestRHDSFixture_MetadataSurvives(t *testing.T) {
 	}
 }
 
+func TestRHDSFixture_CanonicalValueForms(t *testing.T) {
+	tokens := parseRHDS(t)
+
+	duration := testutil.TokenByPath(t, tokens, "animation.speed")
+	if duration.Value != "300ms" {
+		t.Errorf("duration value = %q, want 300ms", duration.Value)
+	}
+	assertSourceValue(t, duration, "0.3s")
+
+	opacity := testutil.TokenByPath(t, tokens, "opacity.50")
+	if opacity.Value != "0.5" {
+		t.Errorf("opacity value = %q, want 0.5", opacity.Value)
+	}
+	if got, ok := opacity.RawValue.(float64); !ok || got != 0.5 {
+		t.Errorf("opacity raw value = %#v, want float64 0.5", opacity.RawValue)
+	}
+	assertSourceValue(t, opacity, "50%")
+
+	lineHeight := testutil.TokenByPath(t, tokens, "line-height.body-text")
+	if got, ok := lineHeight.RawValue.(float64); !ok || got != 1.5 {
+		t.Errorf("line-height raw value = %#v, want float64 1.5", lineHeight.RawValue)
+	}
+
+	shadow := testutil.TokenByPath(t, tokens, "box-shadow.md")
+	shadowMap, ok := shadow.RawValue.(map[string]any)
+	if !ok {
+		t.Fatalf("shadow raw value type = %T, want map", shadow.RawValue)
+	}
+	if shadowMap["offsetX"] != "0px" {
+		t.Errorf("shadow offsetX = %v, want 0px", shadowMap["offsetX"])
+	}
+	if shadowMap["offsetY"] != "{length.xs}" {
+		t.Errorf("shadow offsetY = %v, alias should be preserved", shadowMap["offsetY"])
+	}
+	if shadowMap["color"] != "#15151540" {
+		t.Errorf("shadow color = %v, want #15151540", shadowMap["color"])
+	}
+
+	durationForm := regexp.MustCompile(`^\d+(?:\.\d+)?ms$`)
+	colorForm := regexp.MustCompile(`^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$`)
+	dimensionForm := regexp.MustCompile(`^-?\d+(?:\.\d+)?(?:px|rem)$`)
+
+	for _, tok := range tokens {
+		switch tok.Type {
+		case token.TypeNumber:
+			if _, ok := tok.RawValue.(float64); !ok {
+				t.Errorf("number token %q has non-numeric value %#v", tok.DotPath(), tok.RawValue)
+			}
+		case token.TypeDuration:
+			if !durationForm.MatchString(tok.Value) {
+				t.Errorf("duration token %q value = %q, want milliseconds", tok.DotPath(), tok.Value)
+			}
+		case token.TypeColor:
+			if strings.HasPrefix(tok.Value, "{") {
+				continue
+			}
+			if !colorForm.MatchString(tok.Value) {
+				t.Errorf("color token %q value = %q, want hex", tok.DotPath(), tok.Value)
+			}
+		case token.TypeDimension:
+			if strings.HasPrefix(tok.Value, "{") {
+				continue
+			}
+			if !dimensionForm.MatchString(tok.Value) {
+				t.Errorf("dimension token %q value = %q, want px or rem", tok.DotPath(), tok.Value)
+			}
+		}
+	}
+}
+
+func assertSourceValue(t *testing.T, tok *token.Token, want string) {
+	t.Helper()
+
+	ext, ok := tok.Extensions["com.rhds.mcp"].(map[string]any)
+	if !ok {
+		t.Fatalf("%s: missing com.rhds.mcp extension: %v", tok.DotPath(), tok.Extensions)
+	}
+	if ext["sourceValue"] != want {
+		t.Errorf("%s: sourceValue = %v, want %s", tok.DotPath(), ext["sourceValue"], want)
+	}
+}
+
 func TestRHDSFixture_GroupExtensionsAndProvenance(t *testing.T) {
 	raw := loadRHDSRaw(t)
 
@@ -314,6 +400,26 @@ func TestRHDSFixture_GroupExtensionsAndProvenance(t *testing.T) {
 	}
 	if integrity, _ := rhds["sourceIntegrity"].(string); !strings.HasPrefix(integrity, "sha512-") {
 		t.Errorf("sourceIntegrity = %q, want sha512- prefix", integrity)
+	}
+
+	retained, ok := rhds["retainedGeneratedAliases"].([]any)
+	if !ok || len(retained) != 2 {
+		t.Fatalf("retainedGeneratedAliases = %v, want two entries", rhds["retainedGeneratedAliases"])
+	}
+	for i, want := range []string{"color.red-orange.60-rgb", "color.red-orange.60-hsl"} {
+		if retained[i] != want {
+			t.Errorf("retainedGeneratedAliases[%d] = %v, want %s", i, retained[i], want)
+		}
+	}
+
+	normalization, ok := rhds["valueNormalization"].(map[string]any)
+	if !ok {
+		t.Fatalf("valueNormalization = %v, want object", rhds["valueNormalization"])
+	}
+	for _, key := range []string{"aliases", "duration", "number", "color", "dimension"} {
+		if _, ok := normalization[key]; !ok {
+			t.Errorf("valueNormalization is missing %q", key)
+		}
 	}
 
 	groups := map[string]map[string]any{
