@@ -15,8 +15,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"bennypowers.dev/asimonim/cmd"
-	"bennypowers.dev/asimonim/internal/version"
 	"bennypowers.dev/asimonim/lsp"
+	"bennypowers.dev/asimonim/version"
 )
 
 // NewCmd creates a fresh lsp command.

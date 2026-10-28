@@ -443,7 +443,7 @@ func TestMergePackageJsonConfig(t *testing.T) {
 			Resolvers:   []string{"existing-resolver.json"},
 		}
 		pkg := &types.ServerConfig{
-			TokensFiles: []any{},   // explicit empty
+			TokensFiles: []any{},    // explicit empty
 			Resolvers:   []string{}, // explicit empty
 		}
 		mergePackageJsonConfig(current, pkg)
@@ -455,7 +455,7 @@ func TestMergePackageJsonConfig(t *testing.T) {
 	t.Run("explicit empty pkg overrides nil current", func(t *testing.T) {
 		current := &types.ServerConfig{}
 		pkg := &types.ServerConfig{
-			TokensFiles: []any{},   // explicit empty
+			TokensFiles: []any{},    // explicit empty
 			Resolvers:   []string{}, // explicit empty
 		}
 		mergePackageJsonConfig(current, pkg)
@@ -824,6 +824,18 @@ func TestLoadTokensFromDocumentContent(t *testing.T) {
 		assert.Equal(t, 1, server.TokenCount())
 	})
 
+	t.Run("loads JSONC content", func(t *testing.T) {
+		server, err := NewServer()
+		require.NoError(t, err)
+		defer func() { _ = server.Close() }()
+
+		content := "// tokens\n{\"color\": {\"primary\": {\"$value\": \"#ff0000\", \"$type\": \"color\"}}}"
+		err = server.LoadTokensFromDocumentContent("file:///tmp/tokens.jsonc", "jsonc", content)
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, server.TokenCount())
+	})
+
 	t.Run("skips unsupported language", func(t *testing.T) {
 		server, err := NewServer()
 		require.NoError(t, err)
@@ -890,6 +902,20 @@ func TestParseAndAddTokens(t *testing.T) {
 		tok := server.Token("color-primary")
 		require.NotNil(t, tok, "token should exist by name")
 		assert.Equal(t, "ds", tok.Prefix, "token should have prefix set")
+	})
+
+	t.Run("normalizes dashed prefix in CSS names and lookups", func(t *testing.T) {
+		server, err := NewServer()
+		require.NoError(t, err)
+		defer func() { _ = server.Close() }()
+
+		count, err := server.parseAndAddTokens(colorPrimaryJSON, "/tmp/tokens.json", "file:///tmp/tokens.json", &TokenFileOptions{Prefix: "--ds"})
+		require.NoError(t, err)
+		assert.Equal(t, 1, count)
+
+		tok := server.Token("--ds-color-primary")
+		require.NotNil(t, tok, "token should be found by normalized CSS variable name")
+		assert.Equal(t, "--ds-color-primary", tok.CSSVariableName())
 	})
 
 	t.Run("returns error for invalid JSON", func(t *testing.T) {
@@ -964,4 +990,28 @@ func TestParseAndAddTokens(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, count)
 	})
+}
+
+func TestLoadTokensFromConfig_DropsStaleFileTracking(t *testing.T) {
+	dir := t.TempDir()
+	fileA := filepath.Join(dir, "a.json")
+	fileB := filepath.Join(dir, "b.json")
+	body := `{"color":{"primary":{"$type":"color","$value":"#ff0000"}}}`
+	require.NoError(t, os.WriteFile(fileA, []byte(body), 0o644))
+	require.NoError(t, os.WriteFile(fileB, []byte(body), 0o644))
+
+	server, err := NewServer()
+	require.NoError(t, err)
+	defer func() { _ = server.Close() }()
+	server.SetRootPath(dir)
+
+	server.SetConfig(types.ServerConfig{TokensFiles: []any{fileA}})
+	require.NoError(t, server.LoadTokensFromConfig())
+	require.True(t, server.IsTokenFile(fileA))
+
+	server.SetConfig(types.ServerConfig{TokensFiles: []any{fileB}})
+	require.NoError(t, server.LoadTokensFromConfig())
+
+	assert.False(t, server.IsTokenFile(fileA), "stale file should no longer be tracked")
+	assert.True(t, server.IsTokenFile(fileB), "current config file should be tracked")
 }

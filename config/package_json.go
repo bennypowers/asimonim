@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 
 	asimfs "bennypowers.dev/asimonim/fs"
-	"github.com/tidwall/jsonc"
+	"bennypowers.dev/asimonim/schema"
 )
 
 // configKeys are the package.json keys to check, in priority order.
@@ -22,7 +22,10 @@ var configKeys = []string{"asimonim", "designTokensLanguageServer", "design-toke
 
 // LoadFromPackageJSON reads design tokens configuration from package.json.
 // Checks "asimonim", "designTokensLanguageServer", and "design-tokens-language-server"
-// keys in priority order. Returns nil if no config found (not an error).
+// keys in priority order. It reads only prefix, cdn, schema, groupMarkers,
+// resolvers, and tokensFiles/files; other Config fields such as header and
+// outputs are ignored when loading from package.json. Returns nil if no
+// config found (not an error).
 func LoadFromPackageJSON(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
 	if rootDir == "" {
 		return nil, nil
@@ -38,7 +41,7 @@ func LoadFromPackageJSON(filesystem asimfs.FileSystem, rootDir string) (*Config,
 		return nil, fmt.Errorf("failed to read package.json: %w", err)
 	}
 
-	data = jsonc.ToJSON(data)
+	data = schema.NormalizeJSON(data)
 
 	var pkgJSON map[string]json.RawMessage
 	if err := json.Unmarshal(data, &pkgJSON); err != nil {

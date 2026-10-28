@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"bennypowers.dev/asimonim/lsp/internal/log"
+	"bennypowers.dev/asimonim/lsp/internal/uriutil"
 	asimonimParser "bennypowers.dev/asimonim/parser"
 	"bennypowers.dev/asimonim/schema"
 	asimonimToken "bennypowers.dev/asimonim/token"
 	"bennypowers.dev/asimonim/validator"
-	"bennypowers.dev/asimonim/lsp/internal/log"
-	"bennypowers.dev/asimonim/lsp/internal/uriutil"
 )
 
 // detectSchemaVersion returns the schema version from the first token that has one set.
@@ -82,7 +82,7 @@ func (s *Server) loadTokenFileInternal(filePath string, opts *TokenFileOptions) 
 	// Validate file extension
 	ext := strings.ToLower(filepath.Ext(filePath))
 	switch ext {
-	case ".json", ".yaml", ".yml":
+	case ".json", ".jsonc", ".yaml", ".yml":
 		// Supported
 	default:
 		return fmt.Errorf("unsupported file type %s: %s", ext, filePath)
@@ -191,7 +191,7 @@ func (s *Server) LoadTokensFromJSON(data []byte, prefix string) error {
 func (s *Server) LoadTokensFromDocumentContent(uri, languageID, content string) error {
 	// Only parse JSON and YAML files
 	switch languageID {
-	case "json", "yaml":
+	case "json", "jsonc", "yaml":
 		// Supported
 	default:
 		// Not a supported token file format

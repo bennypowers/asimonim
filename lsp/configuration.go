@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"bennypowers.dev/asimonim/load"
+	"bennypowers.dev/asimonim/lsp/internal/log"
+	"bennypowers.dev/asimonim/lsp/types"
 	"bennypowers.dev/asimonim/resolver"
 	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/specifier"
-	"bennypowers.dev/asimonim/lsp/internal/log"
-	"bennypowers.dev/asimonim/lsp/types"
 )
 
 // GetConfig returns the current server configuration (user settings only)
@@ -114,8 +114,13 @@ func (s *Server) LoadTokensFromConfig() error {
 	hasResolvers := cfg.Resolvers != nil
 
 	if hasTokensFiles || hasResolvers {
-		// Clear existing tokens before loading configured files
+		// Clear existing tokens before loading configured files. File tracking
+		// must be reset too, or a file from the previous configuration keeps
+		// IsTokenFile true even though its tokens were cleared.
 		s.tokens.Clear()
+		s.loadedFilesMu.Lock()
+		s.loadedFiles = make(map[string]*TokenFileOptions)
+		s.loadedFilesMu.Unlock()
 
 		var errs []error
 

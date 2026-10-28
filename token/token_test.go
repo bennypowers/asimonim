@@ -95,6 +95,159 @@ func TestNewMap(t *testing.T) {
 	})
 }
 
+func TestNewMap_NormalizesPrefixDashes(t *testing.T) {
+	for _, prefix := range []string{"rh", "--rh", "---rh"} {
+		t.Run(prefix, func(t *testing.T) {
+			tokens := []*token.Token{
+				{Name: "color-primary", Value: "#FF0000"},
+			}
+			m := token.NewMap(tokens, prefix)
+
+			tok, ok := m.Get("color.primary")
+			if !ok {
+				t.Fatal("expected to find token by dot-path")
+			}
+			if got := tok.CSSVariableName(); got != "--rh-color-primary" {
+				t.Errorf("CSSVariableName() = %q, want %q", got, "--rh-color-primary")
+			}
+			if _, ok := m.Get("--rh-color-primary"); !ok {
+				t.Error("expected to find token by full CSS name")
+			}
+		})
+	}
+}
+
+func TestNewMap_NormalizesParserProvidedPrefix(t *testing.T) {
+	// The parser stores Options.Prefix on each token before NewMap runs, so
+	// dashes in that prefix must be normalized on the copies as well.
+	tokens := []*token.Token{
+		{Name: "color-primary", Value: "#FF0000", Prefix: "--rh"},
+	}
+	m := token.NewMap(tokens, "--rh")
+
+	tok, ok := m.Get("color-primary")
+	if !ok {
+		t.Fatal("expected to find token by short name")
+	}
+	if tok.Prefix != "rh" {
+		t.Errorf("token.Prefix = %q, want %q", tok.Prefix, "rh")
+	}
+	if got := tok.CSSVariableName(); got != "--rh-color-primary" {
+		t.Errorf("CSSVariableName() = %q, want %q", got, "--rh-color-primary")
+	}
+	if _, ok := m.Get("--rh-color-primary"); !ok {
+		t.Error("expected to find token by full CSS name")
+	}
+	if tokens[0].Prefix != "--rh" {
+		t.Errorf("original token was modified, Prefix = %q", tokens[0].Prefix)
+	}
+}
+
+func TestNewMap_PreservesDifferentTokenPrefix(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "color-primary", Value: "#FF0000", Prefix: "other"},
+	}
+	m := token.NewMap(tokens, "rh")
+
+	tok, ok := m.Get("--other-color-primary")
+	if !ok {
+		t.Fatal("expected to find token by its own prefixed CSS name")
+	}
+	if tok.Prefix != "other" {
+		t.Errorf("token.Prefix = %q, want %q", tok.Prefix, "other")
+	}
+	if got := tok.CSSVariableName(); got != "--other-color-primary" {
+		t.Errorf("CSSVariableName() = %q, want %q", got, "--other-color-primary")
+	}
+}
+
+func TestNewMap_NormalizesDashedDifferentTokenPrefix(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "color-primary", Value: "#FF0000", Prefix: "--other"},
+	}
+	m := token.NewMap(tokens, "rh")
+
+	tok, ok := m.Get("--other-color-primary")
+	if !ok {
+		t.Fatal("expected to find token by its own prefixed CSS name")
+	}
+	if tok.Prefix != "other" {
+		t.Errorf("token.Prefix = %q, want %q (dash spelling normalized, prefix preserved)", tok.Prefix, "other")
+	}
+	if got := tok.CSSVariableName(); got != "--other-color-primary" {
+		t.Errorf("CSSVariableName() = %q, want %q", got, "--other-color-primary")
+	}
+	if tokens[0].Prefix != "--other" {
+		t.Errorf("original token was modified, Prefix = %q", tokens[0].Prefix)
+	}
+}
+
+func TestNewMap_NormalizesAllDashTokenPrefix(t *testing.T) {
+	// A token prefix consisting only of dashes normalizes to the empty
+	// prefix, so the requested prefix must be applied to it.
+	tokens := []*token.Token{
+		{Name: "color-primary", Value: "#FF0000", Prefix: "--"},
+	}
+	m := token.NewMap(tokens, "rh")
+
+	tok, ok := m.Get("color-primary")
+	if !ok {
+		t.Fatal("expected to find token by short name")
+	}
+	if tok.Prefix != "rh" {
+		t.Errorf("token.Prefix = %q, want %q", tok.Prefix, "rh")
+	}
+	if got := tok.CSSVariableName(); got != "--rh-color-primary" {
+		t.Errorf("CSSVariableName() = %q, want %q", got, "--rh-color-primary")
+	}
+	if _, ok := m.Get("--rh-color-primary"); !ok {
+		t.Error("expected to find token by full CSS name")
+	}
+	if tokens[0].Prefix != "--" {
+		t.Errorf("original token was modified, Prefix = %q", tokens[0].Prefix)
+	}
+}
+
+func TestNormalizePrefix(t *testing.T) {
+	for _, tt := range []struct{ in, want string }{
+		{"", ""},
+		{"rh", "rh"},
+		{"--rh", "rh"},
+		{"---rh", "rh"},
+		{"--", ""},
+		{"rh-", "rh"},
+		{"--rh-", "rh"},
+		{"rh.", "rh"},
+		{"rh.theme", "rh-theme"},
+		{"--rh.theme", "rh-theme"},
+		{"--rh.theme--", "rh-theme"},
+	} {
+		if got := token.NormalizePrefix(tt.in); got != tt.want {
+			t.Errorf("NormalizePrefix(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestNewMap_NormalizesDottedPrefix(t *testing.T) {
+	// A dotted prefix must produce the same CSS spelling in map keys and in
+	// lookups.
+	tokens := []*token.Token{
+		{Name: "color-primary", Value: "#FF0000"},
+	}
+	m := token.NewMap(tokens, "--rh.theme")
+
+	tok, ok := m.Get("color.primary")
+	if !ok {
+		t.Fatal("expected to find token by dot-path")
+	}
+	if got := tok.CSSVariableName(); got != "--rh-theme-color-primary" {
+		t.Errorf("CSSVariableName() = %q, want %q", got, "--rh-theme-color-primary")
+	}
+	if _, ok := m.Get("--rh-theme-color-primary"); !ok {
+		t.Error("expected to find token by full CSS name")
+	}
+}
+
 func TestMap_Get(t *testing.T) {
 	tokens := []*token.Token{
 		{Name: "color-primary", Value: "#FF0000"},

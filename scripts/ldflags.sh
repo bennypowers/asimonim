@@ -9,10 +9,10 @@ if [[ $(git status --porcelain 2>/dev/null) ]]; then
     TAG=$(git describe --tags --exact-match 2>/dev/null || echo "unknown")
     BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-    LDFLAGS="-X 'bennypowers.dev/asimonim/internal/version.GitCommit=${COMMIT}'"
-    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/internal/version.GitTag=${TAG}'"
-    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/internal/version.BuildTime=${BUILD_TIME}'"
-    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/internal/version.GitDirty=dirty'"
+    LDFLAGS="-X 'bennypowers.dev/asimonim/version.GitCommit=${COMMIT}'"
+    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/version.GitTag=${TAG}'"
+    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/version.BuildTime=${BUILD_TIME}'"
+    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/version.GitDirty=dirty'"
 else
     # Clean repo - prefer exact tag, fallback to git describe
     VERSION=$(git describe --tags --exact-match 2>/dev/null || git describe --tags --always 2>/dev/null || echo "dev")
@@ -20,11 +20,11 @@ else
     TAG=$(git describe --tags --exact-match 2>/dev/null || echo "unknown")
     BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-    LDFLAGS="-X 'bennypowers.dev/asimonim/internal/version.Version=${VERSION}'"
-    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/internal/version.GitCommit=${COMMIT}'"
-    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/internal/version.GitTag=${TAG}'"
-    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/internal/version.BuildTime=${BUILD_TIME}'"
-    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/internal/version.GitDirty='"
+    LDFLAGS="-X 'bennypowers.dev/asimonim/version.Version=${VERSION}'"
+    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/version.GitCommit=${COMMIT}'"
+    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/version.GitTag=${TAG}'"
+    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/version.BuildTime=${BUILD_TIME}'"
+    LDFLAGS="${LDFLAGS} -X 'bennypowers.dev/asimonim/version.GitDirty='"
 fi
 
 # Strip debug info and symbol table for smaller binaries

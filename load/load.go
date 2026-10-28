@@ -6,7 +6,6 @@ License, or (at your option) any later version.
 See the LICENSE file for details.
 */
 
-// Package load provides a high-level API for loading design tokens.
 package load
 
 import (
@@ -45,6 +44,7 @@ type Options struct {
 	FS fs.FileSystem
 
 	// Prefix is the CSS variable prefix for tokens.
+	// It is stored on each token and used by the returned token.Map.
 	// Takes precedence over config file if set.
 	Prefix string
 
@@ -53,6 +53,8 @@ type Options struct {
 	GroupMarkers []string
 
 	// SchemaVersion overrides auto-detection from file content.
+	// The zero value, schema.Unknown, auto-detects from the config file
+	// and then from the document contents.
 	// Takes precedence over config file if set.
 	SchemaVersion schema.Version
 
@@ -84,7 +86,7 @@ type resolvedContent struct {
 // by looking for the "resolutionOrder" field at the root.
 func isResolverDocument(data []byte) bool {
 	var doc map[string]json.RawMessage
-	if err := json.Unmarshal(data, &doc); err != nil {
+	if err := json.Unmarshal(schema.NormalizeJSON(data), &doc); err != nil {
 		return false
 	}
 	_, hasResolutionOrder := doc["resolutionOrder"]
@@ -102,7 +104,7 @@ func isResolverDocument(data []byte) bool {
 // resolution will fall back to fetching from a CDN (configurable via Options.CDN).
 //
 // The loading process:
-//  1. Optionally loads config from .config/design-tokens.yaml
+//  1. Optionally loads config from .config/design-tokens.{yaml,yml,json}
 //  2. Applies Options values (they take precedence over config)
 //  3. Resolves specifier to file content via filesystem (with optional CDN fallback)
 //  4. Detects schema version (if not specified)

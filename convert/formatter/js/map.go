@@ -71,7 +71,7 @@ func (f *Formatter) formatFull(tokens []*token.Token, opts formatter.Options) ([
 	data := templateData{
 		TokenNames: buildTokenNames(tokens, opts),
 		Entries:    buildEntries(tokens, opts),
-		Prefix:     escapeTS(opts.Prefix),
+		Prefix:     escapeTS(token.NormalizePrefix(opts.Prefix)),
 		Delimiter:  escapeTS(defaultDelimiter(opts.Delimiter)),
 		UseJSDoc:   f.opts.Types == TypesJSDoc,
 		UseCJS:     f.opts.Module == ModuleCJS,
@@ -119,7 +119,7 @@ func (f *Formatter) formatSplitModule(tokens []*token.Token, opts formatter.Opti
 		Entries:        buildEntries(tokens, opts),
 		ClassName:      className,
 		ValueTypeUnion: buildValueTypeUnion(valueTypes),
-		Prefix:         escapeTS(opts.Prefix),
+		Prefix:         escapeTS(token.NormalizePrefix(opts.Prefix)),
 		Delimiter:      escapeTS(defaultDelimiter(opts.Delimiter)),
 		UseJSDoc:       f.opts.Types == TypesJSDoc,
 		UseCJS:         f.opts.Module == ModuleCJS,
@@ -181,8 +181,8 @@ func defaultDelimiter(d string) string {
 // buildCSSVarName constructs a CSS variable name like --rh-color-blue.
 func buildCSSVarName(tok *token.Token, opts formatter.Options) string {
 	name := strings.Join(tok.Path, "-")
-	if opts.Prefix != "" {
-		name = opts.Prefix + "-" + name
+	if prefix := token.NormalizePrefix(opts.Prefix); prefix != "" {
+		name = prefix + "-" + name
 	}
 	return "--" + name
 }

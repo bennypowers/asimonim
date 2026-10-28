@@ -259,6 +259,31 @@ func TestExtractSourcePaths(t *testing.T) {
 		}
 	})
 
+	t.Run("extracts paths from JSONC with BOM and comments", func(t *testing.T) {
+		data := []byte("\xEF\xBB\xBF// resolver\n" + `{
+  "sets": {
+    "base": {
+      "sources": [{"$ref": "./palette.json"}, {"$ref": "./colors.json"}]
+    }
+  },
+  "resolutionOrder": [{"$ref": "#/sets/base"}] /* inline */
+}`)
+
+		paths, err := ExtractSourcePaths(data, "/project")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(paths) != 2 {
+			t.Fatalf("expected 2 paths, got %d", len(paths))
+		}
+		if paths[0] != "/project/palette.json" {
+			t.Errorf("expected /project/palette.json, got %s", paths[0])
+		}
+		if paths[1] != "/project/colors.json" {
+			t.Errorf("expected /project/colors.json, got %s", paths[1])
+		}
+	})
+
 	t.Run("returns error for invalid JSON", func(t *testing.T) {
 		_, err := ExtractSourcePaths([]byte(`{invalid`), "/project")
 		if err == nil {

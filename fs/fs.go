@@ -6,7 +6,6 @@ License, or (at your option) any later version.
 See the LICENSE file for details.
 */
 
-// Package fs provides filesystem abstractions for asimonim.
 package fs
 
 import (

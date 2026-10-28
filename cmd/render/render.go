@@ -21,6 +21,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
+	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/token"
 )
 
@@ -116,7 +117,7 @@ var refPattern = regexp.MustCompile(`\{[^}]+\}`)
 // NameToCSSVar converts a token name to a CSS variable name.
 // e.g., "color-primary" with prefix "rh" → "--rh-color-primary"
 func NameToCSSVar(name, prefix string) string {
-	if prefix != "" {
+	if prefix = token.NormalizePrefix(prefix); prefix != "" {
 		return "--" + prefix + "-" + name
 	}
 	return "--" + name
@@ -326,7 +327,7 @@ func BuildHierarchy(rows []Row) *HierarchyNode {
 // Returns a map keyed by dot-separated path (e.g., "color.brand").
 func ExtractGroupMeta(data []byte) (map[string]GroupMeta, error) {
 	var raw map[string]any
-	if err := json.Unmarshal(data, &raw); err != nil {
+	if err := json.Unmarshal(schema.NormalizeJSON(data), &raw); err != nil {
 		return nil, err
 	}
 

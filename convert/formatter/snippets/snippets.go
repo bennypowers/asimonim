@@ -263,7 +263,7 @@ type tokenIndexEntry struct {
 // buildTokenName creates a CSS custom property name from a token path.
 func buildTokenName(path []string, prefix string) string {
 	name := formatter.ToKebabCase(strings.Join(path, "-"))
-	if prefix != "" {
+	if prefix = token.NormalizePrefix(prefix); prefix != "" {
 		return fmt.Sprintf("%s-%s", prefix, name)
 	}
 	return name

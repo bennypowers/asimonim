@@ -43,9 +43,9 @@ func TestFormat_V2025_10_StructuredColors(t *testing.T) {
 
 	// Swift should convert structured colors to Color() initializers
 	expectations := []string{
-		"Color(.sRGB, red: 1, green: 0.42, blue: 0.21)",                    // srgb-hex: srgb [1, 0.42, 0.21]
-		"Color(.sRGB, red: 0.7, green: 0.15, blue: 180, opacity: 0.8)",     // oklch-alpha: oklch [0.7, 0.15, 180] alpha 0.8
-		"Color(.displayP3, red: 1, green: 0.5, blue: 0.25)",                // display-p3: [1, 0.5, 0.25]
+		"Color(.sRGB, red: 1, green: 0.42, blue: 0.21)",                // srgb-hex: srgb [1, 0.42, 0.21]
+		"Color(.sRGB, red: 0.7, green: 0.15, blue: 180, opacity: 0.8)", // oklch-alpha: oklch [0.7, 0.15, 180] alpha 0.8
+		"Color(.displayP3, red: 1, green: 0.5, blue: 0.25)",            // display-p3: [1, 0.5, 0.25]
 	}
 
 	for _, expected := range expectations {
@@ -396,6 +396,21 @@ func TestFormat_StringColorValue(t *testing.T) {
 	// "not-a-color" → quoted string fallback
 	if !strings.Contains(output, `"not-a-color"`) {
 		t.Errorf("expected quoted fallback for unparseable color, got:\n%s", output)
+	}
+}
+
+func TestFormat_PunctuationOnlyPrefixUsesDefaultEnum(t *testing.T) {
+	tokens := []*token.Token{
+		{Name: "color-primary", Type: "color", Value: "#FF0000"},
+	}
+
+	f := swift.New()
+	result, err := f.Format(tokens, formatter.Options{Prefix: "--"})
+	if err != nil {
+		t.Fatalf("Format() error = %v", err)
+	}
+	if !strings.Contains(string(result), "public enum DesignTokens") {
+		t.Errorf("expected default enum name for punctuation-only prefix, got:\n%s", result)
 	}
 }
 

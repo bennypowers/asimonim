@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"bennypowers.dev/asimonim/schema"
 )
 
 // normalizePath resolves a token file path based on its prefix and workspace root.
@@ -308,7 +310,7 @@ func readPackageJSON(packageDir string) (*PackageJSON, error) {
 	}
 
 	var pkg PackageJSON
-	if err := json.Unmarshal(data, &pkg); err != nil {
+	if err := json.Unmarshal(schema.NormalizeJSON(data), &pkg); err != nil {
 		return nil, fmt.Errorf("failed to parse package.json: %w", err)
 	}
 

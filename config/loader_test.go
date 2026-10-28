@@ -17,6 +17,22 @@ import (
 	"bennypowers.dev/asimonim/testutil"
 )
 
+func TestLoad_JSONWithBOMAndComments(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/.config/design-tokens.json", "\xEF\xBB\xBF// workspace config\n{\"prefix\": \"rh\"}", 0644)
+
+	cfg, err := Load(mfs, "/project")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("expected config, got nil")
+	}
+	if cfg.Prefix != "rh" {
+		t.Errorf("expected prefix 'rh', got %q", cfg.Prefix)
+	}
+}
+
 func TestLoad_SimpleYAML(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/config/simple", "/project")
 

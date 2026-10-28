@@ -16,6 +16,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestLoadFromPackageJSON_JSONCComments(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "trailing comment after nested object",
+			body: `{
+	"name": "my-project",
+	"asimonim": { "prefix": "rh" }, // design tokens prefix
+}`,
+		},
+		{
+			name: "comment before closing brace",
+			body: `{
+	"name": "my-project",
+	"asimonim": { "prefix": "rh" }
+	// trailing note
+}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mfs := mapfs.New()
+			mfs.AddFile("/project/package.json", tt.body, 0644)
+
+			cfg, err := LoadFromPackageJSON(mfs, "/project")
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
+			assert.Equal(t, "rh", cfg.Prefix)
+		})
+	}
+}
+
+func TestLoadFromPackageJSON_JSONCTrailingComma(t *testing.T) {
+	mfs := mapfs.New()
+	mfs.AddFile("/project/package.json", `{"name":"my-project","asimonim":{"prefix":"rh",},}`, 0644)
+
+	cfg, err := LoadFromPackageJSON(mfs, "/project")
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	assert.Equal(t, "rh", cfg.Prefix)
+}
+
 func TestLoadFromPackageJSON_AsimonimKey(t *testing.T) {
 	mfs := mapfs.New()
 	mfs.AddFile("/project/package.json", `{

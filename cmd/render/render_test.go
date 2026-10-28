@@ -165,10 +165,10 @@ func TestGenerateTOC(t *testing.T) {
 
 func TestFormatTokenName(t *testing.T) {
 	tests := []struct {
-		name       string
-		row        Row
-		showLinks  bool
-		expected   string
+		name      string
+		row       Row
+		showLinks bool
+		expected  string
 	}{
 		{
 			name:      "plain name",
@@ -384,6 +384,8 @@ func TestNameToCSSVar(t *testing.T) {
 	}{
 		{"color-primary", "", "--color-primary"},
 		{"color-primary", "rh", "--rh-color-primary"},
+		{"color-primary", "--rh", "--rh-color-primary"},
+		{"color-primary", "---rh", "--rh-color-primary"},
 		{"a", "x", "--x-a"},
 	}
 

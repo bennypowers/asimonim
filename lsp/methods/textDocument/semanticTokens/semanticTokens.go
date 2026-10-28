@@ -10,7 +10,6 @@ import (
 	"go.lsp.dev/protocol"
 )
 
-
 // SemanticTokenIntermediate represents an intermediate token before delta encoding
 type SemanticTokenIntermediate struct {
 	Line           int
@@ -32,9 +31,9 @@ func SemanticTokensFull(req *types.RequestContext, params *protocol.SemanticToke
 		return nil, fmt.Errorf("document not found: %s", uri)
 	}
 
-	// Only provide semantic tokens for JSON and YAML token files
+	// Only provide semantic tokens for JSON, JSONC, and YAML token files
 	languageID := doc.LanguageID()
-	if languageID != "json" && languageID != "yaml" {
+	if languageID != "json" && languageID != "jsonc" && languageID != "yaml" {
 		return nil, nil
 	}
 
@@ -190,9 +189,9 @@ func SemanticTokensFullDelta(req *types.RequestContext, params *protocol.Semanti
 		return nil, fmt.Errorf("document not found: %s", uri)
 	}
 
-	// Only provide semantic tokens for JSON and YAML token files
+	// Only provide semantic tokens for JSON, JSONC, and YAML token files
 	languageID := doc.LanguageID()
-	if languageID != "json" && languageID != "yaml" {
+	if languageID != "json" && languageID != "jsonc" && languageID != "yaml" {
 		return nil, nil
 	}
 

@@ -4,6 +4,8 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"bennypowers.dev/asimonim/internal/jsonc"
 )
 
 // dtcgSchemaURLPrefix is the required prefix for Design Tokens schema URLs
@@ -16,7 +18,7 @@ const dtcgSchemaURLPrefix = "https://www.designtokens.org/schemas/"
 func IsDesignTokensSchema(content string) bool {
 	// Parse content as YAML (works for both YAML and JSON)
 	var doc map[string]any
-	if err := yaml.Unmarshal([]byte(content), &doc); err != nil {
+	if err := yaml.Unmarshal(jsonc.NormalizeContent([]byte(content)), &doc); err != nil {
 		return false
 	}
 
@@ -51,7 +53,7 @@ func IsDesignTokensSchema(content string) bool {
 func LooksLikeDTCGContent(content string) bool {
 	// Parse content as YAML (works for both YAML and JSON)
 	var doc map[string]any
-	if err := yaml.Unmarshal([]byte(content), &doc); err != nil {
+	if err := yaml.Unmarshal(jsonc.NormalizeContent([]byte(content)), &doc); err != nil {
 		return false
 	}
 

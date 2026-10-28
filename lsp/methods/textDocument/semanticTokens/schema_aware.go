@@ -3,11 +3,12 @@ package semantictokens
 import (
 	"strings"
 
+	"bennypowers.dev/asimonim/internal/jsonc"
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/internal/parser/common"
 	"bennypowers.dev/asimonim/lsp/internal/position"
-	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/lsp/types"
+	"bennypowers.dev/asimonim/schema"
 )
 
 // Token type constants matching LSP SemanticTokensLegend indices
@@ -114,6 +115,11 @@ func extractRootKeywordTokens(line string, lineNum int) []SemanticTokenIntermedi
 // GetSemanticTokensForDocumentSchemaAware extracts semantic tokens with schema awareness
 func GetSemanticTokensForDocumentSchemaAware(ctx types.ServerContext, doc *documents.Document) []SemanticTokenIntermediate {
 	content := doc.Content()
+	if doc.LanguageID() == "jsonc" {
+		// Mask comment text so references inside comments are not
+		// highlighted. The mask preserves line breaks and UTF-16 columns.
+		content = string(jsonc.MaskJSONCComments([]byte(content)))
+	}
 	tokens := []SemanticTokenIntermediate{}
 
 	// Detect schema version

@@ -76,6 +76,18 @@ func TestLooksLikeDTCGContent(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "JSONC token with leading comment",
+			content: `// workspace tokens
+{
+  "color": {
+    "primary": {
+      "$value": "#ff0000"
+    }
+  }
+}`,
+			expected: true,
+		},
+		{
 			name: "token with $type",
 			content: `{
   "color": {
@@ -117,8 +129,8 @@ func TestLooksLikeDTCGContent(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "empty object",
-			content: `{}`,
+			name:     "empty object",
+			content:  `{}`,
 			expected: false,
 		},
 		{
@@ -208,10 +220,20 @@ func TestIsDesignTokensSchema_EdgeCases(t *testing.T) {
 			expected: false, // only top-level schemas should match
 		},
 		{
-			name:     "schema with subdirectory",
-			content:  `{
+			name: "schema with subdirectory",
+			content: `{
   "$schema": "https://www.designtokens.org/schemas/dtcg/2025.10.json"
 }`,
+			expected: true,
+		},
+		{
+			name:     "JSONC with leading comment",
+			content:  "// workspace tokens\n{\"$schema\": \"https://www.designtokens.org/schemas/draft.json\"}",
+			expected: true,
+		},
+		{
+			name:     "JSONC with UTF-8 BOM and comment",
+			content:  "\xEF\xBB\xBF// workspace tokens\n{\"$schema\": \"https://www.designtokens.org/schemas/draft.json\"}",
 			expected: true,
 		},
 		{

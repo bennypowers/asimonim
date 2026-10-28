@@ -9,15 +9,16 @@ import (
 
 	"bennypowers.dev/asimonim/config"
 	"bennypowers.dev/asimonim/load"
-	"bennypowers.dev/asimonim/specifier"
 	"bennypowers.dev/asimonim/lsp/internal/log"
+	"bennypowers.dev/asimonim/schema"
+	"bennypowers.dev/asimonim/specifier"
 )
 
 // isResolverDocument checks if JSON data represents a resolver document
 // by looking for the "resolutionOrder" field at the root.
 func isResolverDocument(data []byte) bool {
 	var doc map[string]json.RawMessage
-	if err := json.Unmarshal(data, &doc); err != nil {
+	if err := json.Unmarshal(schema.NormalizeJSON(data), &doc); err != nil {
 		return false
 	}
 	_, hasResolutionOrder := doc["resolutionOrder"]

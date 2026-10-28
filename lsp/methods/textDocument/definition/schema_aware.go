@@ -1,14 +1,12 @@
 package definition
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 
+	"bennypowers.dev/asimonim/internal/jsonc"
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/internal/parser/common"
 	posutil "bennypowers.dev/asimonim/lsp/internal/position"
-	"bennypowers.dev/asimonim/lsp/internal/uriutil"
 	"bennypowers.dev/asimonim/lsp/types"
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
@@ -104,40 +102,18 @@ func findJSONPointerReferenceAtPosition(line string, pos protocol.Position) stri
 	return ""
 }
 
-// getLineText retrieves the text of a specific line from a URI.
-// First checks the document manager (for open files), then falls back to reading from disk.
-func getLineText(req *types.RequestContext, uri string, lineNum uint32) (string, error) {
-	// Try to get from document manager first (for open files)
-	if doc := req.Server.DocumentManager().Get(uri); doc != nil {
-		content := normalizeLineEndings(doc.Content())
-		lines := strings.Split(content, "\n")
-		if int(lineNum) < len(lines) {
-			return lines[lineNum], nil
-		}
-		return "", nil
-	}
-
-	// Fall back to reading from disk
-	// Note: filepath.Clean normalizes . and .. segments which URIToPath doesn't guarantee
-	filePath := filepath.Clean(uriutil.URIToPath(uri))
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", err
-	}
-
-	content := normalizeLineEndings(string(data))
-	lines := strings.Split(content, "\n")
-	if int(lineNum) < len(lines) {
-		return lines[lineNum], nil
-	}
-
-	return "", nil
-}
-
 // DefinitionForTokenFile handles go-to-definition for references within token files
 func DefinitionForTokenFile(req *types.RequestContext, doc *documents.Document, position protocol.Position) (protocol.DefinitionResult, error) {
-	// Find reference at the cursor position
-	tokenName := findReferenceAtPosition(doc.Content(), position)
+	// Find reference at the cursor position. For JSONC, replace comment bytes
+	// with spaces (preserving offsets) so references inside comments do not
+	// resolve.
+	content := doc.Content()
+	if doc.LanguageID() == "jsonc" {
+		// Mask comment text (preserving line breaks and UTF-16 columns) so
+		// references inside comments do not resolve.
+		content = string(jsonc.MaskJSONCComments([]byte(content)))
+	}
+	tokenName := findReferenceAtPosition(content, position)
 	if tokenName == "" {
 		return nil, nil
 	}
@@ -150,25 +126,8 @@ func DefinitionForTokenFile(req *types.RequestContext, doc *documents.Document, 
 
 	// Return the definition location
 	if token.DefinitionURI != "" && len(token.Path) > 0 {
-		// Get the line text where the token is defined
-		// token.Character is a byte offset, so we need to convert to UTF-16
-		lineText, err := getLineText(req, token.DefinitionURI, token.Line)
-		if err != nil || lineText == "" {
-			// If we can't get the line text, fall back to zero-width range
-			location := protocol.Location{
-				URI: uri.URI(token.DefinitionURI),
-				Range: protocol.Range{
-					Start: protocol.Position{Line: token.Line, Character: 0},
-					End:   protocol.Position{Line: token.Line, Character: 0},
-				},
-			}
-			return protocol.LocationSlice([]protocol.Location{location}), nil
-		}
-
-		// Convert byte offset to UTF-16 position
-		startCharUTF16 := posutil.ByteOffsetToUTF16Uint32(lineText, int(token.Character))
-
-		// Calculate end position: start + token name length in UTF-16
+		// token.Character is a 0-based UTF-16 offset, the same unit LSP uses.
+		startCharUTF16 := token.Character
 		tokenNameLenUTF16 := posutil.StringLengthUTF16Uint32(token.Name)
 		endCharUTF16 := startCharUTF16 + tokenNameLenUTF16
 

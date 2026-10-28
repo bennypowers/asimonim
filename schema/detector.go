@@ -11,8 +11,18 @@ package schema
 import (
 	"fmt"
 
+	"bennypowers.dev/asimonim/internal/jsonc"
 	"gopkg.in/yaml.v3"
 )
+
+// NormalizeJSON strips a UTF-8 BOM and JSONC comments and trailing commas
+// from JSON content. Callers that decode the result with encoding/json should
+// use it; content that does not become valid JSON is returned unchanged.
+// Callers that decode with a YAML decoder must not use it: YAML-aware
+// normalization is internal and not part of this package's API.
+func NormalizeJSON(content []byte) []byte {
+	return jsonc.NormalizeJSON(content)
+}
 
 // DetectionConfig provides configuration for schema version detection.
 type DetectionConfig struct {
@@ -27,6 +37,8 @@ type DetectionConfig struct {
 // 3. Duck typing (detect reserved fields/structured formats)
 // 4. Default to draft (backward compatibility)
 func DetectVersion(content []byte, config *DetectionConfig) (Version, error) {
+	content = jsonc.NormalizeContent(content)
+
 	var data map[string]any
 	if err := yaml.Unmarshal(content, &data); err != nil {
 		return Unknown, fmt.Errorf("invalid YAML/JSON: %w", err)

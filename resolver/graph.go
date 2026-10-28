@@ -6,7 +6,6 @@ License, or (at your option) any later version.
 See the LICENSE file for details.
 */
 
-// Package resolver provides token reference resolution.
 package resolver
 
 import (
@@ -26,7 +25,15 @@ type DependencyGraph struct {
 }
 
 // BuildDependencyGraph builds a dependency graph from a list of tokens.
+// Tokens without their own SchemaVersion are treated as non-draft; use
+// ResolveAliases to apply a fallback schema version.
 func BuildDependencyGraph(tokens []*token.Token) *DependencyGraph {
+	return buildDependencyGraph(tokens, schema.Unknown)
+}
+
+// buildDependencyGraph builds a dependency graph, using fallback for tokens
+// that do not carry their own schema version.
+func buildDependencyGraph(tokens []*token.Token, fallback schema.Version) *DependencyGraph {
 	graph := &DependencyGraph{
 		dependencies: make(map[string][]string),
 		dependents:   make(map[string][]string),
@@ -38,7 +45,7 @@ func BuildDependencyGraph(tokens []*token.Token) *DependencyGraph {
 	}
 
 	for _, tok := range tokens {
-		deps := extractDependencies(tok)
+		deps := extractDependencies(tok, fallback)
 		if len(deps) > 0 {
 			graph.dependencies[tok.Name] = deps
 			for _, dep := range deps {
@@ -51,7 +58,7 @@ func BuildDependencyGraph(tokens []*token.Token) *DependencyGraph {
 }
 
 // extractDependencies extracts token names that this token depends on.
-func extractDependencies(tok *token.Token) []string {
+func extractDependencies(tok *token.Token, fallback schema.Version) []string {
 	deps := []string{}
 
 	// Check for curly brace references in Value
@@ -64,13 +71,22 @@ func extractDependencies(tok *token.Token) []string {
 	}
 
 	// Check for JSON Pointer references ($ref field)
-	if tok.SchemaVersion != schema.Draft && strings.HasPrefix(tok.Value, "#/") {
+	if effectiveVersion(tok, fallback) != schema.Draft && strings.HasPrefix(tok.Value, "#/") {
 		path := strings.TrimPrefix(tok.Value, "#/")
 		tokenName := strings.ReplaceAll(path, "/", "-")
 		deps = append(deps, tokenName)
 	}
 
 	return deps
+}
+
+// effectiveVersion returns the token's own schema version, falling back to
+// the caller-provided version when the token has none.
+func effectiveVersion(tok *token.Token, fallback schema.Version) schema.Version {
+	if tok.SchemaVersion != schema.Unknown {
+		return tok.SchemaVersion
+	}
+	return fallback
 }
 
 // extractCurlyBraceRefs extracts token paths from curly brace references.

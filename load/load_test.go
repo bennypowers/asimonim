@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"bennypowers.dev/asimonim/config"
@@ -88,6 +89,81 @@ func TestLoad_WithPrefix(t *testing.T) {
 	}
 	if tok2.Value != "#FF6B35" {
 		t.Errorf("tok2.Value = %q, want %q", tok2.Value, "#FF6B35")
+	}
+}
+
+func TestLoad_JSONC2025(t *testing.T) {
+	// JSONC comments and BOM must work through the whole Load pipeline,
+	// including schema detection and $extends resolution.
+	tokenMap, err := load.Load(t.Context(), "jsonc-2025.jsonc", load.Options{
+		Root: testdataDir(),
+	})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if _, ok := tokenMap.Get("theme-red"); !ok {
+		t.Error("expected inherited token theme-red")
+	}
+	if _, ok := tokenMap.Get("theme-blue"); !ok {
+		t.Error("expected token theme-blue")
+	}
+}
+
+func TestLoadAll_JSONC(t *testing.T) {
+	// LoadAll detects the schema itself, before parsing. JSONC comments and a
+	// BOM must not break detection.
+	result, err := load.LoadAll(t.Context(), &config.Config{}, []string{"jsonc-2025.jsonc"}, load.Options{
+		Root: testdataDir(),
+	})
+	if err != nil {
+		t.Fatalf("LoadAll() error = %v", err)
+	}
+	if result.Version != schema.V2025_10 {
+		t.Errorf("result.Version = %v, want %v", result.Version, schema.V2025_10)
+	}
+
+	names := make(map[string]bool, len(result.All))
+	for _, tok := range result.All {
+		names[tok.Name] = true
+	}
+	if !names["base-color-red"] {
+		t.Error("expected token base-color-red")
+	}
+	if !names["theme-blue"] {
+		t.Error("expected token theme-blue")
+	}
+}
+
+func TestLoad_WithDashedPrefixNormalizesKeys(t *testing.T) {
+	// load.Load passes the prefix to the parser, which stores it on every
+	// token before NewMap builds the lookup keys. A prefix with leading
+	// dashes must still produce normalized --rh-* names and keys.
+	for _, prefix := range []string{"rh", "--rh", "---rh"} {
+		t.Run(prefix, func(t *testing.T) {
+			root := testdataDir()
+			tokenMap, err := load.Load(t.Context(), "simple.json", load.Options{
+				Root:   root,
+				Prefix: prefix,
+			})
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+
+			tok, ok := tokenMap.Get("color-primary")
+			if !ok {
+				t.Fatal("expected to find token by short name")
+			}
+			if tok.Prefix != "rh" {
+				t.Errorf("tok.Prefix = %q, want %q", tok.Prefix, "rh")
+			}
+			if got := tok.CSSVariableName(); got != "--rh-color-primary" {
+				t.Errorf("CSSVariableName() = %q, want %q", got, "--rh-color-primary")
+			}
+			if _, ok := tokenMap.Get("--rh-color-primary"); !ok {
+				t.Error("expected to find token by full CSS name")
+			}
+		})
 	}
 }
 
@@ -279,6 +355,38 @@ func TestLoadAll_MultipleFiles(t *testing.T) {
 	}
 }
 
+func TestLoadAll_WithDashedPrefixNormalizesCSSNames(t *testing.T) {
+	// LoadAll passes the prefix straight to the parser and does not build a
+	// token.Map, so CSS names must be normalized by the token itself.
+	for _, prefix := range []string{"rh", "--rh", "---rh"} {
+		t.Run(prefix, func(t *testing.T) {
+			cfg := &config.Config{}
+			result, err := load.LoadAll(t.Context(), cfg, []string{"simple.json"}, load.Options{
+				Root:   testdataDir(),
+				Prefix: prefix,
+			})
+			if err != nil {
+				t.Fatalf("LoadAll() error = %v", err)
+			}
+
+			found := false
+			for _, tok := range result.All {
+				got := tok.CSSVariableName()
+				want := "--rh-" + strings.ReplaceAll(tok.Name, ".", "-")
+				if got != want {
+					t.Errorf("CSSVariableName() = %q, want %q", got, want)
+				}
+				if tok.Name == "color-primary" {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatal("expected color-primary in LoadAll result")
+			}
+		})
+	}
+}
+
 func TestLoadAll_CrossFileAliases(t *testing.T) {
 	root := testdataDir()
 	cfg := &config.Config{}
@@ -306,6 +414,21 @@ func TestLoadAll_NoFiles(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error when no files specified and no config")
+	}
+}
+
+func TestLoad_JSONCResolverDocument(t *testing.T) {
+	// Resolver document detection uses encoding/json directly. JSONC comments
+	// and a BOM must not make it fall through to token parsing and return an
+	// empty map.
+	tokenMap, err := load.Load(t.Context(), "resolver-jsonc.jsonc", load.Options{
+		Root: testdataDir(),
+	})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if tokenMap.Len() != 3 {
+		t.Errorf("expected 3 tokens from JSONC resolver document, got %d", tokenMap.Len())
 	}
 }
 

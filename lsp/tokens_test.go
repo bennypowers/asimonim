@@ -20,6 +20,16 @@ func TestLoadTokenFile_ExtensionHandling(t *testing.T) {
 		shouldError bool
 	}{
 		{
+			name:     "standard .jsonc",
+			filename: "tokens.jsonc",
+			content:  "// tokens\n{\"color\": {\"primary\": {\"$value\": \"#ff0000\", \"$type\": \"color\"}}}",
+		},
+		{
+			name:     "uppercase .JSONC",
+			filename: "tokens.JSONC",
+			content:  "{\"color\": {\"primary\": {\"$value\": \"#ff0000\", \"$type\": \"color\"}}}",
+		},
+		{
 			name:     "standard .json",
 			filename: "tokens.json",
 			content:  `{"color": {"primary": {"$value": "#ff0000", "$type": "color"}}}`,

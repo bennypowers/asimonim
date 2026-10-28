@@ -6,7 +6,6 @@ License, or (at your option) any later version.
 See the LICENSE file for details.
 */
 
-// Package convert provides DTCG token serialization and schema conversion.
 package convert
 
 import (
@@ -24,11 +23,11 @@ import (
 // Options configures token serialization behavior.
 type Options struct {
 	// InputSchema is the schema version of the input tokens.
-	// If Unknown, defaults to Draft.
+	// The zero value, schema.Unknown, defaults to schema.Draft.
 	InputSchema schema.Version
 
 	// OutputSchema is the target schema version for output.
-	// If Unknown, matches InputSchema.
+	// The zero value, schema.Unknown, matches InputSchema.
 	OutputSchema schema.Version
 
 	// Flatten produces a shallow structure with delimiter-separated keys
@@ -42,6 +41,8 @@ type Options struct {
 	Format Format
 
 	// Prefix is added to output variable names.
+	// For example, a prefix of "rh" produces --rh-color-primary.
+	// It does not modify token paths.
 	Prefix string
 
 	// Header is the content to prepend to the output.

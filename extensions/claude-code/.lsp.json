@@ -38,7 +38,8 @@
     "command": "asimonim",
     "args": ["lsp"],
     "extensionToLanguage": {
-      ".json": "json"
+      ".json": "json",
+      ".jsonc": "jsonc"
     }
   },
   "yaml": {

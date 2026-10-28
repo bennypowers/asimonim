@@ -15,7 +15,7 @@ import (
 
 	"bennypowers.dev/asimonim/config"
 	"bennypowers.dev/asimonim/fs"
-	"bennypowers.dev/asimonim/internal/version"
+	"bennypowers.dev/asimonim/version"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

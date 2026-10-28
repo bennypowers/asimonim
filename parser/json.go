@@ -9,6 +9,7 @@ See the LICENSE file for details.
 package parser
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -17,14 +18,20 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 
 	"bennypowers.dev/asimonim/fs"
+	internaljsonc "bennypowers.dev/asimonim/internal/jsonc"
 	"bennypowers.dev/asimonim/parser/common"
 	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/token"
 	"github.com/tidwall/jsonc"
 	"gopkg.in/yaml.v3"
 )
+
+// utf8BOM is the UTF-8 byte order mark.
+var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
 
 // JSONParser parses DTCG-compliant JSON token files.
 type JSONParser struct{}
@@ -38,20 +45,31 @@ func NewJSONParser() *JSONParser {
 func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 	var raw map[string]any
 	var positionData []byte
-
 	// Detect format: JSON typically starts with '{' or whitespace then '{'
 	// YAML uses indentation-based structure
-	if isLikelyJSON(data) {
-		// JSON path: strip comments and parse
-		cleanJSON := jsonc.ToJSON(data)
-		if err := json.Unmarshal(cleanJSON, &raw); err != nil {
+	looksJSON, skippedBlockComment := isLikelyJSON(data)
+	parsedJSON := false
+	var jsonErr error
+	if looksJSON {
+		// JSON path: strip a UTF-8 BOM, then strip comments and parse.
+		jsonData := bytes.TrimPrefix(data, utf8BOM)
+		cleanJSON := jsonc.ToJSON(jsonData)
+		if err := json.Unmarshal(cleanJSON, &raw); err == nil {
+			positionData = internaljsonc.MaskJSONCComments(jsonData)
+			parsedJSON = true
+		} else if !skippedBlockComment {
 			return nil, fmt.Errorf("failed to parse JSON: %w", err)
+		} else {
+			jsonErr = err
 		}
-		positionData = cleanJSON
-	} else {
+	}
+	if !parsedJSON {
 		// YAML path: parse directly with yaml.v3
 		var yamlRaw any
 		if err := yaml.Unmarshal(data, &yamlRaw); err != nil {
+			if jsonErr != nil {
+				return nil, fmt.Errorf("failed to parse JSON: %w (YAML fallback also failed: %v)", jsonErr, err)
+			}
 			return nil, fmt.Errorf("failed to parse YAML: %w", err)
 		}
 		// Normalize map types (YAML numeric keys create map[any]any)
@@ -59,14 +77,17 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 		var ok bool
 		raw, ok = normalized.(map[string]any)
 		if !ok {
+			if jsonErr != nil {
+				return nil, fmt.Errorf("failed to parse JSON: %w (YAML fallback did not produce an object)", jsonErr)
+			}
 			return nil, fmt.Errorf("YAML root must be an object")
 		}
-		positionData = data
+		positionData = bytes.TrimPrefix(data, utf8BOM)
 	}
 
 	// Auto-detect schema version if not explicitly set
 	if opts.SchemaVersion == schema.Unknown {
-		if detected, err := schema.DetectVersion(data, nil); err == nil {
+		if detected, err := schema.DetectVersion(positionData, nil); err == nil {
 			opts.SchemaVersion = detected
 		} else {
 			opts.SchemaVersion = schema.Draft
@@ -88,21 +109,52 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 }
 
 // isLikelyJSON checks if data appears to be JSON rather than YAML.
-// JSON typically starts with '{' (optionally preceded by whitespace/BOM).
-func isLikelyJSON(data []byte) bool {
-	for _, b := range data {
-		switch b {
+// JSON typically starts with '{', optionally preceded by whitespace, a BOM,
+// or JSONC comments. Leading comments are skipped so a document that begins
+// with // or /* is still recognized as JSONC. The second return value reports
+// whether a block comment was skipped, which lets Parse fall back to YAML when
+// a commented document is valid YAML but not valid JSON.
+func isLikelyJSON(data []byte) (likely bool, skippedBlockComment bool) {
+	for i := 0; i < len(data); {
+		switch data[i] {
 		case ' ', '\t', '\n', '\r':
+			i++
 			continue
 		case 0xEF, 0xBB, 0xBF: // UTF-8 BOM
+			i++
 			continue
 		case '{':
-			return true
+			return true, skippedBlockComment
+		case '/':
+			if i+1 >= len(data) {
+				return false, skippedBlockComment
+			}
+			switch data[i+1] {
+			case '/':
+				// Line comment: skip to the end of the line.
+				i += 2
+				for i < len(data) && data[i] != '\n' {
+					i++
+				}
+			case '*':
+				// Block comment: skip through the closing */.
+				skippedBlockComment = true
+				i += 2
+				for i+1 < len(data) && (data[i] != '*' || data[i+1] != '/') {
+					i++
+				}
+				if i+1 >= len(data) {
+					return false, skippedBlockComment
+				}
+				i += 2
+			default:
+				return false, skippedBlockComment
+			}
 		default:
-			return false
+			return false, skippedBlockComment
 		}
 	}
-	return false
+	return false, skippedBlockComment
 }
 
 // normalizeMap recursively converts map[interface{}]interface{} to map[string]any.
@@ -269,7 +321,7 @@ func (p *JSONParser) createToken(key, path string, valueMap map[string]any, json
 	t := &token.Token{
 		Name:          name,
 		Value:         value,
-		Prefix:        opts.Prefix,
+		Prefix:        token.NormalizePrefix(opts.Prefix),
 		Path:          jsonPath,
 		Reference:     reference,
 		Line:          0, // Filled in by addPositions if needed
@@ -344,16 +396,83 @@ func (p *JSONParser) addPositions(data []byte, tokens []*token.Token) error {
 		return fmt.Errorf("failed to parse JSON for positions: %w", err)
 	}
 
+	// Build line starts once so each token scans only its own line.
+	lineStarts := lineStartOffsets(data)
+
 	// Walk the AST and update token positions
 	if len(root.Content) > 0 {
-		p.walkForPositions(root.Content[0], []string{}, tokenByPath)
+		p.walkForPositions(data, lineStarts, root.Content[0], []string{}, tokenByPath)
 	}
 
 	return nil
 }
 
+// lineStartOffsets returns the byte offset of each line start. Line breaks
+// are CRLF, CR, or LF, matching yaml.v3.
+func lineStartOffsets(data []byte) []int {
+	starts := []int{0}
+	for i := 0; i < len(data); {
+		switch data[i] {
+		case '\r':
+			if i+1 < len(data) && data[i+1] == '\n' {
+				i += 2
+			} else {
+				i++
+			}
+			starts = append(starts, i)
+		case '\n':
+			i++
+			starts = append(starts, i)
+		default:
+			i++
+		}
+	}
+	return starts
+}
+
+// utf16Column converts a 1-based YAML rune column within a line to a 0-based
+// UTF-16 offset, which is what LSP positions use.
+func utf16Column(line []byte, column int) uint32 {
+	if column < 1 {
+		return 0
+	}
+	remaining := column - 1
+	col := 0
+	for b := 0; b < len(line) && remaining > 0; {
+		r, size := utf8.DecodeRune(line[b:])
+		width := utf16.RuneLen(r)
+		if width < 1 {
+			width = 1
+		}
+		col += width
+		b += size
+		remaining--
+	}
+	if col > math.MaxUint32 {
+		return math.MaxUint32
+	}
+	return uint32(col)
+}
+
+// utf16ColumnAt converts a 1-based YAML rune column on the given line to a
+// 0-based UTF-16 offset. Out-of-range lines return 0.
+func utf16ColumnAt(data []byte, lineStarts []int, line, column int) uint32 {
+	if line < 1 || line > len(lineStarts) {
+		return 0
+	}
+	start := lineStarts[line-1]
+	end := len(data)
+	if line < len(lineStarts) {
+		end = lineStarts[line]
+	}
+	for end > start && (data[end-1] == '\n' || data[end-1] == '\r') {
+		end--
+	}
+	return utf16Column(data[start:end], column)
+}
+
 // walkForPositions walks the yaml AST to find token positions.
-func (p *JSONParser) walkForPositions(node *yaml.Node, jsonPath []string, tokenByPath map[string]*token.Token) {
+func (p *JSONParser) walkForPositions(data []byte, lineStarts []int, node *yaml.Node, jsonPath []string, tokenByPath map[string]*token.Token) {
 	if node.Kind != yaml.MappingNode {
 		return
 	}
@@ -392,15 +511,12 @@ func (p *JSONParser) walkForPositions(node *yaml.Node, jsonPath []string, tokenB
 				}
 			}
 			if keyNode.Column > 0 {
-				colVal := keyNode.Column - 1
-				if colVal >= 0 && colVal <= math.MaxUint32 {
-					t.Character = uint32(colVal)
-				}
+				t.Character = utf16ColumnAt(data, lineStarts, keyNode.Line, keyNode.Column)
 			}
 		}
 
 		// Recurse into children
-		p.walkForPositions(valueNode, currentPath, tokenByPath)
+		p.walkForPositions(data, lineStarts, valueNode, currentPath, tokenByPath)
 	}
 }
 
@@ -423,4 +539,3 @@ func (p *JSONParser) ParseFile(filesystem fs.FileSystem, path string, opts Optio
 
 	return tokens, nil
 }
-

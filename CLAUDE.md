@@ -30,8 +30,8 @@ asimonim/
 ├── fs/                    # FileSystem interface (enables testability)
 ├── internal/
 │   ├── mapfs/             # In-memory filesystem for tests
-│   ├── logger/            # Internal logger
-│   └── version/           # Build version info
+│   └── logger/            # Internal logger
+├── version/               # Public build version info (Get, Full, Info)
 └── testutil/              # Test helpers (NewFixtureFS, golden files)
 ```
 

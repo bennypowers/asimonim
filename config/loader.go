@@ -18,6 +18,8 @@ import (
 	"gopkg.in/yaml.v3"
 
 	asimfs "bennypowers.dev/asimonim/fs"
+	"bennypowers.dev/asimonim/internal/jsonc"
+	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/specifier"
 )
 
@@ -43,15 +45,14 @@ func Load(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
-
 		cfg := &Config{}
 		switch ext {
 		case ".yaml", ".yml":
-			if err := yaml.Unmarshal(data, cfg); err != nil {
+			if err := yaml.Unmarshal(jsonc.NormalizeContent(data), cfg); err != nil {
 				return nil, err
 			}
 		case ".json":
-			if err := json.Unmarshal(data, cfg); err != nil {
+			if err := json.Unmarshal(schema.NormalizeJSON(data), cfg); err != nil {
 				return nil, err
 			}
 		}
@@ -63,6 +64,9 @@ func Load(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
 }
 
 // LoadOrDefault returns config or defaults if not found.
+// It returns Default when configuration is missing or when loading fails,
+// including malformed or unreadable configuration; the error is not
+// returned to the caller.
 func LoadOrDefault(filesystem asimfs.FileSystem, rootDir string) *Config {
 	cfg, err := Load(filesystem, rootDir)
 	if err != nil || cfg == nil {
@@ -72,7 +76,11 @@ func LoadOrDefault(filesystem asimfs.FileSystem, rootDir string) *Config {
 }
 
 // LoadFull reads config from package.json first, then merges with
-// .config/design-tokens.{yaml,yml,json}. Package.json takes precedence.
+// .config/design-tokens.{yaml,yml,json}. Package.json takes precedence: when
+// both sources set the same field, the package.json value wins. The config
+// file fills only fields left unset in package.json. For string fields an
+// empty string counts as unset; for list fields only an absent (nil) list is
+// filled, so an explicitly empty list is preserved.
 // Returns nil if neither source exists (not an error).
 func LoadFull(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
 	pkgCfg, err := LoadFromPackageJSON(filesystem, rootDir)
@@ -97,6 +105,9 @@ func LoadFull(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
 }
 
 // LoadFullOrDefault returns config from all sources or defaults if not found.
+// It returns Default when configuration is missing or when loading fails,
+// including malformed or unreadable configuration; the error is not
+// returned to the caller.
 func LoadFullOrDefault(filesystem asimfs.FileSystem, rootDir string) *Config {
 	cfg, err := LoadFull(filesystem, rootDir)
 	if err != nil || cfg == nil {

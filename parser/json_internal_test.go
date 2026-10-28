@@ -17,6 +17,7 @@ func TestIsLikelyJSON(t *testing.T) {
 		name     string
 		input    []byte
 		expected bool
+		skipped  bool
 	}{
 		{
 			name:     "starts with brace",
@@ -68,13 +69,43 @@ func TestIsLikelyJSON(t *testing.T) {
 			input:    []byte("# comment\nkey: value"),
 			expected: false,
 		},
+		{
+			name:     "leading line comment",
+			input:    []byte("// comment\n{\"key\": \"value\"}"),
+			expected: true,
+		},
+		{
+			name:     "leading block comment",
+			input:    []byte("/* comment */ {\"key\": \"value\"}"),
+			expected: true,
+			skipped:  true,
+		},
+		{
+			name:     "unterminated block comment",
+			input:    []byte(`/* never closed {"a":1}`),
+			expected: false,
+			skipped:  true,
+		},
+		{
+			name:     "trailing lone slash",
+			input:    []byte("/"),
+			expected: false,
+		},
+		{
+			name:     "slash followed by non-comment",
+			input:    []byte("/x"),
+			expected: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := isLikelyJSON(tt.input)
+			got, skipped := isLikelyJSON(tt.input)
 			if got != tt.expected {
 				t.Errorf("isLikelyJSON(%q) = %v, want %v", string(tt.input), got, tt.expected)
+			}
+			if skipped != tt.skipped {
+				t.Errorf("isLikelyJSON(%q) skippedBlockComment = %v, want %v", string(tt.input), skipped, tt.skipped)
 			}
 		})
 	}

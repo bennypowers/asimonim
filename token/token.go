@@ -6,7 +6,6 @@ License, or (at your option) any later version.
 See the LICENSE file for details.
 */
 
-// Package token provides DTCG design token types.
 package token
 
 import (
@@ -77,7 +76,8 @@ type Token struct {
 	// Line is the 0-based line number where this token is defined.
 	Line uint32 `json:"-"`
 
-	// Character is the 0-based character offset where this token is defined.
+	// Character is the 0-based UTF-16 offset where this token is defined.
+	// LSP positions use the same unit.
 	Character uint32 `json:"-"`
 
 	// Reference is the original reference format (e.g., "{color.primary}").
@@ -111,23 +111,47 @@ type Map struct {
 
 // NewMap creates a Map from tokens with optional prefix for lookups.
 // Tokens are indexed by their CSSVariableName for efficient lookup.
+// Leading dashes are stripped and dots become dashes, so "rh", "--rh", and
+// "---rh" all produce the same --rh-* names. The prefix stored on a token
+// (for example by the parser, which receives the same prefix from load.Load)
+// is normalized the same way on a copy, so keys match lookups. A token whose
+// prefix differs from the requested prefix keeps that prefix; only its dash
+// and dot spelling is normalized. The input slice is never mutated.
 func NewMap(tokens []*Token, prefix string) *Map {
+	normalizedPrefix := NormalizePrefix(prefix)
 	m := &Map{
-		prefix: strings.TrimLeft(prefix, "-"),
+		prefix: normalizedPrefix,
 		tokens: make(map[string]*Token, len(tokens)),
 	}
 	for _, t := range tokens {
-		// Apply prefix to token if not already set
 		tok := t
-		if tok.Prefix == "" && prefix != "" {
-			// Create a copy with prefix set
+		tokPrefix := NormalizePrefix(tok.Prefix)
+		switch {
+		case tokPrefix == "" && normalizedPrefix != "":
+			// Apply the requested prefix to a copy. This also covers a
+			// token prefix made only of dashes, which normalizes to empty.
 			copy := *t
-			copy.Prefix = prefix
+			copy.Prefix = normalizedPrefix
+			tok = &copy
+		case tokPrefix != "" && tokPrefix != tok.Prefix:
+			// Normalize the dash spelling on a copy. This also covers a
+			// parser-provided prefix and a deliberately different prefix
+			// without replacing the latter with the requested one.
+			copy := *t
+			copy.Prefix = tokPrefix
 			tok = &copy
 		}
 		m.tokens[tok.CSSVariableName()] = tok
 	}
 	return m
+}
+
+// NormalizePrefix converts a CSS variable prefix to its canonical spelling:
+// leading and trailing dashes and dots are stripped and remaining dots become
+// dashes, so "rh", "--rh", "rh-" and "--rh.theme" produce "rh" and
+// "rh-theme". This matches the spelling used in CSS variable names.
+func NormalizePrefix(prefix string) string {
+	return strings.ReplaceAll(strings.Trim(prefix, "-."), ".", "-")
 }
 
 // Get returns the Token for the given name, prepending the prefix if needed.
@@ -184,8 +208,8 @@ func (t *Token) CSSVariableName() string {
 		return ""
 	}
 	name := strings.ReplaceAll(t.Name, ".", "-")
-	if t.Prefix != "" {
-		prefix := strings.ReplaceAll(t.Prefix, ".", "-")
+	prefix := NormalizePrefix(t.Prefix)
+	if prefix != "" {
 		return "--" + prefix + "-" + name
 	}
 	return "--" + name

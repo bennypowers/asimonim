@@ -9,6 +9,8 @@ See the LICENSE file for details.
 package schema_test
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"bennypowers.dev/asimonim/schema"
@@ -176,6 +178,25 @@ func TestDetectVersion_StructuredColors(t *testing.T) {
 	}
 }
 
+func TestNormalizeJSON(t *testing.T) {
+	t.Run("trailing comment and comma are normalized", func(t *testing.T) {
+		input := []byte(`{"name":"p","asimonim":{"prefix":"rh"}, // note
+}`)
+		got := schema.NormalizeJSON(input)
+		if !json.Valid(got) {
+			t.Errorf("NormalizeJSON() = %q, want valid JSON", got)
+		}
+	})
+
+	t.Run("leading comment is removed", func(t *testing.T) {
+		input := []byte("// header\n{\"a\": 1}")
+		got := schema.NormalizeJSON(input)
+		if !json.Valid(got) || strings.Contains(string(got), "//") {
+			t.Errorf("NormalizeJSON() = %q, want valid JSON without comments", got)
+		}
+	})
+}
+
 func TestDetectVersion(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -241,6 +262,26 @@ func TestDetectVersion(t *testing.T) {
 			name:    "invalid JSON",
 			content: `{invalid json`,
 			wantErr: true,
+		},
+		{
+			name:     "JSONC with line and block comments",
+			content:  "// leading comment\n{\n  \"color\": {\"$value\": {\"$ref\": \"#/other\"}} /* trailing */\n}\n",
+			expected: schema.V2025_10,
+		},
+		{
+			name:     "JSONC with inline block comment after $schema",
+			content:  `{"$schema": /* DTCG 2025.10 */ "https://www.designtokens.org/schemas/2025.10.json"}`,
+			expected: schema.V2025_10,
+		},
+		{
+			name:     "JSONC with UTF-8 BOM",
+			content:  "\xEF\xBB\xBF// leading comment\n{\"color\": {\"$value\": {\"$ref\": \"#/other\"}}}",
+			expected: schema.V2025_10,
+		},
+		{
+			name:     "YAML flow mapping",
+			content:  `{color: {"$value": "#fff"}}`,
+			expected: schema.Draft,
 		},
 		{
 			name:     "YAML format",

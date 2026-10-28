@@ -1,12 +1,15 @@
 package integration_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"bennypowers.dev/asimonim/lsp"
 	"bennypowers.dev/asimonim/lsp/methods/textDocument"
 	semantictokens "bennypowers.dev/asimonim/lsp/methods/textDocument/semanticTokens"
-	"bennypowers.dev/asimonim/lsp/types"
 	"bennypowers.dev/asimonim/lsp/test/integration/testutil"
+	"bennypowers.dev/asimonim/lsp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.lsp.dev/protocol"
@@ -47,7 +50,7 @@ func TestSemanticTokens_YAMLWithReferences(t *testing.T) {
 	testutil.LoadBasicTokens(t, server)
 
 	// Open YAML fixture with token references
-	testutil.OpenTokenFixture(t, server,"file:///tokens.yaml", "semantic-tokens/yaml-with-refs.yaml")
+	testutil.OpenTokenFixture(t, server, "file:///tokens.yaml", "semantic-tokens/yaml-with-refs.yaml")
 
 	req := types.NewRequestContext(server, nil)
 	result, err := semantictokens.SemanticTokensFull(req, &protocol.SemanticTokensParams{
@@ -69,7 +72,7 @@ func TestSemanticTokens_EmptyDocument(t *testing.T) {
 	server := testutil.NewTestServer(t)
 
 	// Open empty JSON fixture
-	testutil.OpenTokenFixture(t, server,"file:///empty.json", "semantic-tokens/empty-tokens.json")
+	testutil.OpenTokenFixture(t, server, "file:///empty.json", "semantic-tokens/empty-tokens.json")
 
 	req := types.NewRequestContext(server, nil)
 	result, err := semantictokens.SemanticTokensFull(req, &protocol.SemanticTokensParams{
@@ -109,7 +112,7 @@ func TestSemanticTokens_MalformedReferences(t *testing.T) {
 	testutil.LoadBasicTokens(t, server)
 
 	// Open fixture with malformed references
-	testutil.OpenTokenFixture(t, server,"file:///malformed.json", "semantic-tokens/malformed-reference.json")
+	testutil.OpenTokenFixture(t, server, "file:///malformed.json", "semantic-tokens/malformed-reference.json")
 
 	req := types.NewRequestContext(server, nil)
 	result, err := semantictokens.SemanticTokensFull(req, &protocol.SemanticTokensParams{
@@ -131,7 +134,7 @@ func TestSemanticTokens_UnicodeHandling(t *testing.T) {
 	server := testutil.NewTestServer(t)
 
 	// Load tokens first so references can resolve
-	testutil.OpenTokenFixture(t, server,"file:///unicode-base.json", "semantic-tokens/unicode-refs.json")
+	testutil.OpenTokenFixture(t, server, "file:///unicode-base.json", "semantic-tokens/unicode-refs.json")
 	tokensContent := testutil.LoadTokenFixture(t, "semantic-tokens/unicode-refs.json")
 	err := server.LoadTokensFromJSON(tokensContent, "")
 	require.NoError(t, err)
@@ -415,4 +418,31 @@ func TestSemanticTokens_AutoLoadOnDidOpen(t *testing.T) {
 
 	// Verify token data is correct (each token = 5 values)
 	assert.Equal(t, 0, len(result.Data)%5, "Token data should be groups of 5 values")
+}
+
+// TestDidOpen_DoesNotClobberConfiguredTokenFile verifies that opening a token
+// file that is already loaded with per-file options keeps those options.
+func TestDidOpen_DoesNotClobberConfiguredTokenFile(t *testing.T) {
+	server := testutil.NewTestServer(t)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "tokens.json")
+	content := `{"color":{"primary":{"$type":"color","$value":"#ff0000"}}}`
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+	require.NoError(t, server.LoadTokenFileWithOptions(path, &lsp.TokenFileOptions{Prefix: "rh"}))
+	require.NotNil(t, server.Token("--rh-color-primary"))
+
+	params := &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI:        uri.File(path),
+			LanguageID: "json",
+			Version:    1,
+			Text:       content,
+		},
+	}
+
+	err := textDocument.DidOpen(types.NewRequestContext(server, nil), params)
+	require.NoError(t, err)
+
+	assert.NotNil(t, server.Token("--rh-color-primary"), "configured prefix should survive didOpen")
 }

@@ -6,7 +6,6 @@ License, or (at your option) any later version.
 See the LICENSE file for details.
 */
 
-// Package config provides configuration loading for design tokens tooling.
 package config
 
 import (

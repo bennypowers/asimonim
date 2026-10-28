@@ -9,11 +9,14 @@ See the LICENSE file for details.
 package parser_test
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"bennypowers.dev/asimonim/parser"
 	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/testutil"
+	"bennypowers.dev/asimonim/token"
 )
 
 func TestJSONParser_Parse(t *testing.T) {
@@ -305,5 +308,329 @@ func TestJSONParser_SkipPositions(t *testing.T) {
 		if tok.Line != 0 || tok.Character != 0 {
 			t.Errorf("expected zero positions in fast mode for %s, got Line=%d Character=%d", tok.Name, tok.Line, tok.Character)
 		}
+	}
+}
+
+func TestJSONParser_AutoDetectSchemaFromJSONC(t *testing.T) {
+	// The block comment makes this invalid YAML, but valid JSONC. Schema
+	// detection must inspect the normalized JSON so the 2025.10 $ref is
+	// recognized instead of falling back to Draft.
+	data := []byte(`{
+		/* 2025.10 $ref tokens require schema detection */
+		"color": {
+			"primary": {"$type": "color", "$value": "#ff0000"},
+			"alias": {"$type": "color", "$ref": "#/color/primary"}
+		}
+	}`)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var aliasFound bool
+	for _, tok := range tokens {
+		if tok.Name == "color-alias" {
+			aliasFound = true
+			if tok.SchemaVersion != schema.V2025_10 {
+				t.Errorf("color-alias schema = %s, want %s", tok.SchemaVersion, schema.V2025_10)
+			}
+		}
+	}
+	if !aliasFound {
+		t.Fatal("color-alias token not found; schema auto-detection failed for JSONC input")
+	}
+}
+
+func TestJSONParser_ParseJSONCWithLeadingComment(t *testing.T) {
+	// A leading // comment must not cause the document to be classified as
+	// YAML. The parser should recognize JSONC and parse it.
+	data := []byte(`// tokens for the 2025.10 schema
+{
+	"$schema": "https://www.designtokens.org/schemas/2025.10.json",
+	"spacing": {
+		"small": {"$type": "number", "$value": 4}
+	}
+}`)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+	if err != nil {
+		t.Fatalf("unexpected error parsing JSONC with leading comment: %v", err)
+	}
+	if len(tokens) != 1 {
+		t.Fatalf("got %d tokens, want 1", len(tokens))
+	}
+	if tokens[0].Name != "spacing-small" {
+		t.Errorf("token name = %q, want %q", tokens[0].Name, "spacing-small")
+	}
+	if tokens[0].SchemaVersion != schema.V2025_10 {
+		t.Errorf("schema = %s, want %s", tokens[0].SchemaVersion, schema.V2025_10)
+	}
+}
+
+func TestJSONParser_ParseBlockCommentYAMLFallback(t *testing.T) {
+	// This is valid YAML but not valid JSON. It must not be reclassified as
+	// JSON merely because a leading block comment is skipped.
+	data := []byte(`/* c */ {foo: bar}`)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(tokens) != 0 {
+		t.Errorf("got %d tokens, want 0", len(tokens))
+	}
+}
+
+func TestJSONParser_ParseYAMLFlowMapping(t *testing.T) {
+	data := []byte("color:\n  primary: {$type: color, $value: '#fff'}\n")
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(tokens) != 1 {
+		t.Fatalf("got %d tokens, want 1", len(tokens))
+	}
+	if tokens[0].Name != "color-primary" {
+		t.Errorf("token name = %q, want %q", tokens[0].Name, "color-primary")
+	}
+	if tokens[0].Value != "#fff" {
+		t.Errorf("token value = %q, want %q", tokens[0].Value, "#fff")
+	}
+}
+
+func TestJSONParser_ParseNormalizesPrefix(t *testing.T) {
+	// The parser stores Options.Prefix on every token. Normalize it there so
+	// consumers that read Token.Prefix directly, including LoadAll callers,
+	// see the same spelling as CSS names and map keys.
+	data := []byte(`{"color":{"primary":{"$type":"color","$value":"#fff"}}}`)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{Prefix: "--rh"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(tokens) != 1 {
+		t.Fatalf("got %d tokens, want 1", len(tokens))
+	}
+	if tokens[0].Prefix != "rh" {
+		t.Errorf("token.Prefix = %q, want %q", tokens[0].Prefix, "rh")
+	}
+	if got := tokens[0].CSSVariableName(); got != "--rh-color-primary" {
+		t.Errorf("CSSVariableName() = %q, want %q", got, "--rh-color-primary")
+	}
+}
+
+func TestJSONParser_ParseInvalidBlockCommentDocument(t *testing.T) {
+	// A block comment makes the parser try the YAML fallback. Input that is
+	// neither valid JSONC nor valid YAML must return an error rather than
+	// silently producing tokens, and the error must mention the JSON failure.
+	_, err := parser.NewJSONParser().Parse([]byte(`/* c */ {invalid`), parser.Options{})
+	if err == nil {
+		t.Fatal("expected an error for input that is neither JSONC nor YAML")
+	}
+	if !strings.Contains(err.Error(), "failed to parse JSON") {
+		t.Errorf("error = %v, want it to mention the JSON parse failure", err)
+	}
+}
+
+func TestJSONParser_ParseUTF8BOM(t *testing.T) {
+	bom := []byte{0xEF, 0xBB, 0xBF}
+
+	t.Run("plain JSON", func(t *testing.T) {
+		payload := []byte(`{"spacing":{"small":{"$type":"number","$value":4}}}`)
+		data := append(append([]byte{}, bom...), payload...)
+
+		tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(tokens) != 1 {
+			t.Fatalf("got %d tokens, want 1", len(tokens))
+		}
+		if tokens[0].Name != "spacing-small" {
+			t.Errorf("token name = %q, want %q", tokens[0].Name, "spacing-small")
+		}
+	})
+
+	t.Run("JSONC with leading comment", func(t *testing.T) {
+		payload := []byte("// comment\n{\"spacing\":{\"small\":{\"$type\":\"number\",\"$value\":4}}}")
+		data := append(append([]byte{}, bom...), payload...)
+
+		tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(tokens) != 1 {
+			t.Fatalf("got %d tokens, want 1", len(tokens))
+		}
+		if tokens[0].Name != "spacing-small" {
+			t.Errorf("token name = %q, want %q", tokens[0].Name, "spacing-small")
+		}
+	})
+}
+
+func TestJSONParser_PositionsUseUTF16Columns(t *testing.T) {
+	// A non-BMP character before the key occupies two UTF-16 code units but
+	// one rune. Token.Character must be the UTF-16 offset used by LSP.
+	data := []byte(`{"😀": "x", "color": {"primary": {"$type": "color", "$value": "#fff"}}}`)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var tok *token.Token
+	for _, candidate := range tokens {
+		if candidate.Name == "color-primary" {
+			tok = candidate
+			break
+		}
+	}
+	if tok == nil {
+		t.Fatal("color-primary token not found")
+	}
+
+	byteIdx := strings.Index(string(data), `"primary"`)
+	want := uint32(len(utf16.Encode([]rune(string(data[:byteIdx])))))
+	if tok.Line != 0 {
+		t.Errorf("token.Line = %d, want 0", tok.Line)
+	}
+	if tok.Character != want {
+		t.Errorf("token.Character = %d, want UTF-16 offset %d", tok.Character, want)
+	}
+}
+
+func TestJSONParser_AutoDetectSchemaFromTrailingBlockComment(t *testing.T) {
+	// A block comment after a value must not hide 2025.10 features from
+	// schema detection: the parser passes the comment-stripped document to
+	// DetectVersion.
+	data := []byte(`{
+		"color": {
+			"primary": {"$type": "color", "$value": "#ff0000"},
+			"alias": {"$type": "color", "$ref": "#/color/primary"}
+		}
+	} /* trailing comment */`)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{SkipPositions: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var found bool
+	for _, tok := range tokens {
+		if tok.Name == "color-alias" {
+			found = true
+			if tok.SchemaVersion != schema.V2025_10 {
+				t.Errorf("color-alias schema = %s, want %s", tok.SchemaVersion, schema.V2025_10)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("color-alias token not found")
+	}
+}
+
+func TestJSONParser_JSONCCommentDoesNotShiftPositions(t *testing.T) {
+	// A multibyte comment on the same line as a token must not shift the
+	// token's UTF-16 column; positions are tracked on a comment mask that
+	// preserves UTF-16 width.
+	data := []byte(`/* 😀 */ {"spacing":{"small":{"$type":"number","$value":4}}}`)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var tok *token.Token
+	for _, candidate := range tokens {
+		if candidate.Name == "spacing-small" {
+			tok = candidate
+			break
+		}
+	}
+	if tok == nil {
+		t.Fatal("spacing-small token not found")
+	}
+
+	byteIdx := strings.Index(string(data), `"small"`)
+	want := uint32(len(utf16.Encode([]rune(string(data[:byteIdx])))))
+	if tok.Character != want {
+		t.Errorf("token.Character = %d, want UTF-16 offset %d", tok.Character, want)
+	}
+}
+
+func TestJSONParser_ParseUTF8BOMPositionsAreBOMLess(t *testing.T) {
+	// yaml.v3 ignores a leading BOM when computing columns, and LSP clients
+	// strip it from document text. Positions therefore use the BOM-less
+	// column, matching the text clients send.
+	bom := []byte{0xEF, 0xBB, 0xBF}
+	payload := []byte(`{"spacing":{"small":{"$type":"number","$value":4}}}`)
+	data := append(append([]byte{}, bom...), payload...)
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(tokens) != 1 {
+		t.Fatalf("got %d tokens, want 1", len(tokens))
+	}
+
+	byteIdx := strings.Index(string(payload), `"small"`)
+	want := uint32(len(utf16.Encode([]rune(string(payload[:byteIdx])))))
+	if tokens[0].Character != want {
+		t.Errorf("token.Character = %d, want BOM-less UTF-16 offset %d", tokens[0].Character, want)
+	}
+}
+
+func TestJSONParser_PositionsWithCROnlyLineEndings(t *testing.T) {
+	data := []byte("{\r  \"color\": {\r    \"primary\": {\"$type\":\"color\",\"$value\":\"#fff\"}}}")
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var tok *token.Token
+	for _, candidate := range tokens {
+		if candidate.Name == "color-primary" {
+			tok = candidate
+			break
+		}
+	}
+	if tok == nil {
+		t.Fatal("color-primary token not found")
+	}
+	if tok.Line != 2 {
+		t.Errorf("token.Line = %d, want 2", tok.Line)
+	}
+	if tok.Character != 4 {
+		t.Errorf("token.Character = %d, want 4", tok.Character)
+	}
+}
+
+func TestJSONParser_PositionsWithCRLFLineEndings(t *testing.T) {
+	data := []byte("{\r\n  \"color\": {\r\n    \"primary\": {\"$type\":\"color\",\"$value\":\"#fff\"}}}")
+
+	tokens, err := parser.NewJSONParser().Parse(data, parser.Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var tok *token.Token
+	for _, candidate := range tokens {
+		if candidate.Name == "color-primary" {
+			tok = candidate
+			break
+		}
+	}
+	if tok == nil {
+		t.Fatal("color-primary token not found")
+	}
+	if tok.Line != 2 {
+		t.Errorf("token.Line = %d, want 2", tok.Line)
+	}
+	if tok.Character != 4 {
+		t.Errorf("token.Character = %d, want 4", tok.Character)
 	}
 }

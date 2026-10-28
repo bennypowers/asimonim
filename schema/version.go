@@ -6,7 +6,6 @@ License, or (at your option) any later version.
 See the LICENSE file for details.
 */
 
-// Package schema provides DTCG schema version handling.
 package schema
 
 import "fmt"
