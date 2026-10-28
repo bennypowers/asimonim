@@ -18,6 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	asimfs "bennypowers.dev/asimonim/fs"
+	"bennypowers.dev/asimonim/internal/jsonc"
 	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/specifier"
 )
@@ -47,7 +48,7 @@ func Load(filesystem asimfs.FileSystem, rootDir string) (*Config, error) {
 		cfg := &Config{}
 		switch ext {
 		case ".yaml", ".yml":
-			if err := yaml.Unmarshal(schema.NormalizeContent(data), cfg); err != nil {
+			if err := yaml.Unmarshal(jsonc.NormalizeContent(data), cfg); err != nil {
 				return nil, err
 			}
 		case ".json":

@@ -36,8 +36,10 @@ See the LICENSE file for details.
 // parsing speed is critical.
 //
 // SkipPositions disables the second pass that records Line and Character on
-// each token. Position data is needed for editor features such as
-// go-to-definition. Set SkipPositions for batch tools that do not need it.
+// each token. Line is a 0-based line number and Character is a 0-based UTF-16
+// offset, matching LSP positions. Position data is needed for editor features
+// such as go-to-definition. Set SkipPositions for batch tools that do not
+// need it.
 //
 // # Style Dictionary
 //

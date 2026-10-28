@@ -22,6 +22,7 @@ import (
 	"unicode/utf8"
 
 	"bennypowers.dev/asimonim/fs"
+	internaljsonc "bennypowers.dev/asimonim/internal/jsonc"
 	"bennypowers.dev/asimonim/parser/common"
 	"bennypowers.dev/asimonim/schema"
 	"bennypowers.dev/asimonim/token"
@@ -54,7 +55,7 @@ func (p *JSONParser) Parse(data []byte, opts Options) ([]*token.Token, error) {
 		jsonData := bytes.TrimPrefix(data, utf8BOM)
 		cleanJSON := jsonc.ToJSON(jsonData)
 		if err := json.Unmarshal(cleanJSON, &raw); err == nil {
-			positionData = schema.MaskJSONCComments(jsonData)
+			positionData = internaljsonc.MaskJSONCComments(jsonData)
 			parsedJSON = true
 		} else if !skippedBlockComment {
 			return nil, fmt.Errorf("failed to parse JSON: %w", err)

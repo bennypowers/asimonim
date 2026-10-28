@@ -3,11 +3,11 @@ package definition
 import (
 	"strings"
 
+	"bennypowers.dev/asimonim/internal/jsonc"
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/internal/parser/common"
 	posutil "bennypowers.dev/asimonim/lsp/internal/position"
 	"bennypowers.dev/asimonim/lsp/types"
-	"bennypowers.dev/asimonim/schema"
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 )
@@ -111,7 +111,7 @@ func DefinitionForTokenFile(req *types.RequestContext, doc *documents.Document, 
 	if doc.LanguageID() == "jsonc" {
 		// Mask comment text (preserving line breaks and UTF-16 columns) so
 		// references inside comments do not resolve.
-		content = string(schema.MaskJSONCComments([]byte(content)))
+		content = string(jsonc.MaskJSONCComments([]byte(content)))
 	}
 	tokenName := findReferenceAtPosition(content, position)
 	if tokenName == "" {

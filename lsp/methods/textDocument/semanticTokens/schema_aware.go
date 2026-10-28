@@ -3,6 +3,7 @@ package semantictokens
 import (
 	"strings"
 
+	"bennypowers.dev/asimonim/internal/jsonc"
 	"bennypowers.dev/asimonim/lsp/internal/documents"
 	"bennypowers.dev/asimonim/lsp/internal/parser/common"
 	"bennypowers.dev/asimonim/lsp/internal/position"
@@ -117,7 +118,7 @@ func GetSemanticTokensForDocumentSchemaAware(ctx types.ServerContext, doc *docum
 	if doc.LanguageID() == "jsonc" {
 		// Mask comment text so references inside comments are not
 		// highlighted. The mask preserves line breaks and UTF-16 columns.
-		content = string(schema.MaskJSONCComments([]byte(content)))
+		content = string(jsonc.MaskJSONCComments([]byte(content)))
 	}
 	tokens := []SemanticTokenIntermediate{}
 

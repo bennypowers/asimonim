@@ -30,6 +30,13 @@ See the LICENSE file for details.
 //
 // An explicit non-Unknown Options.SchemaVersion always overrides detection.
 //
+// # Normalization
+//
+// NormalizeJSON converts JSONC with a UTF-8 BOM or trailing commas to JSON
+// for callers that decode with encoding/json. YAML-aware normalization and
+// comment masking are internal implementation details, not part of this
+// package's API.
+//
 // # Style Dictionary
 //
 // Style Dictionary JSON is not DTCG. Detection and parsing operate on DTCG
