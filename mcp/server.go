@@ -47,9 +47,37 @@ func NewServer(filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server
 		}, nil),
 	}
 
-	s.setupTools()
-	s.setupResources()
+	s.Register(s.server)
 
+	return s
+}
+
+// Register adds asimonim's tools and resources to server.
+//
+// Use this to mount asimonim's token tools and resources on an existing MCP
+// server. The caller owns server and its transport: Register only wires up
+// handlers and does not start the server. server must not be nil.
+//
+// Config resolution stays lazy and session-aware. Handlers resolve config
+// from the session they are invoked through, so roots advertised by the
+// embedding server's client are honored.
+func (s *Server) Register(server *mcp.Server) {
+	s.setupTools(server)
+	s.setupResources(server)
+}
+
+// Register creates a Server and registers its tools and resources on server.
+//
+// The returned Server holds asimonim's handler state (filesystem, config, and
+// resolved roots). The caller owns server and its transport. See
+// [Server.Register] for details.
+func Register(server *mcp.Server, filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server {
+	s := &Server{
+		fs:  filesystem,
+		cfg: cfg,
+		cwd: cwd,
+	}
+	s.Register(server)
 	return s
 }
 
