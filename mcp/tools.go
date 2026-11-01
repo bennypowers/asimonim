@@ -86,22 +86,37 @@ func newTokenSummary(tok *token.Token) tokenSummary {
 	}
 }
 
-// setupTools registers asimonim's tools on the given MCP server.
-func (s *Server) setupTools(server *mcp.Server) {
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "validate_tokens",
-		Description: "Validate design token files for correctness, detect circular references, and report deprecated tokens.",
-	}, s.handleValidate)
-
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "search_tokens",
-		Description: "Search design tokens by name, value, description, or type. Substring search is case-insensitive. Regex search is case-sensitive by default; use (?i) flag for case-insensitive regex.",
-	}, s.handleSearch)
-
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "convert_tokens",
-		Description: "Convert design tokens to CSS, SCSS, JavaScript, Swift, Android XML, or other formats.",
-	}, s.handleConvert)
+// toolFeatures returns asimonim's tools, keyed by the name they register.
+func (s *Server) toolFeatures() []feature {
+	return []feature{
+		{
+			id: "validate_tokens",
+			add: func(server *mcp.Server) {
+				mcp.AddTool(server, &mcp.Tool{
+					Name:        "validate_tokens",
+					Description: "Validate design token files for correctness, detect circular references, and report deprecated tokens.",
+				}, s.handleValidate)
+			},
+		},
+		{
+			id: "search_tokens",
+			add: func(server *mcp.Server) {
+				mcp.AddTool(server, &mcp.Tool{
+					Name:        "search_tokens",
+					Description: "Search design tokens by name, value, description, or type. Substring search is case-insensitive. Regex search is case-sensitive by default; use (?i) flag for case-insensitive regex.",
+				}, s.handleSearch)
+			},
+		},
+		{
+			id: "convert_tokens",
+			add: func(server *mcp.Server) {
+				mcp.AddTool(server, &mcp.Tool{
+					Name:        "convert_tokens",
+					Description: "Convert design tokens to CSS, SCSS, JavaScript, Swift, Android XML, or other formats.",
+				}, s.handleConvert)
+			},
+		},
+	}
 }
 
 func textResult(text string) *mcp.CallToolResult {

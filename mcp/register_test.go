@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"bennypowers.dev/asimonim/config"
+	"bennypowers.dev/asimonim/fs"
 	"bennypowers.dev/asimonim/internal/mapfs"
 	"bennypowers.dev/asimonim/testutil"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -121,6 +122,15 @@ func newEmbeddingServer() *mcp.Server {
 	}, nil)
 }
 
+// mustRegister registers asimonim's surface on server and fails the test if
+// registration returns an error.
+func mustRegister(t *testing.T, server *mcp.Server, filesystem fs.FileSystem, cfg *config.Config, cwd string, opts ...RegisterOption) *Server {
+	t.Helper()
+	s, err := Register(server, filesystem, cfg, cwd, opts...)
+	require.NoError(t, err)
+	return s
+}
+
 func TestRegister_ToolParity(t *testing.T) {
 	ctx := context.Background()
 
@@ -131,7 +141,7 @@ func TestRegister_ToolParity(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
 	cfg := &config.Config{Files: []config.FileSpec{{Path: "/test/tokens.json"}}}
 	server := newEmbeddingServer()
-	Register(server, mfs, cfg, "/test")
+	mustRegister(t, server, mfs, cfg, "/test")
 	session := connectSession(t, server)
 	registered := listToolNames(t, ctx, session)
 	registeredTools := normalizedTools(t, ctx, session)
@@ -154,7 +164,7 @@ func TestRegister_ResourceParity(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
 	cfg := &config.Config{Files: []config.FileSpec{{Path: "/test/tokens.json"}}}
 	server := newEmbeddingServer()
-	Register(server, mfs, cfg, "/test")
+	mustRegister(t, server, mfs, cfg, "/test")
 	session := connectSession(t, server)
 
 	assert.Equal(t, baselineResources, listResourceURIs(t, ctx, session))
@@ -172,7 +182,7 @@ func TestRegister_CallSearchTool(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
 	cfg := &config.Config{Files: []config.FileSpec{{Path: "/test/tokens.json"}}}
 	server := newEmbeddingServer()
-	Register(server, mfs, cfg, "/test")
+	mustRegister(t, server, mfs, cfg, "/test")
 	session := connectSession(t, server)
 
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
@@ -198,7 +208,7 @@ func TestRegister_ReadTokensResource(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
 	cfg := &config.Config{Files: []config.FileSpec{{Path: "/test/tokens.json"}}}
 	server := newEmbeddingServer()
-	Register(server, mfs, cfg, "/test")
+	mustRegister(t, server, mfs, cfg, "/test")
 	session := connectSession(t, server)
 
 	result, err := session.ReadResource(ctx, &mcp.ReadResourceParams{URI: "asimonim://tokens"})
@@ -219,7 +229,7 @@ func TestRegister_ReadResourceTemplate(t *testing.T) {
 	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
 	cfg := &config.Config{Files: []config.FileSpec{{Path: "/test/tokens.json"}}}
 	server := newEmbeddingServer()
-	Register(server, mfs, cfg, "/test")
+	mustRegister(t, server, mfs, cfg, "/test")
 	session := connectSession(t, server)
 
 	t.Run("tokens by source", func(t *testing.T) {
@@ -253,7 +263,7 @@ func TestRegister_FallsBackToCwdWithoutRoots(t *testing.T) {
 
 	// No roots are advertised, so config resolution must fall back to cwd.
 	server := newEmbeddingServer()
-	Register(server, cwdFS(), nil, "/mycwd")
+	mustRegister(t, server, cwdFS(), nil, "/mycwd")
 	session := connectSession(t, server)
 
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
@@ -270,14 +280,18 @@ func TestRegister_FallsBackToCwdWithoutRoots(t *testing.T) {
 }
 
 func TestRegister_RejectsNilServer(t *testing.T) {
-	assert.PanicsWithValue(t, "mcp: Register called with nil server", func() {
-		Register(nil, testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test"), nil, "/test")
-	})
+	s, err := Register(nil, testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test"), nil, "/test")
+	require.Error(t, err)
+	assert.Nil(t, s)
+
+	// The method form returns an error too, matching cem.
+	err = (&Server{}).Register(nil)
+	require.Error(t, err)
 }
 
 func TestRegister_RunHasNoTransport(t *testing.T) {
 	server := newEmbeddingServer()
-	s := Register(server, testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test"), nil, "/test")
+	s := mustRegister(t, server, testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test"), nil, "/test")
 	require.NotNil(t, s)
 
 	require.Error(t, s.Run(context.Background()))
@@ -289,7 +303,7 @@ func TestRegister_ResolvesConfigFromSessionRoots(t *testing.T) {
 	// cfg is nil and cwd does not contain a config, so the only way this
 	// succeeds is by resolving roots through the embedding server's session.
 	server := newEmbeddingServer()
-	s := Register(server, projectFS(), nil, "/elsewhere")
+	s := mustRegister(t, server, projectFS(), nil, "/elsewhere")
 	require.NotNil(t, s)
 	session := connectSession(t, server, &mcp.Root{URI: "file:///project"})
 
@@ -338,7 +352,7 @@ func TestRegister_ResolvesPerSessionRoots(t *testing.T) {
 	// A single embedding server serves two clients with different roots.
 	// Each session must resolve its own workspace.
 	server := newEmbeddingServer()
-	Register(server, twoProjectFS(), nil, "/elsewhere")
+	mustRegister(t, server, twoProjectFS(), nil, "/elsewhere")
 
 	sessionA := connectSession(t, server, &mcp.Root{URI: "file:///project-a"})
 	sessionB := connectSession(t, server, &mcp.Root{URI: "file:///project-b"})

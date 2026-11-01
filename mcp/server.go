@@ -11,6 +11,7 @@ package mcp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"sync"
 
@@ -64,7 +65,11 @@ func NewServer(filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server
 		}, nil),
 	}
 
-	s.Register(s.server)
+	// NewServer uses the same registration path as an embedder. Default
+	// options cannot fail.
+	if err := s.Register(s.server); err != nil {
+		panic(fmt.Sprintf("mcp: NewServer: %v", err))
+	}
 
 	return s
 }
@@ -73,35 +78,84 @@ func NewServer(filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server
 //
 // Use this to mount asimonim's token tools and resources on an existing MCP
 // server. The caller owns server and its transport: Register only wires up
-// handlers and does not start the server. Register panics if server is nil.
+// handlers and does not start the server. Register returns an error for a nil
+// server or an invalid option instead of panicking.
+//
+// Options filter the mounted surface with [WithTools], [WithResources], and
+// [WithTemplates], and choose how name conflicts are handled with
+// [WithConflictPolicy]. With no options Register mounts the full surface and
+// replaces existing entries, which is the behavior before options existed.
+// Filters are exact, case-sensitive matches; Exclude wins over Include. All
+// options are validated and conflicts are detected before any handler is
+// installed, so an error leaves server unchanged.
 //
 // Config resolution stays lazy and session-aware. Each MCP session resolves
 // and caches its own roots and config, so an embedding server can serve
 // clients with different workspaces. An explicit config is shared by all
 // sessions. Requests without a session share a single lazy cache.
-func (s *Server) Register(server *mcp.Server) {
+func (s *Server) Register(server *mcp.Server, opts ...RegisterOption) error {
 	if server == nil {
-		panic("mcp: Register called with nil server")
+		return errors.New("mcp: Register called with nil server")
 	}
-	s.setupTools(server)
-	s.setupResources(server)
+	cfg := newRegisterConfig(opts)
+
+	tools, err := selectFeatures("tool", s.toolFeatures(), cfg.tools)
+	if err != nil {
+		return err
+	}
+	resources, err := selectFeatures("resource", s.resourceFeatures(), cfg.resources)
+	if err != nil {
+		return err
+	}
+	templates, err := selectFeatures("template", s.templateFeatures(), cfg.templates)
+	if err != nil {
+		return err
+	}
+
+	if cfg.conflict != ConflictReplace {
+		surface, err := inspectServer(server)
+		if err != nil {
+			return fmt.Errorf("mcp: inspect server before registering: %w", err)
+		}
+		var conflicts []string
+		tools = filterConflicts("tool", tools, surface.tools, cfg.conflict, &conflicts)
+		resources = filterConflicts("resource", resources, surface.resources, cfg.conflict, &conflicts)
+		templates = filterConflicts("template", templates, surface.templates, cfg.conflict, &conflicts)
+		if len(conflicts) > 0 && cfg.conflict == ConflictError {
+			return formatConflicts(conflicts)
+		}
+	}
+
+	for _, f := range tools {
+		f.add(server)
+	}
+	for _, f := range resources {
+		f.add(server)
+	}
+	for _, f := range templates {
+		f.add(server)
+	}
+	return nil
 }
 
 // Register creates a Server and registers its tools and resources on server.
+// The options accepted by Register are also accepted here.
 //
 // The returned Server holds asimonim's handler state (filesystem, config, and
 // resolved roots). It has no transport of its own, so its Run method returns
 // an error; the caller owns server and runs it with the transport of their
 // choice. See [Server.Register] for details.
-func Register(server *mcp.Server, filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server {
+func Register(server *mcp.Server, filesystem fs.FileSystem, cfg *config.Config, cwd string, opts ...RegisterOption) (*Server, error) {
 	s := &Server{
 		fs:          filesystem,
 		cfg:         cfg,
 		cfgProvided: cfg != nil,
 		cwd:         cwd,
 	}
-	s.Register(server)
-	return s
+	if err := s.Register(server, opts...); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // configForRequest resolves config for the session, caching per session.
