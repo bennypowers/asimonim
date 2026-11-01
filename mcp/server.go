@@ -21,6 +21,13 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// registerMu serializes asimonim registrations so filtering, conflict
+// detection, and handler installation form one critical section. The SDK has
+// no transaction spanning those calls, so this is the only way to keep two
+// Register calls on the same server from interleaving. Register is a
+// setup-time operation, so a single process-wide lock is fine.
+var registerMu sync.Mutex
+
 // Server implements an MCP server for design tokens.
 type Server struct {
 	fs     fs.FileSystem
@@ -77,26 +84,27 @@ func NewServer(filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server
 // Register adds asimonim's tools and resources to server.
 //
 // Use this to mount asimonim's token tools and resources on an existing MCP
-// server. The caller owns server and its transport: Register only wires up
-// handlers and does not start the server. Register returns an error for a nil
-// server or an invalid option instead of panicking.
+// server. The caller owns server and its transport: Register does not start a
+// transport and does not take ownership of server. Register returns an error
+// for a nil server or an invalid option instead of panicking.
 //
 // Options filter the mounted surface with [WithTools], [WithResources], and
 // [WithTemplates], and choose how name conflicts are handled with
 // [WithConflictPolicy]. With no options Register mounts the full surface and
 // replaces existing entries, which is the behavior before options existed.
 // Filters are exact, case-sensitive matches; Exclude wins over Include. All
-// options are validated and conflicts are detected before any handler is
-// installed, so an error installs no asimonim handler. Host session hooks can
-// still observe the conflict-detection probe described by
+// options are validated before any server interaction, and conflicts are
+// detected before any handler is installed, so an error installs no asimonim
+// handler. ConflictError and ConflictSkip do open a short-lived in-memory
+// session to inspect the server; host session hooks can observe it. See
 // [WithConflictPolicy].
 //
 // Register is a setup-time operation. Call it before the target server starts
-// serving requests, and do not run it concurrently with other registration
-// changes. Conflict detection is best effort: it lists the server surface
-// through a short-lived probe session (see [WithConflictPolicy]) and then
-// installs handlers, so a concurrent writer can still change the surface in
-// between.
+// serving requests, and do not add features to the target server concurrently
+// from other goroutines. Asimonim Register calls are serialized, but the SDK
+// offers no transaction covering other writers, so conflict detection is best
+// effort against them; a concurrent writer can still change the surface
+// between inspection and installation.
 //
 // Config resolution stays lazy and session-aware. Each MCP session resolves
 // and caches its own roots and config, so an embedding server can serve
@@ -106,6 +114,10 @@ func (s *Server) Register(server *mcp.Server, opts ...RegisterOption) error {
 	if server == nil {
 		return errors.New("mcp: Register called with nil server")
 	}
+
+	registerMu.Lock()
+	defer registerMu.Unlock()
+
 	cfg := newRegisterConfig(opts)
 	switch cfg.conflict {
 	case ConflictReplace, ConflictError, ConflictSkip:
@@ -135,12 +147,12 @@ func (s *Server) Register(server *mcp.Server, opts ...RegisterOption) error {
 		if err != nil {
 			return fmt.Errorf("mcp: inspect server before registering: %w", err)
 		}
-		var conflicts []string
-		tools = filterConflicts("tool", tools, surface.tools, cfg.conflict, &conflicts)
-		resources = filterConflicts("resource", resources, surface.resources, cfg.conflict, &conflicts)
-		templates = filterConflicts("template", templates, surface.templates, cfg.conflict, &conflicts)
-		if len(conflicts) > 0 && cfg.conflict == ConflictError {
-			return formatConflicts(conflicts)
+		var conflict RegistrationConflict
+		tools = filterConflicts("tool", tools, surface.tools, cfg.conflict, &conflict)
+		resources = filterConflicts("resource", resources, surface.resources, cfg.conflict, &conflict)
+		templates = filterConflicts("template", templates, surface.templates, cfg.conflict, &conflict)
+		if cfg.conflict == ConflictError && !conflict.empty() {
+			return &conflict
 		}
 	}
 

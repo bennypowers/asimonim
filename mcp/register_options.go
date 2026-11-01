@@ -103,6 +103,49 @@ const (
 	ConflictSkip
 )
 
+// RegistrationConflict reports the features that already exist on the target
+// server when Register is called with [ConflictError]. It is returned as an
+// error and can be inspected with [errors.As].
+type RegistrationConflict struct {
+	// Tools lists conflicting tool names.
+	Tools []string
+	// Resources lists conflicting resource URIs.
+	Resources []string
+	// Templates lists conflicting URI template strings.
+	Templates []string
+}
+
+// Error implements the error interface.
+func (c *RegistrationConflict) Error() string {
+	parts := make([]string, 0, len(c.Tools)+len(c.Resources)+len(c.Templates))
+	for _, id := range c.Tools {
+		parts = append(parts, fmt.Sprintf("tool %q", id))
+	}
+	for _, id := range c.Resources {
+		parts = append(parts, fmt.Sprintf("resource %q", id))
+	}
+	for _, id := range c.Templates {
+		parts = append(parts, fmt.Sprintf("template %q", id))
+	}
+	return "mcp: registration conflict: " + strings.Join(parts, ", ")
+}
+
+func (c *RegistrationConflict) empty() bool {
+	return len(c.Tools) == 0 && len(c.Resources) == 0 && len(c.Templates) == 0
+}
+
+// add records one conflicting feature.
+func (c *RegistrationConflict) add(kind, id string) {
+	switch kind {
+	case "tool":
+		c.Tools = append(c.Tools, id)
+	case "resource":
+		c.Resources = append(c.Resources, id)
+	case "template":
+		c.Templates = append(c.Templates, id)
+	}
+}
+
 // WithConflictPolicy sets how Register resolves conflicts with items already
 // registered on the target server. Repeated calls use the last value.
 //
@@ -343,14 +386,14 @@ func listFeatureIDs(fetch func(cursor string) (next string, ids []string, err er
 
 // filterConflicts removes features that already exist on the server when the
 // policy is ConflictSkip, and records every conflict for ConflictError.
-func filterConflicts(kind string, features []feature, existing map[string]struct{}, policy ConflictPolicy, conflicts *[]string) []feature {
+func filterConflicts(kind string, features []feature, existing map[string]struct{}, policy ConflictPolicy, conflict *RegistrationConflict) []feature {
 	if len(existing) == 0 {
 		return features
 	}
 	kept := make([]feature, 0, len(features))
 	for _, f := range features {
 		if _, ok := existing[f.id]; ok {
-			*conflicts = append(*conflicts, fmt.Sprintf("%s %q", kind, f.id))
+			conflict.add(kind, f.id)
 			if policy == ConflictSkip {
 				continue
 			}
@@ -358,9 +401,4 @@ func filterConflicts(kind string, features []feature, existing map[string]struct
 		kept = append(kept, f)
 	}
 	return kept
-}
-
-// formatConflicts returns an error describing every conflicting feature.
-func formatConflicts(conflicts []string) error {
-	return fmt.Errorf("mcp: registration conflict: %s", strings.Join(conflicts, ", "))
 }

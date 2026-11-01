@@ -559,6 +559,126 @@ func TestRegister_OptionCapturesSelectionAtConstruction(t *testing.T) {
 	assert.Equal(t, []string{toolSearch}, tools)
 }
 
+func TestRegister_ConflictErrorIsTyped(t *testing.T) {
+	server := newEmbeddingServer()
+	addExistingSearchTool(t, server, "existing-handler")
+	emptyResource := func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return &mcp.ReadResourceResult{}, nil
+	}
+	server.AddResource(&mcp.Resource{URI: resourceTokens, Name: "existing", MIMEType: "application/json"}, emptyResource)
+	server.AddResourceTemplate(&mcp.ResourceTemplate{URITemplate: templateTokenDetail, Name: "existing", MIMEType: "application/json"}, emptyResource)
+
+	_, err := Register(server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictError))
+	require.Error(t, err)
+
+	var conflict *RegistrationConflict
+	require.ErrorAs(t, err, &conflict)
+	assert.Equal(t, []string{toolSearch}, conflict.Tools)
+	assert.Equal(t, []string{resourceTokens}, conflict.Resources)
+	assert.Equal(t, []string{templateTokenDetail}, conflict.Templates)
+	assert.Contains(t, err.Error(), toolSearch)
+	assert.Contains(t, err.Error(), resourceTokens)
+	assert.Contains(t, err.Error(), templateTokenDetail)
+}
+
+func TestRegister_EmptySurfaceHasNoConflicts(t *testing.T) {
+	for _, policy := range []ConflictPolicy{ConflictError, ConflictSkip} {
+		t.Run(policyName(policy), func(t *testing.T) {
+			server := newEmbeddingServer()
+			mustRegister(t, server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(policy))
+
+			tools, resources, templates := connectAndList(t, server)
+			assert.Equal(t, allToolNames, tools)
+			assert.Equal(t, allResourceURIs, resources)
+			assert.Equal(t, allTemplateURIs, templates)
+		})
+	}
+}
+
+func policyName(p ConflictPolicy) string {
+	switch p {
+	case ConflictReplace:
+		return "replace"
+	case ConflictError:
+		return "error"
+	case ConflictSkip:
+		return "skip"
+	default:
+		return "unknown"
+	}
+}
+
+func TestRegister_ConflictSkipKeepsExistingTemplate(t *testing.T) {
+	server := newEmbeddingServer()
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: templateTokenDetail,
+		Name:        "existing",
+		MIMEType:    "application/json",
+	}, func(_ context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return &mcp.ReadResourceResult{
+			Contents: []*mcp.ResourceContents{{URI: req.Params.URI, Text: "existing-handler"}},
+		}, nil
+	})
+
+	mustRegister(t, server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictSkip))
+
+	_, _, templates := connectAndList(t, server)
+	assert.Equal(t, allTemplateURIs, templates)
+}
+
+func TestRegister_InvalidSelectionDoesNotProbe(t *testing.T) {
+	var initialized atomic.Int32
+	server := mcp.NewServer(&mcp.Implementation{
+		Name:    "hooked-server",
+		Version: "1.0.0",
+	}, &mcp.ServerOptions{
+		InitializedHandler: func(context.Context, *mcp.InitializedRequest) {
+			initialized.Add(1)
+		},
+	})
+
+	_, err := Register(server, fixtureMFS(t), fixtureTokenConfig, "/test",
+		WithTools(Selection{Include: []string{"no_such_tool"}}),
+		WithConflictPolicy(ConflictError),
+	)
+	require.Error(t, err)
+	assert.Zero(t, initialized.Load(), "invalid options must be rejected before the probe")
+}
+
+func TestRegister_ConcurrentConflictErrorIsAtomic(t *testing.T) {
+	server := newEmbeddingServer()
+	mfs := fixtureMFS(t)
+
+	const callers = 2
+	errs := make(chan error, callers)
+	for range callers {
+		go func() {
+			_, err := Register(server, mfs, fixtureTokenConfig, "/test", WithConflictPolicy(ConflictError))
+			errs <- err
+		}()
+	}
+
+	var succeeded, conflicted int
+	for range callers {
+		err := <-errs
+		switch err {
+		case nil:
+			succeeded++
+		default:
+			var conflict *RegistrationConflict
+			require.ErrorAs(t, err, &conflict)
+			conflicted++
+		}
+	}
+	assert.Equal(t, 1, succeeded, "exactly one concurrent registration should win")
+	assert.Equal(t, 1, conflicted, "the other should report a typed conflict")
+
+	tools, resources, templates := connectAndList(t, server)
+	assert.Equal(t, allToolNames, tools)
+	assert.Equal(t, allResourceURIs, resources)
+	assert.Equal(t, allTemplateURIs, templates)
+}
+
 func TestRegister_UnknownConflictPolicyIsError(t *testing.T) {
 	server := newEmbeddingServer()
 	s, err := Register(server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictPolicy(99)))
@@ -696,7 +816,7 @@ func TestRegister_ProbeDoesNotBlockOnStuckHandler(t *testing.T) {
 	case err := <-done:
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "inspect server before registering")
-	case <-time.After(5 * time.Second):
+	case <-time.After(time.Second):
 		t.Fatal("Register did not return after the probe deadline")
 	}
 }
