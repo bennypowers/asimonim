@@ -193,7 +193,7 @@ func TestRootsProtocolMatrix(t *testing.T) {
 			t.Run("capability present with a root", func(t *testing.T) {
 				server := newEmbeddingServer()
 				mustRegister(t, server, projectFS(), nil, "/elsewhere")
-				session, _ := connectMatrixClient(t, server, clientSetup{
+				session, rootsCalls := connectMatrixClient(t, server, clientSetup{
 					protocol:       protocol,
 					advertiseRoots: true,
 					roots:          []*mcp.Root{{URI: "file:///project"}},
@@ -206,6 +206,11 @@ func TestRootsProtocolMatrix(t *testing.T) {
 				assert.Equal(t, testSourceRoots, meta["source"])
 				assert.Equal(t, "/project", meta["root"])
 				assert.NotContains(t, meta, "warning")
+				if protocol >= testProtocol20260728 {
+					assert.Zero(t, rootsCalls.Load(), "2026-07-28 must use MRTR instead of a direct roots/list request")
+				} else {
+					assert.EqualValues(t, 1, rootsCalls.Load(), "legacy revisions use one direct roots/list request")
+				}
 			})
 
 			t.Run("capability present with empty roots", func(t *testing.T) {
@@ -526,6 +531,7 @@ func TestWithWorkspaceRejectsExplicitConfig(t *testing.T) {
 
 	_, err = Register(server, projectFS(), nil, "/elsewhere", WithWorkspace("  "))
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), "non-empty directory")
 }
 
 func TestExplicitConfigMeta(t *testing.T) {
@@ -570,4 +576,144 @@ func TestWorkspaceMetaWarningIsOmittedWhenEmpty(t *testing.T) {
 	assert.Equal(t, testSourceRoots, meta["source"])
 	_, hasWarning := meta["warning"]
 	assert.False(t, hasWarning)
+}
+
+func TestRootsInvalidURIFallsBackToCwdWithWarning(t *testing.T) {
+	ctx := context.Background()
+
+	for _, protocol := range testProtocols {
+		t.Run(protocol, func(t *testing.T) {
+			server := newEmbeddingServer()
+			mustRegister(t, server, cwdFS(), nil, "/mycwd")
+			session, _ := connectMatrixClient(t, server, clientSetup{
+				protocol:       protocol,
+				advertiseRoots: true,
+				roots:          []*mcp.Root{{URI: "https://example.com/project"}},
+			})
+
+			result := callSearch(t, ctx, session, "small")
+			assert.Equal(t, []string{"spacing-small"}, searchNames(t, result))
+
+			meta := workspaceMeta(t, result.Meta)
+			assert.Equal(t, testSourceCwd, meta["source"])
+			assert.Equal(t, "/mycwd", meta["root"])
+			warning, _ := meta["warning"].(string)
+			assert.Contains(t, warning, "invalid root URI")
+		})
+	}
+}
+
+func TestMRTRRetryWithoutInputResponses(t *testing.T) {
+	ctx := context.Background()
+
+	server := newEmbeddingServer()
+	mustRegister(t, server, cwdWithProjectFS(), nil, "/mycwd")
+	session, _ := connectMatrixClient(t, server, clientSetup{
+		protocol:       testProtocol20260728,
+		advertiseRoots: true,
+		roots:          []*mcp.Root{{URI: "file:///project"}},
+		disableMRTR:    true,
+	})
+
+	first := callSearch(t, ctx, session, "small")
+	require.True(t, first.NeedsInput())
+
+	retry, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:         "search_tokens",
+		Arguments:    map[string]any{"query": "small"},
+		RequestState: first.RequestState,
+	})
+	require.NoError(t, err)
+	require.False(t, retry.NeedsInput(), "a retry without responses must not loop")
+	assert.Equal(t, []string{"spacing-small"}, searchNames(t, retry))
+
+	meta := workspaceMeta(t, retry.Meta)
+	assert.Equal(t, testSourceCwd, meta["source"])
+	warning, _ := meta["warning"].(string)
+	assert.Contains(t, warning, "no input responses")
+}
+
+func TestRootsNilElementFallsBackToCwd(t *testing.T) {
+	t.Run("request without a session", func(t *testing.T) {
+		s := NewServer(cwdFS(), nil, "/mycwd")
+		s.listRoots = func(context.Context) ([]*mcp.Root, error) {
+			return []*mcp.Root{nil}, nil
+		}
+
+		ws := s.workspaceForRequest(context.Background(), nil)
+		assert.Equal(t, testSourceCwd, ws.source)
+		assert.Equal(t, "/mycwd", ws.rootDir)
+		assert.Contains(t, ws.warning, "null root")
+	})
+
+	t.Run("MRTR response", func(t *testing.T) {
+		ctx := context.Background()
+		server := newEmbeddingServer()
+		mustRegister(t, server, cwdWithProjectFS(), nil, "/mycwd")
+		session, _ := connectMatrixClient(t, server, clientSetup{
+			protocol:       testProtocol20260728,
+			advertiseRoots: true,
+			roots:          []*mcp.Root{{URI: "file:///project"}},
+			disableMRTR:    true,
+		})
+
+		first := callSearch(t, ctx, session, "small")
+		require.True(t, first.NeedsInput())
+
+		retry, err := session.CallTool(ctx, &mcp.CallToolParams{
+			Name:      "search_tokens",
+			Arguments: map[string]any{"query": "small"},
+			InputResponses: mcp.InputResponseMap{
+				testInputRequestRoots: &mcp.ListRootsResult{Roots: []*mcp.Root{nil}},
+			},
+			RequestState: first.RequestState,
+		})
+		require.NoError(t, err)
+		require.False(t, retry.NeedsInput())
+		assert.Equal(t, []string{"spacing-small"}, searchNames(t, retry))
+
+		meta := workspaceMeta(t, retry.Meta)
+		assert.Equal(t, testSourceCwd, meta["source"])
+		warning, _ := meta["warning"].(string)
+		assert.Contains(t, warning, "null root")
+	})
+}
+
+func TestRegisterWithWorkspaceIsAtomicOnError(t *testing.T) {
+	server := newEmbeddingServer()
+	s := &Server{fs: cwdFS(), cwd: "/mycwd"}
+
+	err := s.Register(server,
+		WithWorkspace("/project"),
+		WithTools(Selection{Include: []string{"does_not_exist"}}),
+	)
+	require.Error(t, err)
+
+	assert.Empty(t, s.hostWorkspace, "a failed Register must not apply the host workspace")
+	assert.False(t, s.hostState.resolved)
+}
+
+func TestWithWorkspaceLastValueWins(t *testing.T) {
+	ctx := context.Background()
+
+	s := mustRegister(t, newEmbeddingServer(), twoProjectFS(), nil, "/elsewhere", WithWorkspace("/project-a"))
+
+	server := newEmbeddingServer()
+	require.NoError(t, s.Register(server, WithWorkspace("/project-b")))
+
+	session, rootsCalls := connectMatrixClient(t, server, clientSetup{
+		protocol:       testProtocol20260728,
+		advertiseRoots: true,
+		roots:          []*mcp.Root{{URI: "file:///project-a"}},
+		disableMRTR:    true,
+	})
+
+	result := callSearch(t, ctx, session, "beta")
+	require.False(t, result.NeedsInput())
+	assert.Equal(t, []string{"color-beta"}, searchNames(t, result))
+
+	meta := workspaceMeta(t, result.Meta)
+	assert.Equal(t, testSourceHost, meta["source"])
+	assert.Equal(t, "/project-b", meta["root"])
+	assert.Zero(t, rootsCalls.Load())
 }

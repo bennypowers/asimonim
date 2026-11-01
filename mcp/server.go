@@ -8,7 +8,6 @@ See the LICENSE file for details.
 
 //lint:file-ignore SA1019 roots/list is deprecated by SEP-2577 but still supported
 
-//nolint:staticcheck // roots/list is deprecated by SEP-2577 but still supported
 package mcp
 
 import (
@@ -60,7 +59,8 @@ const (
 	// roots input request. It lets the server distinguish a genuine first
 	// call from a retry that lost its input responses. It is not a security
 	// boundary: it only chooses between asking for roots and falling back to
-	// cwd, and the client supplies the roots either way.
+	// cwd, and the client supplies the roots either way. It shares a value
+	// with inputRequestRoots for readability, but the two are independent.
 	requestStateRoots = "asimonim/roots"
 
 	// protocolMRTR is the first protocol revision that forbids
@@ -99,7 +99,7 @@ type Server struct {
 
 	// listRoots resolves project roots for requests without a session.
 	// Injectable for tests.
-	listRoots func(ctx context.Context) ([]*mcp.Root, error)
+	listRoots func(ctx context.Context) ([]*mcp.Root, error) //nolint:staticcheck // roots/list is deprecated by SEP-2577 but still supported
 
 	// cfgProvided records whether cfg was passed to the constructor. An
 	// explicit config is shared by every session; otherwise each session
@@ -114,19 +114,13 @@ type Server struct {
 	hostWorkspace string
 
 	mu        sync.Mutex
-	shared    workspaceState                           // requests without a session
-	hostState workspaceState                           // lazily loaded hostWorkspace
-	sessions  map[*mcp.ServerSession]*sessionWorkspace // per-session cache
+	shared    workspaceState                         // requests without a session
+	hostState workspaceState                         // lazily loaded hostWorkspace
+	sessions  map[*mcp.ServerSession]*workspaceState // per-session cache
 }
 
 // workspaceState caches one resolved workspace.
 type workspaceState struct {
-	resolved bool
-	ws       workspace
-}
-
-// sessionWorkspace caches the workspace resolved for one MCP session.
-type sessionWorkspace struct {
 	resolved bool
 	ws       workspace
 }
@@ -215,10 +209,6 @@ func (s *Server) Register(server *mcp.Server, opts ...RegisterOption) error {
 		if strings.TrimSpace(cfg.workspace) == "" {
 			return errors.New("mcp: WithWorkspace requires a non-empty directory")
 		}
-		s.mu.Lock()
-		s.hostWorkspace = cfg.workspace
-		s.hostState = workspaceState{}
-		s.mu.Unlock()
 	}
 	switch cfg.conflict {
 	case ConflictReplace, ConflictError, ConflictSkip:
@@ -255,6 +245,16 @@ func (s *Server) Register(server *mcp.Server, opts ...RegisterOption) error {
 		if cfg.conflict == ConflictError && !conflict.empty() {
 			return &conflict
 		}
+	}
+
+	// Apply the host workspace only after every option and conflict check has
+	// succeeded, so a failed Register leaves the Server's resolution state
+	// untouched.
+	if cfg.workspaceSet {
+		s.mu.Lock()
+		s.hostWorkspace = cfg.workspace
+		s.hostState = workspaceState{}
+		s.mu.Unlock()
 	}
 
 	for _, f := range tools {
@@ -296,24 +296,26 @@ func (s *Server) configForRequest(ctx context.Context, session *mcp.ServerSessio
 	return ws.cfg, ws.rootDir
 }
 
-// resolveConfig returns the config for a request without a session. It is kept
-// for handler tests; serving uses workspaceForRequest.
-func (s *Server) resolveConfig(ctx context.Context) (*config.Config, string) {
-	ws := s.workspaceForRequest(ctx, nil)
-	return ws.cfg, ws.rootDir
-}
-
 // workspaceForRequest resolves the workspace for a request, caching per
 // session. It never issues a roots input request: callers that can return an
 // input-required result use prepareWorkspace first.
 func (s *Server) workspaceForRequest(ctx context.Context, session *mcp.ServerSession) workspace {
-	if ws, ok := s.fixedWorkspace(); ok {
-		return ws
-	}
 	if session == nil {
+		if ws, ok := s.fixedWorkspace(); ok {
+			return ws
+		}
 		return s.sharedWorkspace(ctx)
 	}
-	return s.sessionWorkspace(ctx, session)
+	ws, needsInput := s.prepareWorkspace(ctx, session, nil, "")
+	if needsInput {
+		// A handler ran without the registration wrapper. Return a transient
+		// cwd workspace without caching it, so a later wrapped call can still
+		// resolve roots through MRTR. This path is defensive and intentionally
+		// has no end-to-end test.
+		ws = s.cwdWorkspace("roots require a multi round-trip request")
+		logWorkspaceWarning(session.ID(), ws)
+	}
+	return ws
 }
 
 // prepareWorkspace resolves the workspace before a handler runs. It reports
@@ -419,36 +421,11 @@ func (s *Server) sharedWorkspace(ctx context.Context) workspace {
 	return resolved
 }
 
-// sessionWorkspace returns the cached workspace for a session, resolving it
-// directly for revisions that permit server-initiated roots requests.
-func (s *Server) sessionWorkspace(ctx context.Context, session *mcp.ServerSession) workspace {
-	s.mu.Lock()
-	if st := s.sessions[session]; st != nil && st.resolved {
-		ws := st.ws
-		s.mu.Unlock()
-		return ws
-	}
-	s.mu.Unlock()
-
-	protocol, hasRoots := sessionRootsCapability(session)
-	switch {
-	case !hasRoots:
-		return s.cacheSessionWorkspace(session, s.cwdWorkspace(""))
-	case protocol >= protocolMRTR:
-		// Reaching this path means a handler was called without the
-		// registration wrapper. Return a transient cwd workspace without
-		// caching it, so the next wrapped call can still resolve roots.
-		return s.cwdWorkspace("roots require a multi round-trip request")
-	default:
-		return s.cacheSessionWorkspace(session, s.workspaceFromSessionRoots(ctx, session))
-	}
-}
-
 // workspaceFromSessionRoots issues a direct roots/list request. It is only
 // valid on protocol revisions before 2026-07-28.
 func (s *Server) workspaceFromSessionRoots(ctx context.Context, session *mcp.ServerSession) workspace {
-	listRoots := func(ctx context.Context) ([]*mcp.Root, error) {
-		result, err := session.ListRoots(ctx, nil)
+	listRoots := func(ctx context.Context) ([]*mcp.Root, error) { //nolint:staticcheck // roots/list is deprecated by SEP-2577 but still supported
+		result, err := session.ListRoots(ctx, nil) //nolint:staticcheck // roots/list is required before 2026-07-28
 		if err != nil || result == nil {
 			return nil, err
 		}
@@ -459,7 +436,7 @@ func (s *Server) workspaceFromSessionRoots(ctx context.Context, session *mcp.Ser
 
 // workspaceFromDirectRoots resolves the first root returned by listRoots and
 // falls back to cwd with a warning when roots cannot be used.
-func (s *Server) workspaceFromDirectRoots(ctx context.Context, listRoots func(context.Context) ([]*mcp.Root, error)) workspace {
+func (s *Server) workspaceFromDirectRoots(ctx context.Context, listRoots func(context.Context) ([]*mcp.Root, error)) workspace { //nolint:staticcheck // roots/list is deprecated by SEP-2577 but still supported
 	if listRoots == nil {
 		return s.cwdWorkspace("")
 	}
@@ -472,7 +449,8 @@ func (s *Server) workspaceFromDirectRoots(ctx context.Context, listRoots func(co
 
 // workspaceFromInputResponses resolves the workspace from a multi round-trip
 // retry. A missing or wrong-typed response falls back to cwd with a warning
-// instead of asking the client again.
+// instead of asking the client again. The caller caches that fallback, which is
+// deliberate: a malformed retry must not turn into a retry loop.
 func (s *Server) workspaceFromInputResponses(responses mcp.InputResponseMap) workspace {
 	if responses == nil {
 		return s.cwdWorkspace("roots retry carried no input responses")
@@ -481,7 +459,7 @@ func (s *Server) workspaceFromInputResponses(responses mcp.InputResponseMap) wor
 	if !ok || response == nil {
 		return s.cwdWorkspace(fmt.Sprintf("roots retry did not include the %q input response", inputRequestRoots))
 	}
-	result, ok := response.(*mcp.ListRootsResult)
+	result, ok := response.(*mcp.ListRootsResult) //nolint:staticcheck // roots/list is deprecated by SEP-2577 but still supported
 	if !ok {
 		return s.cwdWorkspace(fmt.Sprintf("unexpected %q input response type %T", inputRequestRoots, response))
 	}
@@ -489,13 +467,17 @@ func (s *Server) workspaceFromInputResponses(responses mcp.InputResponseMap) wor
 }
 
 // workspaceFromRoots resolves the first client root.
-func (s *Server) workspaceFromRoots(roots []*mcp.Root) workspace {
+func (s *Server) workspaceFromRoots(roots []*mcp.Root) workspace { //nolint:staticcheck // roots/list is deprecated by SEP-2577 but still supported
 	if len(roots) == 0 {
 		return s.cwdWorkspace("client advertised roots but returned an empty list")
 	}
-	path, err := fileURIToPath(roots[0].URI)
+	root := roots[0]
+	if root == nil {
+		return s.cwdWorkspace("client returned a null root")
+	}
+	path, err := fileURIToPath(root.URI)
 	if err != nil {
-		return s.cwdWorkspace(fmt.Sprintf("invalid root URI %q: %v", roots[0].URI, err))
+		return s.cwdWorkspace(fmt.Sprintf("invalid root URI %q: %v", root.URI, err))
 	}
 	return workspace{
 		cfg:     config.LoadFullOrDefault(s.fs, path),
@@ -524,7 +506,7 @@ func sessionRootsCapability(session *mcp.ServerSession) (string, bool) {
 	if params == nil {
 		return "", false
 	}
-	hasRoots := params.Capabilities != nil && params.Capabilities.RootsV2 != nil
+	hasRoots := params.Capabilities != nil && params.Capabilities.RootsV2 != nil //nolint:staticcheck // roots/list is deprecated by SEP-2577 but still supported
 	return params.ProtocolVersion, hasRoots
 }
 
@@ -548,13 +530,13 @@ func (s *Server) cacheSessionWorkspace(session *mcp.ServerSession, ws workspace)
 
 // ensureSession returns the cache entry for session, creating it and starting
 // the cleanup goroutine on first use. Callers must hold s.mu.
-func (s *Server) ensureSession(session *mcp.ServerSession) *sessionWorkspace {
+func (s *Server) ensureSession(session *mcp.ServerSession) *workspaceState {
 	if s.sessions == nil {
-		s.sessions = make(map[*mcp.ServerSession]*sessionWorkspace)
+		s.sessions = make(map[*mcp.ServerSession]*workspaceState)
 	}
 	state := s.sessions[session]
 	if state == nil {
-		state = new(sessionWorkspace)
+		state = new(workspaceState)
 		s.sessions[session] = state
 		go s.forgetSession(session)
 	}
@@ -571,6 +553,8 @@ func (s *Server) forgetSession(session *mcp.ServerSession) {
 
 // logWorkspaceWarning reports a fallback once per resolution. stdout carries
 // JSON-RPC only, so slog's default stderr handler is the right destination.
+// The project's internal logger is deliberately not used here because MCP mode
+// silences it with io.Discard, which would hide these warnings.
 func logWorkspaceWarning(sessionID string, ws workspace) {
 	if ws.warning == "" {
 		return
@@ -676,7 +660,7 @@ func resourceRequestState(req *mcp.ReadResourceRequest) string {
 func inputRequiredToolResult() *mcp.CallToolResult {
 	return &mcp.CallToolResult{
 		InputRequests: mcp.InputRequestMap{
-			inputRequestRoots: &mcp.ListRootsParams{},
+			inputRequestRoots: &mcp.ListRootsParams{}, //nolint:staticcheck // roots/list is deprecated by SEP-2577 but still supported
 		},
 		RequestState: requestStateRoots,
 	}
@@ -685,7 +669,7 @@ func inputRequiredToolResult() *mcp.CallToolResult {
 func inputRequiredResourceResult() *mcp.ReadResourceResult {
 	return &mcp.ReadResourceResult{
 		InputRequests: mcp.InputRequestMap{
-			inputRequestRoots: &mcp.ListRootsParams{},
+			inputRequestRoots: &mcp.ListRootsParams{}, //nolint:staticcheck // roots/list is deprecated by SEP-2577 but still supported
 		},
 		RequestState: requestStateRoots,
 	}
