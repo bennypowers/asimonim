@@ -662,6 +662,7 @@ func TestRegister_ConflictProbeFailureIsReported(t *testing.T) {
 	_, err := Register(server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictError))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "inspect server before registering")
+	assert.Contains(t, err.Error(), "rejected probe client")
 }
 
 func TestRegister_EmptySelectionSkipsProbe(t *testing.T) {
