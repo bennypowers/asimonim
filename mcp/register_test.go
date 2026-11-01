@@ -100,6 +100,20 @@ func listResourceTemplateURIs(t *testing.T, ctx context.Context, session *mcp.Cl
 	return uris
 }
 
+// requiredToolInputs returns the sorted required input fields from a tool's
+// marshaled JSON definition.
+func requiredToolInputs(t *testing.T, toolJSON string) []string {
+	t.Helper()
+	var tool struct {
+		InputSchema struct {
+			Required []string `json:"required"`
+		} `json:"inputSchema"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(toolJSON), &tool))
+	sort.Strings(tool.InputSchema.Required)
+	return tool.InputSchema.Required
+}
+
 func newEmbeddingServer() *mcp.Server {
 	return mcp.NewServer(&mcp.Implementation{
 		Name:    "embedding-server",
@@ -120,9 +134,13 @@ func TestRegister_ToolParity(t *testing.T) {
 	Register(server, mfs, cfg, "/test")
 	session := connectSession(t, server)
 	registered := listToolNames(t, ctx, session)
+	registeredTools := normalizedTools(t, ctx, session)
 
 	assert.Equal(t, baseline, registered)
-	assert.Equal(t, baselineTools, normalizedTools(t, ctx, session))
+	assert.Equal(t, baselineTools, registeredTools)
+	assert.Equal(t, []string{"query"}, requiredToolInputs(t, registeredTools["search_tokens"]))
+	assert.Equal(t, []string{"format"}, requiredToolInputs(t, registeredTools["convert_tokens"]))
+	assert.Empty(t, requiredToolInputs(t, registeredTools["validate_tokens"]))
 	assert.Equal(t, []string{"convert_tokens", "search_tokens", "validate_tokens"}, registered)
 }
 
