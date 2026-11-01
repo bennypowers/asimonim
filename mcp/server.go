@@ -58,7 +58,7 @@ const (
 	workspaceMetaKey = "asimonim/workspace"
 
 	// inputRequestRoots is the server-assigned ID for a roots/list input
-	// request in a multi round-trip request.
+	// request in a multi-round-trip request.
 	inputRequestRoots = "asimonim/roots"
 
 	// requestStateRoots is the opaque state echoed by a client retrying a
@@ -70,7 +70,7 @@ const (
 	requestStateRoots = "asimonim/roots"
 
 	// protocolMRTR is the first protocol revision that forbids
-	// server-initiated roots/list requests and requires multi round-trip
+	// server-initiated roots/list requests and requires multi-round-trip
 	// input requests instead (SEP-2322). Versions are compared
 	// lexicographically, as the SDK does.
 	protocolMRTR = "2026-07-28"
@@ -133,7 +133,7 @@ type workspaceState struct {
 
 // NewServer creates a new design tokens MCP server.
 // If cfg is nil, config is resolved lazily from MCP roots on first use. Clients
-// on protocol revision 2026-07-28 resolve roots through multi round-trip
+// on protocol revision 2026-07-28 resolve roots through multi-round-trip
 // requests (SEP-2322).
 func NewServer(filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server {
 	s := &Server{
@@ -191,7 +191,7 @@ func NewServer(filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server
 //  2. a workspace supplied with [WithWorkspace];
 //  3. the session's cached resolution;
 //  4. the client's MCP roots, directly on revisions before 2026-07-28 and
-//     through multi round-trip requests on 2026-07-28 and later;
+//     through multi-round-trip requests on 2026-07-28 and later;
 //  5. the server's cwd.
 //
 // Each session caches its own roots and config, so an embedding server can
@@ -318,7 +318,7 @@ func (s *Server) workspaceForRequest(ctx context.Context, session *mcp.ServerSes
 		// cwd workspace without caching it, so a later wrapped call can still
 		// resolve roots through MRTR. This path is defensive and intentionally
 		// has no end-to-end test.
-		ws = s.cwdWorkspace("roots require a multi round-trip request")
+		ws = s.cwdWorkspace("roots require a multi-round-trip request")
 		logWorkspaceWarning(session.ID(), ws)
 	}
 	return ws
@@ -463,7 +463,7 @@ func (s *Server) workspaceFromDirectRoots(ctx context.Context, listRoots func(co
 	return s.workspaceFromRoots(roots)
 }
 
-// workspaceFromInputResponses resolves the workspace from a multi round-trip
+// workspaceFromInputResponses resolves the workspace from a multi-round-trip
 // retry. A missing or wrong-typed response falls back to cwd with a warning
 // instead of asking the client again. The caller caches that fallback, which is
 // deliberate: a malformed retry must not turn into a retry loop.
@@ -600,7 +600,7 @@ func attachWorkspaceMeta(result metaResult, ws workspace) {
 }
 
 // addServerTool registers handler through the workspace-aware wrapper so no
-// tool can forget multi round-trip roots or provenance.
+// tool can forget multi-round-trip roots or provenance.
 func addServerTool[In, Out any](s *Server, server *mcp.Server, tool *mcp.Tool, handler mcp.ToolHandlerFor[In, Out]) {
 	mcp.AddTool(server, tool, wrapServerTool(s, handler))
 }

@@ -38,7 +38,7 @@ The MCP server discovers tokens from:
 The server resolves its workspace in this order: an explicit config, a host
 workspace supplied by an embedder, the session's cached resolution, the
 client's MCP roots (directly on protocol revisions before `2026-07-28`, and
-through multi round-trip requests on `2026-07-28` and later), then the working
+through multi-round-trip requests on `2026-07-28` and later), then the working
 directory.
 
 Every completed tool and resource result carries provenance in `_meta`:
