@@ -125,10 +125,12 @@ Tools and resources resolve their workspace lazily, in this order:
 5. the server's `cwd`.
 
 Each session caches its own resolution, so one embedding server can serve
-clients with different roots. `WithWorkspace` cannot be combined with an
-explicit config: `Register` rejects that combination. The MCP server targets
-`go-sdk` v1.8.0, which supplies the multi round-trip primitives used on
-`2026-07-28`.
+clients with different roots. Stateless Streamable HTTP deployments create a
+new session per request, so roots are resolved on every call; use
+`WithWorkspace` there to avoid the extra round trip. `WithWorkspace` cannot be
+combined with an explicit config: `Register` rejects that combination. The MCP
+server targets `go-sdk` v1.8.0, which supplies the multi round-trip primitives
+used on `2026-07-28`.
 
 Every completed tool and resource result carries its provenance in `_meta`:
 

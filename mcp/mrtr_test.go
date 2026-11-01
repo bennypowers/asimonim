@@ -691,6 +691,18 @@ func TestRegisterWithWorkspaceIsAtomicOnError(t *testing.T) {
 
 	assert.Empty(t, s.hostWorkspace, "a failed Register must not apply the host workspace")
 	assert.False(t, s.hostState.resolved)
+
+	// A second failed Register must preserve a workspace applied by an
+	// earlier successful call.
+	require.NoError(t, s.Register(server, WithWorkspace("/project-a")))
+	require.Equal(t, "/project-a", s.hostWorkspace)
+
+	err = s.Register(server,
+		WithWorkspace("/project-b"),
+		WithTools(Selection{Include: []string{"does_not_exist"}}),
+	)
+	require.Error(t, err)
+	assert.Equal(t, "/project-a", s.hostWorkspace, "a failed Register must not replace an existing host workspace")
 }
 
 func TestWithWorkspaceLastValueWins(t *testing.T) {
@@ -716,4 +728,42 @@ func TestWithWorkspaceLastValueWins(t *testing.T) {
 	assert.Equal(t, testSourceHost, meta["source"])
 	assert.Equal(t, "/project-b", meta["root"])
 	assert.Zero(t, rootsCalls.Load())
+}
+
+func TestMRTRNeedsInput(t *testing.T) {
+	responses := mcp.InputResponseMap{
+		testInputRequestRoots: &mcp.ListRootsResult{},
+	}
+
+	assert.True(t, mrtrNeedsInput("", nil), "a first call with no responses needs input")
+	assert.True(t, mrtrNeedsInput("", mcp.InputResponseMap{}), "an empty response map counts as absent")
+	assert.False(t, mrtrNeedsInput(requestStateRoots, nil), "our request state marks a retry")
+	assert.False(t, mrtrNeedsInput("", responses), "a response without echoed state marks a retry")
+}
+
+func TestRootsLegacyResourceRead(t *testing.T) {
+	ctx := context.Background()
+
+	for _, protocol := range []string{testProtocol20250618, testProtocol20251125} {
+		t.Run(protocol, func(t *testing.T) {
+			server := newEmbeddingServer()
+			mustRegister(t, server, projectFS(), nil, "/elsewhere")
+			session, rootsCalls := connectMatrixClient(t, server, clientSetup{
+				protocol:       protocol,
+				advertiseRoots: true,
+				roots:          []*mcp.Root{{URI: "file:///project"}},
+			})
+
+			result, err := session.ReadResource(ctx, &mcp.ReadResourceParams{URI: "asimonim://config"})
+			require.NoError(t, err)
+			require.False(t, result.NeedsInput(), "legacy resource reads must not return an input request")
+			require.Len(t, result.Contents, 1)
+			assert.Contains(t, result.Contents[0].Text, "/project/tokens.json")
+
+			meta := workspaceMeta(t, result.Meta)
+			assert.Equal(t, testSourceRoots, meta["source"])
+			assert.Equal(t, "/project", meta["root"])
+			assert.EqualValues(t, 1, rootsCalls.Load())
+		})
+	}
 }

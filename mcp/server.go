@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 
@@ -31,6 +32,11 @@ import (
 // Register calls on the same server from interleaving. Register is a
 // setup-time operation, so a single process-wide lock is fine.
 var registerMu sync.Mutex
+
+// workspaceLogger writes to stderr regardless of any host-installed slog
+// default, so an embedder that configures slog to write to stdout cannot
+// corrupt the JSON-RPC stream with workspace warnings.
+var workspaceLogger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 // Workspace provenance values reported in result _meta under
 // [workspaceMetaKey].
@@ -348,12 +354,19 @@ func (s *Server) prepareWorkspace(
 		return s.cacheSessionWorkspace(session, s.cwdWorkspace("")), false
 	}
 	if protocol >= protocolMRTR {
-		if state != requestStateRoots && responses == nil {
+		if mrtrNeedsInput(state, responses) {
 			return workspace{}, true
 		}
 		return s.cacheSessionWorkspace(session, s.workspaceFromInputResponses(responses)), false
 	}
 	return s.cacheSessionWorkspace(session, s.workspaceFromSessionRoots(ctx, session)), false
+}
+
+// mrtrNeedsInput reports whether a request on protocol 2026-07-28 or later must
+// first ask for roots. An empty response map counts as absent: only a retry
+// that echoes our request state or carries a response proceeds without asking.
+func mrtrNeedsInput(state string, responses mcp.InputResponseMap) bool {
+	return state != requestStateRoots && len(responses) == 0
 }
 
 // fixedWorkspace returns an explicit config or host workspace when one is
@@ -387,7 +400,10 @@ func (s *Server) fixedWorkspace() (workspace, bool) {
 	s.mu.Lock()
 	if s.hostState.resolved {
 		ws = s.hostState.ws
-	} else {
+	} else if s.hostWorkspace == host {
+		// Only cache the load if the host workspace did not change while the
+		// filesystem read held no lock. A concurrent successful Register with
+		// WithWorkspace wins; this call still uses the value it loaded.
 		s.hostState = workspaceState{resolved: true, ws: ws}
 	}
 	s.mu.Unlock()
@@ -552,8 +568,8 @@ func (s *Server) forgetSession(session *mcp.ServerSession) {
 }
 
 // logWorkspaceWarning reports a fallback once per resolution. stdout carries
-// JSON-RPC only, so slog's default stderr handler is the right destination.
-// The project's internal logger is deliberately not used here because MCP mode
+// JSON-RPC only, so workspaceLogger writes to stderr unconditionally. The
+// project's internal logger is deliberately not used here because MCP mode
 // silences it with io.Discard, which would hide these warnings.
 func logWorkspaceWarning(sessionID string, ws workspace) {
 	if ws.warning == "" {
@@ -563,7 +579,7 @@ func logWorkspaceWarning(sessionID string, ws workspace) {
 	if sessionID != "" {
 		args = append(args, "session", sessionID)
 	}
-	slog.Warn("asimonim: workspace resolution", args...)
+	workspaceLogger.Warn("asimonim: workspace resolution", args...)
 }
 
 // metaResult is implemented by MCP results that carry _meta.
