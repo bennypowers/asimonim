@@ -77,8 +77,8 @@ func NewServer(filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server
 //
 // Config resolution stays lazy and session-aware. Each MCP session resolves
 // and caches its own roots and config, so an embedding server can serve
-// clients with different workspaces. Requests without a session share a
-// single lazy cache.
+// clients with different workspaces. An explicit config is shared by all
+// sessions. Requests without a session share a single lazy cache.
 func (s *Server) Register(server *mcp.Server) {
 	if server == nil {
 		panic("mcp: Register called with nil server")
