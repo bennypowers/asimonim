@@ -11,10 +11,12 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"testing"
 
 	"bennypowers.dev/asimonim/config"
+	"bennypowers.dev/asimonim/internal/mapfs"
 	"bennypowers.dev/asimonim/testutil"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
@@ -284,4 +286,60 @@ func TestRegister_ResolvesConfigFromSessionRoots(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(resultText(t, result)), &tokens))
 	require.Len(t, tokens, 1)
 	assert.Equal(t, "color-primary", tokens[0].Name)
+}
+
+// twoProjectFS returns a filesystem with two independent workspaces.
+func twoProjectFS() *mapfs.MapFileSystem {
+	mfs := mapfs.New()
+	projects := []struct {
+		root  string
+		name  string
+		value string
+	}{
+		{"/project-a", "alpha", "#FF0000"},
+		{"/project-b", "beta", "#0000FF"},
+	}
+	for _, project := range projects {
+		mfs.AddFile(project.root+"/.config/design-tokens.yaml",
+			"files:\n  - "+project.root+"/tokens.json\n", 0644)
+		mfs.AddFile(project.root+"/tokens.json", fmt.Sprintf(`{
+			"color": {
+				"%s": {
+					"$type": "color",
+					"$value": "%s"
+				}
+			}
+		}`, project.name, project.value), 0644)
+	}
+	return mfs
+}
+
+func TestRegister_ResolvesPerSessionRoots(t *testing.T) {
+	ctx := context.Background()
+
+	// A single embedding server serves two clients with different roots.
+	// Each session must resolve its own workspace.
+	server := newEmbeddingServer()
+	Register(server, twoProjectFS(), nil, "/elsewhere")
+
+	sessionA := connectSession(t, server, &mcp.Root{URI: "file:///project-a"})
+	sessionB := connectSession(t, server, &mcp.Root{URI: "file:///project-b"})
+
+	assertSearchFinds(t, ctx, sessionA, "alpha")
+	assertSearchFinds(t, ctx, sessionB, "beta")
+}
+
+func assertSearchFinds(t *testing.T, ctx context.Context, session *mcp.ClientSession, name string) {
+	t.Helper()
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "search_tokens",
+		Arguments: map[string]any{"query": name},
+	})
+	require.NoError(t, err)
+	require.False(t, result.IsError, "unexpected tool error: %s", resultText(t, result))
+
+	var tokens []tokenSummary
+	require.NoError(t, json.Unmarshal([]byte(resultText(t, result)), &tokens))
+	require.Len(t, tokens, 1)
+	assert.Equal(t, "color-"+name, tokens[0].Name)
 }
