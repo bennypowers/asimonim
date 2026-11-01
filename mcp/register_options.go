@@ -26,6 +26,13 @@ const (
 	// target server during conflict detection.
 	probeClientName = "asimonim-register-probe"
 
+	// probeProtocolVersion pins the conflict probe to the newest legacy
+	// revision. The probe only lists features, so it does not need the
+	// 2026-07-28 stateless discovery path, and the legacy handshake keeps host
+	// session hooks observable as documented for ConflictError and
+	// ConflictSkip.
+	probeProtocolVersion = "2025-11-25"
+
 	defaultProbeTimeout = 5 * time.Second
 )
 
@@ -54,10 +61,30 @@ type RegisterOption func(*registerConfig)
 
 // registerConfig is the accumulated state of the options passed to Register.
 type registerConfig struct {
-	tools     Selection
-	resources Selection
-	templates Selection
-	conflict  ConflictPolicy
+	tools        Selection
+	resources    Selection
+	templates    Selection
+	conflict     ConflictPolicy
+	workspace    string
+	workspaceSet bool
+}
+
+// WithWorkspace supplies the workspace directory asimonim should use instead of
+// resolving the client's MCP roots.
+//
+// The directory is shared by every session on the server, is loaded lazily,
+// and never triggers a roots round trip. It has lower precedence than an
+// explicit config: passing both WithWorkspace and a non-nil config to
+// [Register] is an error. An empty or whitespace-only directory is also an
+// error.
+//
+// Results carry _meta "asimonim/workspace" with source "host" and root set to
+// dir. Repeated calls use the last value.
+func WithWorkspace(dir string) RegisterOption {
+	return func(c *registerConfig) {
+		c.workspace = dir
+		c.workspaceSet = true
+	}
 }
 
 // WithTools filters the tools Register mounts by exact tool name.
@@ -303,7 +330,9 @@ func inspectServer(server *mcp.Server, need surfaceNeeds) (serverSurface, error)
 		Name:    probeClientName,
 		Version: version.Get(),
 	}, nil)
-	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	clientSession, err := client.Connect(ctx, clientTransport, &mcp.ClientSessionOptions{
+		ProtocolVersion: probeProtocolVersion,
+	})
 	if err != nil {
 		return serverSurface{}, fmt.Errorf("connect client: %w", err)
 	}

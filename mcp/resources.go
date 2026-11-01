@@ -78,7 +78,7 @@ func (s *Server) resourceFeatures() []feature {
 			id: resourceTokens,
 			add: func(server *mcp.Server) {
 				// asimonim://tokens - list available token sources
-				server.AddResource(&mcp.Resource{
+				s.addResource(server, &mcp.Resource{
 					URI:         resourceTokens,
 					Name:        "tokens",
 					Description: "Lists available design token sources in the workspace with token counts.",
@@ -90,7 +90,7 @@ func (s *Server) resourceFeatures() []feature {
 			id: resourceConfig,
 			add: func(server *mcp.Server) {
 				// asimonim://config - workspace configuration
-				server.AddResource(&mcp.Resource{
+				s.addResource(server, &mcp.Resource{
 					URI:         resourceConfig,
 					Name:        "config",
 					Description: "Workspace design token configuration (files, resolvers, schema, prefix).",
@@ -109,7 +109,7 @@ func (s *Server) templateFeatures() []feature {
 			id: templateTokensBySource,
 			add: func(server *mcp.Server) {
 				// asimonim://tokens/{+source} - all tokens for a source
-				server.AddResourceTemplate(&mcp.ResourceTemplate{
+				s.addResourceTemplate(server, &mcp.ResourceTemplate{
 					URITemplate: templateTokensBySource,
 					Name:        "tokens-by-source",
 					Description: "All design tokens from a specific source (file or package).",
@@ -121,7 +121,7 @@ func (s *Server) templateFeatures() []feature {
 			id: templateTokenDetail,
 			add: func(server *mcp.Server) {
 				// asimonim://token/{+rest} - individual token detail (rest = source/path...)
-				server.AddResourceTemplate(&mcp.ResourceTemplate{
+				s.addResourceTemplate(server, &mcp.ResourceTemplate{
 					URITemplate: templateTokenDetail,
 					Name:        "token-detail",
 					Description: "Detailed information about an individual design token by source and path.",

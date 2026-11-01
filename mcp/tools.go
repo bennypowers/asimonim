@@ -99,7 +99,7 @@ func (s *Server) toolFeatures() []feature {
 		{
 			id: toolValidate,
 			add: func(server *mcp.Server) {
-				mcp.AddTool(server, &mcp.Tool{
+				addServerTool(s, server, &mcp.Tool{
 					Name:        toolValidate,
 					Description: "Validate design token files for correctness, detect circular references, and report deprecated tokens.",
 				}, s.handleValidate)
@@ -108,7 +108,7 @@ func (s *Server) toolFeatures() []feature {
 		{
 			id: toolSearch,
 			add: func(server *mcp.Server) {
-				mcp.AddTool(server, &mcp.Tool{
+				addServerTool(s, server, &mcp.Tool{
 					Name:        toolSearch,
 					Description: "Search design tokens by name, value, description, or type. Substring search is case-insensitive. Regex search is case-sensitive by default; use (?i) flag for case-insensitive regex.",
 				}, s.handleSearch)
@@ -117,7 +117,7 @@ func (s *Server) toolFeatures() []feature {
 		{
 			id: toolConvert,
 			add: func(server *mcp.Server) {
-				mcp.AddTool(server, &mcp.Tool{
+				addServerTool(s, server, &mcp.Tool{
 					Name:        toolConvert,
 					Description: "Convert design tokens to CSS, SCSS, JavaScript, Swift, Android XML, or other formats.",
 				}, s.handleConvert)
