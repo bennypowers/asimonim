@@ -86,32 +86,39 @@ func newTokenSummary(tok *token.Token) tokenSummary {
 	}
 }
 
+// Tool names, shared by registration, filtering, and tests.
+const (
+	toolValidate = "validate_tokens"
+	toolSearch   = "search_tokens"
+	toolConvert  = "convert_tokens"
+)
+
 // toolFeatures returns asimonim's tools, keyed by the name they register.
 func (s *Server) toolFeatures() []feature {
 	return []feature{
 		{
-			id: "validate_tokens",
+			id: toolValidate,
 			add: func(server *mcp.Server) {
 				mcp.AddTool(server, &mcp.Tool{
-					Name:        "validate_tokens",
+					Name:        toolValidate,
 					Description: "Validate design token files for correctness, detect circular references, and report deprecated tokens.",
 				}, s.handleValidate)
 			},
 		},
 		{
-			id: "search_tokens",
+			id: toolSearch,
 			add: func(server *mcp.Server) {
 				mcp.AddTool(server, &mcp.Tool{
-					Name:        "search_tokens",
+					Name:        toolSearch,
 					Description: "Search design tokens by name, value, description, or type. Substring search is case-insensitive. Regex search is case-sensitive by default; use (?i) flag for case-insensitive regex.",
 				}, s.handleSearch)
 			},
 		},
 		{
-			id: "convert_tokens",
+			id: toolConvert,
 			add: func(server *mcp.Server) {
 				mcp.AddTool(server, &mcp.Tool{
-					Name:        "convert_tokens",
+					Name:        toolConvert,
 					Description: "Convert design tokens to CSS, SCSS, JavaScript, Swift, Android XML, or other formats.",
 				}, s.handleConvert)
 			},

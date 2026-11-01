@@ -10,6 +10,8 @@ package mcp
 
 import (
 	"context"
+	"errors"
+	"sync/atomic"
 	"testing"
 
 	"bennypowers.dev/asimonim/config"
@@ -21,9 +23,9 @@ import (
 )
 
 var (
-	allToolNames       = []string{"convert_tokens", "search_tokens", "validate_tokens"}
-	allResourceURIs    = []string{"asimonim://config", "asimonim://tokens"}
-	allTemplateURIs    = []string{"asimonim://token/{+rest}", "asimonim://tokens/{+source}"}
+	allToolNames       = []string{toolConvert, toolSearch, toolValidate}
+	allResourceURIs    = []string{resourceConfig, resourceTokens}
+	allTemplateURIs    = []string{templateTokenDetail, templateTokensBySource}
 	fixtureTokenConfig = &config.Config{Files: []config.FileSpec{{Path: "/test/tokens.json"}}}
 )
 
@@ -47,16 +49,23 @@ type existingSearchInput struct {
 	Query string `json:"query"`
 }
 
-// addExistingSearchTool pre-registers a search_tokens handler that returns
-// marker, so tests can tell it apart from asimonim's handler.
-func addExistingSearchTool(t *testing.T, server *mcp.Server, marker string) {
+// addExistingTool pre-registers a tool that returns marker, so tests can tell
+// it apart from asimonim's handlers.
+func addExistingTool(t *testing.T, server *mcp.Server, name, marker string) {
 	t.Helper()
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "search_tokens",
-		Description: "pre-existing search handler",
+		Name:        name,
+		Description: "pre-existing handler",
 	}, func(context.Context, *mcp.CallToolRequest, existingSearchInput) (*mcp.CallToolResult, any, error) {
 		return textResult(marker), nil, nil
 	})
+}
+
+// addExistingSearchTool pre-registers a search_tokens handler that returns
+// marker.
+func addExistingSearchTool(t *testing.T, server *mcp.Server, marker string) {
+	t.Helper()
+	addExistingTool(t, server, toolSearch, marker)
 }
 
 func callExistingSearch(t *testing.T, session *mcp.ClientSession) string {
@@ -89,6 +98,11 @@ func TestRegister_DefaultOptionsPreserveSurface(t *testing.T) {
 	assert.Equal(t, baselineTools, normalizedTools(t, ctx, session))
 	assert.Equal(t, baselineResources, listResourceURIs(t, ctx, session))
 	assert.Equal(t, baselineTemplates, listResourceTemplateURIs(t, ctx, session))
+
+	// Also pin the literal surface so the baseline is not only self-referential.
+	assert.Equal(t, allToolNames, listToolNames(t, ctx, session))
+	assert.Equal(t, allResourceURIs, listResourceURIs(t, ctx, session))
+	assert.Equal(t, allTemplateURIs, listResourceTemplateURIs(t, ctx, session))
 }
 
 func TestRegister_ToolSelection(t *testing.T) {
@@ -435,7 +449,7 @@ func TestRegister_ConflictPolicyLastValueWins(t *testing.T) {
 func TestRegister_ConflictErrorDetectsResourceConflict(t *testing.T) {
 	server := newEmbeddingServer()
 	server.AddResource(&mcp.Resource{
-		URI:      "asimonim://tokens",
+		URI:      resourceTokens,
 		Name:     "existing",
 		MIMEType: "application/json",
 	}, func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
@@ -445,10 +459,76 @@ func TestRegister_ConflictErrorDetectsResourceConflict(t *testing.T) {
 	s, err := Register(server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictError))
 	require.Error(t, err)
 	assert.Nil(t, s)
-	assert.Contains(t, err.Error(), "asimonim://tokens")
+	assert.Contains(t, err.Error(), resourceTokens)
 
-	_, resources, _ := connectAndList(t, server)
-	assert.Equal(t, []string{"asimonim://tokens"}, resources)
+	tools, resources, templates := connectAndList(t, server)
+	assert.Empty(t, tools, "validation must stop before other categories register")
+	assert.Equal(t, []string{resourceTokens}, resources)
+	assert.Empty(t, templates)
+}
+
+func TestRegister_ConflictErrorDetectsTemplateConflict(t *testing.T) {
+	server := newEmbeddingServer()
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: templateTokensBySource,
+		Name:        "existing",
+		MIMEType:    "application/json",
+	}, func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return &mcp.ReadResourceResult{}, nil
+	})
+
+	s, err := Register(server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictError))
+	require.Error(t, err)
+	assert.Nil(t, s)
+	assert.Contains(t, err.Error(), templateTokensBySource)
+
+	tools, resources, templates := connectAndList(t, server)
+	assert.Empty(t, tools)
+	assert.Empty(t, resources)
+	assert.Equal(t, []string{templateTokensBySource}, templates)
+}
+
+func TestRegister_ConflictSkipKeepsExistingResource(t *testing.T) {
+	server := newEmbeddingServer()
+	server.AddResource(&mcp.Resource{
+		URI:      resourceTokens,
+		Name:     "existing",
+		MIMEType: "application/json",
+	}, func(_ context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return &mcp.ReadResourceResult{
+			Contents: []*mcp.ResourceContents{{URI: req.Params.URI, Text: "existing-handler"}},
+		}, nil
+	})
+
+	mustRegister(t, server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictSkip))
+
+	session := connectSession(t, server)
+	result, err := session.ReadResource(context.Background(), &mcp.ReadResourceParams{URI: resourceTokens})
+	require.NoError(t, err)
+	require.Len(t, result.Contents, 1)
+	assert.Equal(t, "existing-handler", result.Contents[0].Text)
+
+	_, resources, templates := connectAndList(t, server)
+	assert.Equal(t, allResourceURIs, resources)
+	assert.Equal(t, allTemplateURIs, templates)
+}
+
+func TestRegister_ExcludedConflictDoesNotFail(t *testing.T) {
+	ctx := context.Background()
+
+	server := newEmbeddingServer()
+	addExistingSearchTool(t, server, "existing-handler")
+
+	// The conflicting tool is filtered out, so conflict detection must not
+	// see it and ConflictError must not fire.
+	mustRegister(t, server, fixtureMFS(t), fixtureTokenConfig, "/test",
+		WithTools(Selection{Exclude: []string{toolSearch}}),
+		WithConflictPolicy(ConflictError),
+	)
+
+	session := connectSession(t, server)
+	assert.Equal(t, allToolNames, listToolNames(t, ctx, session))
+	assert.Equal(t, "existing-handler", callExistingSearch(t, session))
 }
 
 func TestRegister_ExplicitConfigSharedAcrossSessions(t *testing.T) {
@@ -462,4 +542,216 @@ func TestRegister_ExplicitConfigSharedAcrossSessions(t *testing.T) {
 
 	assertSearchFinds(t, context.Background(), sessionA, "primary")
 	assertSearchFinds(t, context.Background(), sessionB, "primary")
+}
+
+func TestRegister_OptionCapturesSelectionAtConstruction(t *testing.T) {
+	sel := Selection{Include: []string{toolSearch}}
+	opt := WithTools(sel)
+	// Mutating the caller's slice after constructing the option must not
+	// change what the option selects.
+	sel.Include[0] = toolConvert
+
+	server := newEmbeddingServer()
+	mustRegister(t, server, fixtureMFS(t), fixtureTokenConfig, "/test", opt)
+
+	tools, _, _ := connectAndList(t, server)
+	assert.Equal(t, []string{toolSearch}, tools)
+}
+
+func TestRegister_UnknownConflictPolicyIsError(t *testing.T) {
+	server := newEmbeddingServer()
+	s, err := Register(server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictPolicy(99)))
+	require.Error(t, err)
+	assert.Nil(t, s)
+	assert.Contains(t, err.Error(), "conflict policy")
+
+	tools, resources, templates := connectAndList(t, server)
+	assert.Empty(t, tools)
+	assert.Empty(t, resources)
+	assert.Empty(t, templates)
+}
+
+func TestRegister_NilOptionIsIgnored(t *testing.T) {
+	server := newEmbeddingServer()
+	s, err := Register(server, fixtureMFS(t), fixtureTokenConfig, "/test", nil)
+	require.NoError(t, err)
+	require.NotNil(t, s)
+
+	tools, resources, templates := connectAndList(t, server)
+	assert.Equal(t, allToolNames, tools)
+	assert.Equal(t, allResourceURIs, resources)
+	assert.Equal(t, allTemplateURIs, templates)
+}
+
+func TestRegister_SelectionIsCaseSensitive(t *testing.T) {
+	t.Run("exclude with wrong case keeps the tool", func(t *testing.T) {
+		server := newEmbeddingServer()
+		mustRegister(t, server, fixtureMFS(t), fixtureTokenConfig, "/test",
+			WithTools(Selection{Exclude: []string{"SEARCH_TOKENS"}}),
+		)
+
+		tools, _, _ := connectAndList(t, server)
+		assert.Equal(t, allToolNames, tools)
+	})
+
+	t.Run("include with wrong case is unknown", func(t *testing.T) {
+		server := newEmbeddingServer()
+		_, err := Register(server, fixtureMFS(t), fixtureTokenConfig, "/test",
+			WithTools(Selection{Include: []string{"Search_Tokens"}}),
+		)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Search_Tokens")
+	})
+}
+
+func TestRegister_ConflictProbePaginates(t *testing.T) {
+	// PageSize 1 forces the probe to follow cursors. Tools list in sorted
+	// order, so search_tokens lands on the second page.
+	server := mcp.NewServer(&mcp.Implementation{
+		Name:    "paged-server",
+		Version: "1.0.0",
+	}, &mcp.ServerOptions{PageSize: 1})
+	for _, name := range []string{"aaa_tool", toolSearch, "zzz_tool"} {
+		addExistingTool(t, server, name, "existing-handler")
+	}
+
+	s, err := Register(server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictError))
+	require.Error(t, err)
+	assert.Nil(t, s)
+	assert.Contains(t, err.Error(), toolSearch)
+}
+
+func TestRegister_ConflictProbePaginatesAllCategories(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{
+		Name:    "paged-server",
+		Version: "1.0.0",
+	}, &mcp.ServerOptions{PageSize: 1})
+
+	// Sort each category so the conflicting item is never on the first page.
+	addExistingTool(t, server, "aaa_tool", "existing-handler")
+	addExistingSearchTool(t, server, "existing-handler")
+
+	emptyResource := func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		return &mcp.ReadResourceResult{}, nil
+	}
+	server.AddResource(&mcp.Resource{URI: "asimonim://aaa", Name: "aaa", MIMEType: "application/json"}, emptyResource)
+	server.AddResource(&mcp.Resource{URI: resourceTokens, Name: "existing", MIMEType: "application/json"}, emptyResource)
+
+	server.AddResourceTemplate(&mcp.ResourceTemplate{URITemplate: "asimonim://aaa/{+x}", Name: "aaa", MIMEType: "application/json"}, emptyResource)
+	server.AddResourceTemplate(&mcp.ResourceTemplate{URITemplate: templateTokenDetail, Name: "existing", MIMEType: "application/json"}, emptyResource)
+
+	s, err := Register(server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictError))
+	require.Error(t, err)
+	assert.Nil(t, s)
+	assert.Contains(t, err.Error(), toolSearch)
+	assert.Contains(t, err.Error(), resourceTokens)
+	assert.Contains(t, err.Error(), templateTokenDetail)
+}
+
+func TestRegister_ConflictProbeFailureIsReported(t *testing.T) {
+	server := newEmbeddingServer()
+	server.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			if method == "initialize" {
+				return nil, errors.New("rejected probe client")
+			}
+			return next(ctx, method, req)
+		}
+	})
+
+	_, err := Register(server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictError))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "inspect server before registering")
+}
+
+func TestRegister_EmptySelectionSkipsProbe(t *testing.T) {
+	var initializeCalls atomic.Int32
+	server := newEmbeddingServer()
+	server.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			if method == "initialize" {
+				initializeCalls.Add(1)
+			}
+			return next(ctx, method, req)
+		}
+	})
+
+	// Nothing is selected, so there is no conflict to detect and no reason to
+	// touch the host server.
+	mustRegister(t, server, fixtureMFS(t), fixtureTokenConfig, "/test",
+		WithTools(Selection{Exclude: allToolNames}),
+		WithResources(Selection{Exclude: allResourceURIs}),
+		WithTemplates(Selection{Exclude: allTemplateURIs}),
+		WithConflictPolicy(ConflictError),
+	)
+	assert.Zero(t, initializeCalls.Load(), "empty selection must not probe the server")
+
+	tools, resources, templates := connectAndList(t, server)
+	assert.Empty(t, tools)
+	assert.Empty(t, resources)
+	assert.Empty(t, templates)
+}
+
+func TestRegister_ProbeListsOnlyNeededCategories(t *testing.T) {
+	var resourceListCalls, templateListCalls atomic.Int32
+	server := newEmbeddingServer()
+	server.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			switch method {
+			case "resources/list":
+				resourceListCalls.Add(1)
+			case "resources/templates/list":
+				templateListCalls.Add(1)
+			}
+			return next(ctx, method, req)
+		}
+	})
+
+	// Only tools are selected, so the probe must not list resources.
+	mustRegister(t, server, fixtureMFS(t), fixtureTokenConfig, "/test",
+		WithTools(Selection{Include: []string{toolSearch}}),
+		WithResources(Selection{Exclude: allResourceURIs}),
+		WithTemplates(Selection{Exclude: allTemplateURIs}),
+		WithConflictPolicy(ConflictSkip),
+	)
+	assert.Zero(t, resourceListCalls.Load(), "probe must not list unneeded resources")
+	assert.Zero(t, templateListCalls.Load(), "probe must not list unneeded templates")
+
+	session := connectSession(t, server)
+	assert.Equal(t, []string{toolSearch}, listToolNames(t, context.Background(), session))
+}
+
+func TestRegister_ConflictProbeRunsHostHooksOnlyForNonDefaultPolicies(t *testing.T) {
+	var initialized atomic.Int32
+	newHookedServer := func() *mcp.Server {
+		return mcp.NewServer(&mcp.Implementation{
+			Name:    "hooked-server",
+			Version: "1.0.0",
+		}, &mcp.ServerOptions{
+			InitializedHandler: func(context.Context, *mcp.InitializedRequest) {
+				initialized.Add(1)
+			},
+		})
+	}
+
+	replaceServer := newHookedServer()
+	mustRegister(t, replaceServer, fixtureMFS(t), fixtureTokenConfig, "/test")
+	assert.Zero(t, initialized.Load(), "ConflictReplace must not probe the server")
+
+	skipServer := newHookedServer()
+	mustRegister(t, skipServer, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictSkip))
+	assert.Equal(t, int32(1), initialized.Load(), "ConflictSkip probes the server once")
+}
+
+func TestRegister_ConflictProbeWithLiveSession(t *testing.T) {
+	ctx := context.Background()
+
+	server := newEmbeddingServer()
+	liveSession := connectSession(t, server)
+	addExistingSearchTool(t, server, "existing-handler")
+
+	mustRegister(t, server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictSkip))
+
+	assert.Equal(t, allToolNames, listToolNames(t, ctx, liveSession))
+	assert.Equal(t, "existing-handler", callExistingSearch(t, liveSession))
 }

@@ -11,17 +11,29 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
+	"time"
 
 	"bennypowers.dev/asimonim/version"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+const (
+	// probeClientName identifies the short-lived client used to inspect a
+	// target server during conflict detection.
+	probeClientName = "asimonim-register-probe"
+	// probeTimeout bounds conflict detection so a host handler or middleware
+	// cannot hang Register indefinitely.
+	probeTimeout = 5 * time.Second
 )
 
 // Selection filters a set of items by exact name.
 //
 // An empty Include list selects every item. Exclude is applied after Include
 // and wins on overlap. Matching is exact and case-sensitive. Empty strings
-// are rejected.
+// are rejected. An Exclude entry that matches nothing is accepted and
+// ignored, so a deny list stays valid across versions.
 type Selection struct {
 	Include []string
 	Exclude []string
@@ -43,6 +55,7 @@ type registerConfig struct {
 // Repeated calls accumulate: their Include and Exclude lists are unioned.
 // Exclude wins over Include. An Include entry that names no tool is an error.
 func WithTools(sel Selection) RegisterOption {
+	sel = cloneSelection(sel)
 	return func(c *registerConfig) {
 		c.tools = mergeSelections(c.tools, sel)
 	}
@@ -54,6 +67,7 @@ func WithTools(sel Selection) RegisterOption {
 // Exclude wins over Include. An Include entry that names no resource is an
 // error.
 func WithResources(sel Selection) RegisterOption {
+	sel = cloneSelection(sel)
 	return func(c *registerConfig) {
 		c.resources = mergeSelections(c.resources, sel)
 	}
@@ -66,6 +80,7 @@ func WithResources(sel Selection) RegisterOption {
 // Exclude wins over Include. An Include entry that names no template is an
 // error.
 func WithTemplates(sel Selection) RegisterOption {
+	sel = cloneSelection(sel)
 	return func(c *registerConfig) {
 		c.templates = mergeSelections(c.templates, sel)
 	}
@@ -88,9 +103,23 @@ const (
 
 // WithConflictPolicy sets how Register resolves conflicts with items already
 // registered on the target server. Repeated calls use the last value.
+//
+// ConflictError and ConflictSkip inspect the target server through a
+// short-lived in-memory client session, so host session hooks, middleware,
+// and connection logging observe that probe session. ConflictReplace, the
+// default, does not inspect the server.
 func WithConflictPolicy(p ConflictPolicy) RegisterOption {
 	return func(c *registerConfig) {
 		c.conflict = p
+	}
+}
+
+// cloneSelection copies both lists so later mutation of the caller's Selection
+// cannot change an option that was already constructed.
+func cloneSelection(sel Selection) Selection {
+	return Selection{
+		Include: slices.Clone(sel.Include),
+		Exclude: slices.Clone(sel.Exclude),
 	}
 }
 
@@ -176,13 +205,37 @@ type serverSurface struct {
 	templates map[string]struct{}
 }
 
+// surfaceNeeds selects which feature categories conflict detection inspects.
+type surfaceNeeds struct {
+	tools     bool
+	resources bool
+	templates bool
+}
+
+func (n surfaceNeeds) empty() bool {
+	return !n.tools && !n.resources && !n.templates
+}
+
 // inspectServer lists the features already registered on server.
 //
 // The SDK exposes no way to query a server's registered features directly.
 // Conflict detection therefore uses a short-lived in-memory client, which
 // observes the same surface a real client would without installing handlers.
-func inspectServer(server *mcp.Server) (serverSurface, error) {
-	ctx := context.Background()
+// The probe performs a normal MCP initialize handshake, so host session hooks
+// and middleware run for it. Only the requested categories are listed.
+func inspectServer(server *mcp.Server, need surfaceNeeds) (serverSurface, error) {
+	surface := serverSurface{
+		tools:     make(map[string]struct{}),
+		resources: make(map[string]struct{}),
+		templates: make(map[string]struct{}),
+	}
+	if need.empty() {
+		return surface, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
+	defer cancel()
+
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 
 	serverSession, err := server.Connect(ctx, serverTransport, nil)
@@ -192,7 +245,7 @@ func inspectServer(server *mcp.Server) (serverSurface, error) {
 	defer func() { _ = serverSession.Close() }()
 
 	client := mcp.NewClient(&mcp.Implementation{
-		Name:    "asimonim-register-probe",
+		Name:    probeClientName,
 		Version: version.Get(),
 	}, nil)
 	clientSession, err := client.Connect(ctx, clientTransport, nil)
@@ -201,55 +254,80 @@ func inspectServer(server *mcp.Server) (serverSurface, error) {
 	}
 	defer func() { _ = clientSession.Close() }()
 
-	surface := serverSurface{
-		tools:     make(map[string]struct{}),
-		resources: make(map[string]struct{}),
-		templates: make(map[string]struct{}),
+	if need.tools {
+		tools, err := listFeatureIDs(func(cursor string) (string, []string, error) {
+			result, err := clientSession.ListTools(ctx, &mcp.ListToolsParams{Cursor: cursor})
+			if err != nil {
+				return "", nil, fmt.Errorf("list tools: %w", err)
+			}
+			ids := make([]string, len(result.Tools))
+			for i, tool := range result.Tools {
+				ids[i] = tool.Name
+			}
+			return result.NextCursor, ids, nil
+		})
+		if err != nil {
+			return serverSurface{}, err
+		}
+		surface.tools = tools
 	}
 
-	for cursor := ""; ; {
-		result, err := clientSession.ListTools(ctx, &mcp.ListToolsParams{Cursor: cursor})
+	if need.resources {
+		resources, err := listFeatureIDs(func(cursor string) (string, []string, error) {
+			result, err := clientSession.ListResources(ctx, &mcp.ListResourcesParams{Cursor: cursor})
+			if err != nil {
+				return "", nil, fmt.Errorf("list resources: %w", err)
+			}
+			ids := make([]string, len(result.Resources))
+			for i, resource := range result.Resources {
+				ids[i] = resource.URI
+			}
+			return result.NextCursor, ids, nil
+		})
 		if err != nil {
-			return serverSurface{}, fmt.Errorf("list tools: %w", err)
+			return serverSurface{}, err
 		}
-		for _, tool := range result.Tools {
-			surface.tools[tool.Name] = struct{}{}
-		}
-		if result.NextCursor == "" {
-			break
-		}
-		cursor = result.NextCursor
+		surface.resources = resources
 	}
 
-	for cursor := ""; ; {
-		result, err := clientSession.ListResources(ctx, &mcp.ListResourcesParams{Cursor: cursor})
+	if need.templates {
+		templates, err := listFeatureIDs(func(cursor string) (string, []string, error) {
+			result, err := clientSession.ListResourceTemplates(ctx, &mcp.ListResourceTemplatesParams{Cursor: cursor})
+			if err != nil {
+				return "", nil, fmt.Errorf("list resource templates: %w", err)
+			}
+			ids := make([]string, len(result.ResourceTemplates))
+			for i, template := range result.ResourceTemplates {
+				ids[i] = template.URITemplate
+			}
+			return result.NextCursor, ids, nil
+		})
 		if err != nil {
-			return serverSurface{}, fmt.Errorf("list resources: %w", err)
+			return serverSurface{}, err
 		}
-		for _, resource := range result.Resources {
-			surface.resources[resource.URI] = struct{}{}
-		}
-		if result.NextCursor == "" {
-			break
-		}
-		cursor = result.NextCursor
-	}
-
-	for cursor := ""; ; {
-		result, err := clientSession.ListResourceTemplates(ctx, &mcp.ListResourceTemplatesParams{Cursor: cursor})
-		if err != nil {
-			return serverSurface{}, fmt.Errorf("list resource templates: %w", err)
-		}
-		for _, template := range result.ResourceTemplates {
-			surface.templates[template.URITemplate] = struct{}{}
-		}
-		if result.NextCursor == "" {
-			break
-		}
-		cursor = result.NextCursor
+		surface.templates = templates
 	}
 
 	return surface, nil
+}
+
+// listFeatureIDs collects every identifier returned by fetch, following
+// pagination cursors until the server reports no next page.
+func listFeatureIDs(fetch func(cursor string) (next string, ids []string, err error)) (map[string]struct{}, error) {
+	all := make(map[string]struct{})
+	for cursor := ""; ; {
+		next, ids, err := fetch(cursor)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range ids {
+			all[id] = struct{}{}
+		}
+		if next == "" {
+			return all, nil
+		}
+		cursor = next
+	}
 }
 
 // filterConflicts removes features that already exist on the server when the

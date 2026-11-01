@@ -87,7 +87,16 @@ func NewServer(filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server
 // replaces existing entries, which is the behavior before options existed.
 // Filters are exact, case-sensitive matches; Exclude wins over Include. All
 // options are validated and conflicts are detected before any handler is
-// installed, so an error leaves server unchanged.
+// installed, so an error installs no asimonim handler. Host session hooks can
+// still observe the conflict-detection probe described by
+// [WithConflictPolicy].
+//
+// Register is a setup-time operation. Call it before the target server starts
+// serving requests, and do not run it concurrently with other registration
+// changes. Conflict detection is best effort: it lists the server surface
+// through a short-lived probe session (see [WithConflictPolicy]) and then
+// installs handlers, so a concurrent writer can still change the surface in
+// between.
 //
 // Config resolution stays lazy and session-aware. Each MCP session resolves
 // and caches its own roots and config, so an embedding server can serve
@@ -98,6 +107,11 @@ func (s *Server) Register(server *mcp.Server, opts ...RegisterOption) error {
 		return errors.New("mcp: Register called with nil server")
 	}
 	cfg := newRegisterConfig(opts)
+	switch cfg.conflict {
+	case ConflictReplace, ConflictError, ConflictSkip:
+	default:
+		return fmt.Errorf("mcp: unknown conflict policy %d", cfg.conflict)
+	}
 
 	tools, err := selectFeatures("tool", s.toolFeatures(), cfg.tools)
 	if err != nil {
@@ -113,7 +127,11 @@ func (s *Server) Register(server *mcp.Server, opts ...RegisterOption) error {
 	}
 
 	if cfg.conflict != ConflictReplace {
-		surface, err := inspectServer(server)
+		surface, err := inspectServer(server, surfaceNeeds{
+			tools:     len(tools) > 0,
+			resources: len(resources) > 0,
+			templates: len(templates) > 0,
+		})
 		if err != nil {
 			return fmt.Errorf("mcp: inspect server before registering: %w", err)
 		}

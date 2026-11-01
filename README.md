@@ -80,6 +80,36 @@ the packages above are the primary library surface.
 Run `go doc bennypowers.dev/asimonim/parser` (or the name of any package
 above) for the full API and examples.
 
+### Embedding the MCP server
+
+`mcp.Register` mounts asimonim's tools and resources on an MCP server that you
+own:
+
+```go
+import (
+	asimonimmcp "bennypowers.dev/asimonim/mcp"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+srv := mcp.NewServer(&mcp.Implementation{Name: "my-server", Version: "1.0.0"}, nil)
+_, err := asimonimmcp.Register(srv, filesystem, cfg, cwd,
+	asimonimmcp.WithTools(asimonimmcp.Selection{Exclude: []string{"convert_tokens"}}),
+	asimonimmcp.WithConflictPolicy(asimonimmcp.ConflictError),
+)
+if err != nil {
+	return err
+}
+```
+
+With no options, `Register` mounts the full surface and replaces existing
+entries, matching `NewServer`. `WithTools`, `WithResources`, and
+`WithTemplates` take exact, case-sensitive `Include` and `Exclude` lists. An
+`Include` entry that matches nothing is an error; an `Exclude` entry that
+matches nothing is ignored. `ConflictError` and `ConflictSkip` inspect the host
+server through a short-lived in-memory session, so host session hooks and
+middleware observe that probe. A server returned by `Register` has no
+transport of its own, so `Run` returns an error.
+
 ### Version information
 
 ```go
