@@ -14,6 +14,7 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"bennypowers.dev/asimonim/version"
@@ -24,11 +25,18 @@ const (
 	// probeClientName identifies the short-lived client used to inspect a
 	// target server during conflict detection.
 	probeClientName = "asimonim-register-probe"
+
+	defaultProbeTimeout = 5 * time.Second
 )
 
 // probeTimeout bounds the probe's RPCs so a blocked host handler or middleware
-// cannot stall Register indefinitely. It is a variable so tests can shorten it.
-var probeTimeout = 5 * time.Second
+// cannot stall Register indefinitely. Stored as nanoseconds so tests can
+// shorten it without racing concurrent registrations.
+var probeTimeout atomic.Int64
+
+func init() {
+	probeTimeout.Store(int64(defaultProbeTimeout))
+}
 
 // Selection filters a set of items by exact name.
 //
@@ -41,7 +49,7 @@ type Selection struct {
 	Exclude []string
 }
 
-// RegisterOption configures [Server.Register].
+// RegisterOption configures [Server.Register]. A nil option is ignored.
 type RegisterOption func(*registerConfig)
 
 // registerConfig is the accumulated state of the options passed to Register.
@@ -96,8 +104,9 @@ const (
 	// ConflictReplace overwrites the existing entry. This is the default and
 	// the behavior before options existed.
 	ConflictReplace ConflictPolicy = iota
-	// ConflictError fails Register before anything is registered. The target
-	// server is left unchanged.
+	// ConflictError fails Register before anything is registered. Register
+	// installs no asimonim handler on the target server. The conflict probe
+	// still runs host session hooks, which may have their own side effects.
 	ConflictError
 	// ConflictSkip keeps the existing entry and skips the conflicting one.
 	ConflictSkip
@@ -150,9 +159,10 @@ func (c *RegistrationConflict) add(kind, id string) {
 // registered on the target server. Repeated calls use the last value.
 //
 // ConflictError and ConflictSkip inspect the target server through a
-// short-lived in-memory client session, so host session hooks, middleware,
-// and connection logging observe that probe session. ConflictReplace, the
-// default, does not inspect the server.
+// short-lived in-memory client session when they have selected features to
+// check, so host session hooks, middleware, and connection logging can observe
+// that probe session. ConflictReplace, the default, does not inspect the
+// server.
 func WithConflictPolicy(p ConflictPolicy) RegisterOption {
 	return func(c *registerConfig) {
 		c.conflict = p
@@ -278,7 +288,7 @@ func inspectServer(server *mcp.Server, need surfaceNeeds) (serverSurface, error)
 		return surface, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(probeTimeout.Load()))
 	defer cancel()
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()

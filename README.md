@@ -106,8 +106,10 @@ entries, matching `NewServer`. `WithTools`, `WithResources`, and
 `WithTemplates` take exact, case-sensitive `Include` and `Exclude` lists. An
 `Include` entry that matches nothing is an error; an `Exclude` entry that
 matches nothing is ignored. `ConflictError` and `ConflictSkip` inspect the host
-server through a short-lived in-memory session, so host session hooks and
-middleware observe that probe. A server returned by `Register` has no
+server through a short-lived in-memory session when there are selected features
+to check, so host session hooks and middleware observe that probe.
+`ConflictError` returns a `*RegistrationConflict` that lists the conflicting
+tools, resources, and templates. A server returned by `Register` has no
 transport of its own, so `Run` returns an error.
 
 ### Version information

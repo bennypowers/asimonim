@@ -84,9 +84,12 @@ func NewServer(filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server
 // Register adds asimonim's tools and resources to server.
 //
 // Use this to mount asimonim's token tools and resources on an existing MCP
-// server. The caller owns server and its transport: Register does not start a
-// transport and does not take ownership of server. Register returns an error
-// for a nil server or an invalid option instead of panicking.
+// server. The caller owns server and its transport: Register does not start
+// the caller's transport and does not take ownership of server. Register
+// returns an error for a nil server or an invalid option instead of panicking.
+// ConflictError and ConflictSkip briefly attach an in-memory probe session to
+// server when there are selected features to inspect; see
+// [WithConflictPolicy].
 //
 // Options filter the mounted surface with [WithTools], [WithResources], and
 // [WithTemplates], and choose how name conflicts are handled with
@@ -104,7 +107,8 @@ func NewServer(filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server
 // from other goroutines. Asimonim Register calls are serialized, but the SDK
 // offers no transaction covering other writers, so conflict detection is best
 // effort against them; a concurrent writer can still change the surface
-// between inspection and installation.
+// between inspection and installation. Do not call Register from a host
+// session hook or middleware that runs during the conflict probe.
 //
 // Config resolution stays lazy and session-aware. Each MCP session resolves
 // and caches its own roots and config, so an embedding server can serve

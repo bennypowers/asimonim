@@ -622,6 +622,14 @@ func TestRegister_ConflictSkipKeepsExistingTemplate(t *testing.T) {
 
 	mustRegister(t, server, fixtureMFS(t), fixtureTokenConfig, "/test", WithConflictPolicy(ConflictSkip))
 
+	session := connectSession(t, server)
+	result, err := session.ReadResource(context.Background(), &mcp.ReadResourceParams{
+		URI: "asimonim://token//test/tokens.json/color/primary",
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Contents, 1)
+	assert.Equal(t, "existing-handler", result.Contents[0].Text)
+
 	_, _, templates := connectAndList(t, server)
 	assert.Equal(t, allTemplateURIs, templates)
 }
@@ -787,9 +795,8 @@ func TestRegister_ConflictProbeFailureIsReported(t *testing.T) {
 }
 
 func TestRegister_ProbeDoesNotBlockOnStuckHandler(t *testing.T) {
-	oldTimeout := probeTimeout
-	probeTimeout = 100 * time.Millisecond
-	t.Cleanup(func() { probeTimeout = oldTimeout })
+	probeTimeout.Store(int64(100 * time.Millisecond))
+	t.Cleanup(func() { probeTimeout.Store(int64(defaultProbeTimeout)) })
 
 	release := make(chan struct{})
 	t.Cleanup(func() { close(release) })
