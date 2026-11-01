@@ -21,22 +21,22 @@ import (
 // sourceSummary is the JSON representation of a token source.
 type sourceSummary struct {
 	Source     string `json:"source"`
-	TokenCount int   `json:"tokenCount"`
+	TokenCount int    `json:"tokenCount"`
 }
 
 // tokenDetail is the full JSON representation of an individual token.
 type tokenDetail struct {
-	Name              string   `json:"name"`
-	Path              string   `json:"path"`
-	Value             string   `json:"value"`
-	Type              string   `json:"type,omitempty"`
-	Description       string   `json:"description,omitempty"`
-	Deprecated        bool     `json:"deprecated,omitempty"`
-	DeprecationMsg    string   `json:"deprecationMessage,omitempty"`
-	CSSVariableName   string   `json:"cssVariableName,omitempty"`
-	CSSSyntax         string   `json:"cssSyntax,omitempty"`
-	IsResolved        bool     `json:"isResolved,omitempty"`
-	ResolutionChain   []string `json:"resolutionChain,omitempty"`
+	Name            string   `json:"name"`
+	Path            string   `json:"path"`
+	Value           string   `json:"value"`
+	Type            string   `json:"type,omitempty"`
+	Description     string   `json:"description,omitempty"`
+	Deprecated      bool     `json:"deprecated,omitempty"`
+	DeprecationMsg  string   `json:"deprecationMessage,omitempty"`
+	CSSVariableName string   `json:"cssVariableName,omitempty"`
+	CSSSyntax       string   `json:"cssSyntax,omitempty"`
+	IsResolved      bool     `json:"isResolved,omitempty"`
+	ResolutionChain []string `json:"resolutionChain,omitempty"`
 }
 
 func newTokenDetail(tok *token.Token) tokenDetail {
@@ -62,39 +62,74 @@ func sessionFromResourceReq(req *mcp.ReadResourceRequest) *mcp.ServerSession {
 	return req.Session
 }
 
-// setupResources registers asimonim's resources on the given MCP server.
-func (s *Server) setupResources(server *mcp.Server) {
-	// asimonim://tokens - list available token sources
-	server.AddResource(&mcp.Resource{
-		URI:         "asimonim://tokens",
-		Name:        "tokens",
-		Description: "Lists available design token sources in the workspace with token counts.",
-		MIMEType:    "application/json",
-	}, s.handleTokenSources)
+// Resource URIs and template strings, shared by registration, filtering, and
+// tests.
+const (
+	resourceTokens         = "asimonim://tokens"
+	resourceConfig         = "asimonim://config"
+	templateTokensBySource = "asimonim://tokens/{+source}"
+	templateTokenDetail    = "asimonim://token/{+rest}"
+)
 
-	// asimonim://config - workspace configuration
-	server.AddResource(&mcp.Resource{
-		URI:         "asimonim://config",
-		Name:        "config",
-		Description: "Workspace design token configuration (files, resolvers, schema, prefix).",
-		MIMEType:    "application/json",
-	}, s.handleConfig)
+// resourceFeatures returns asimonim's static resources, keyed by URI.
+func (s *Server) resourceFeatures() []feature {
+	return []feature{
+		{
+			id: resourceTokens,
+			add: func(server *mcp.Server) {
+				// asimonim://tokens - list available token sources
+				server.AddResource(&mcp.Resource{
+					URI:         resourceTokens,
+					Name:        "tokens",
+					Description: "Lists available design token sources in the workspace with token counts.",
+					MIMEType:    "application/json",
+				}, s.handleTokenSources)
+			},
+		},
+		{
+			id: resourceConfig,
+			add: func(server *mcp.Server) {
+				// asimonim://config - workspace configuration
+				server.AddResource(&mcp.Resource{
+					URI:         resourceConfig,
+					Name:        "config",
+					Description: "Workspace design token configuration (files, resolvers, schema, prefix).",
+					MIMEType:    "application/json",
+				}, s.handleConfig)
+			},
+		},
+	}
+}
 
-	// asimonim://tokens/{+source} - all tokens for a source
-	server.AddResourceTemplate(&mcp.ResourceTemplate{
-		URITemplate: "asimonim://tokens/{+source}",
-		Name:        "tokens-by-source",
-		Description: "All design tokens from a specific source (file or package).",
-		MIMEType:    "application/json",
-	}, s.handleTokensBySource)
-
-	// asimonim://token/{+rest} - individual token detail (rest = source/path...)
-	server.AddResourceTemplate(&mcp.ResourceTemplate{
-		URITemplate: "asimonim://token/{+rest}",
-		Name:        "token-detail",
-		Description: "Detailed information about an individual design token by source and path.",
-		MIMEType:    "application/json",
-	}, s.handleTokenDetail)
+// templateFeatures returns asimonim's resource templates, keyed by URI
+// template string.
+func (s *Server) templateFeatures() []feature {
+	return []feature{
+		{
+			id: templateTokensBySource,
+			add: func(server *mcp.Server) {
+				// asimonim://tokens/{+source} - all tokens for a source
+				server.AddResourceTemplate(&mcp.ResourceTemplate{
+					URITemplate: templateTokensBySource,
+					Name:        "tokens-by-source",
+					Description: "All design tokens from a specific source (file or package).",
+					MIMEType:    "application/json",
+				}, s.handleTokensBySource)
+			},
+		},
+		{
+			id: templateTokenDetail,
+			add: func(server *mcp.Server) {
+				// asimonim://token/{+rest} - individual token detail (rest = source/path...)
+				server.AddResourceTemplate(&mcp.ResourceTemplate{
+					URITemplate: templateTokenDetail,
+					Name:        "token-detail",
+					Description: "Detailed information about an individual design token by source and path.",
+					MIMEType:    "application/json",
+				}, s.handleTokenDetail)
+			},
+		},
+	}
 }
 
 func (s *Server) handleTokenSources(

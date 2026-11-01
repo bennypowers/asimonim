@@ -86,22 +86,44 @@ func newTokenSummary(tok *token.Token) tokenSummary {
 	}
 }
 
-// setupTools registers asimonim's tools on the given MCP server.
-func (s *Server) setupTools(server *mcp.Server) {
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "validate_tokens",
-		Description: "Validate design token files for correctness, detect circular references, and report deprecated tokens.",
-	}, s.handleValidate)
+// Tool names, shared by registration, filtering, and tests.
+const (
+	toolValidate = "validate_tokens"
+	toolSearch   = "search_tokens"
+	toolConvert  = "convert_tokens"
+)
 
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "search_tokens",
-		Description: "Search design tokens by name, value, description, or type. Substring search is case-insensitive. Regex search is case-sensitive by default; use (?i) flag for case-insensitive regex.",
-	}, s.handleSearch)
-
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "convert_tokens",
-		Description: "Convert design tokens to CSS, SCSS, JavaScript, Swift, Android XML, or other formats.",
-	}, s.handleConvert)
+// toolFeatures returns asimonim's tools, keyed by the name they register.
+func (s *Server) toolFeatures() []feature {
+	return []feature{
+		{
+			id: toolValidate,
+			add: func(server *mcp.Server) {
+				mcp.AddTool(server, &mcp.Tool{
+					Name:        toolValidate,
+					Description: "Validate design token files for correctness, detect circular references, and report deprecated tokens.",
+				}, s.handleValidate)
+			},
+		},
+		{
+			id: toolSearch,
+			add: func(server *mcp.Server) {
+				mcp.AddTool(server, &mcp.Tool{
+					Name:        toolSearch,
+					Description: "Search design tokens by name, value, description, or type. Substring search is case-insensitive. Regex search is case-sensitive by default; use (?i) flag for case-insensitive regex.",
+				}, s.handleSearch)
+			},
+		},
+		{
+			id: toolConvert,
+			add: func(server *mcp.Server) {
+				mcp.AddTool(server, &mcp.Tool{
+					Name:        toolConvert,
+					Description: "Convert design tokens to CSS, SCSS, JavaScript, Swift, Android XML, or other formats.",
+				}, s.handleConvert)
+			},
+		},
+	}
 }
 
 func textResult(text string) *mcp.CallToolResult {

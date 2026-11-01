@@ -11,6 +11,7 @@ package mcp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"sync"
 
@@ -19,6 +20,13 @@ import (
 	"bennypowers.dev/asimonim/version"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+// registerMu serializes asimonim registrations so filtering, conflict
+// detection, and handler installation form one critical section. The SDK has
+// no transaction spanning those calls, so this is the only way to keep two
+// Register calls on the same server from interleaving. Register is a
+// setup-time operation, so a single process-wide lock is fine.
+var registerMu sync.Mutex
 
 // Server implements an MCP server for design tokens.
 type Server struct {
@@ -64,7 +72,11 @@ func NewServer(filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server
 		}, nil),
 	}
 
-	s.Register(s.server)
+	// NewServer uses the same registration path as an embedder. Default
+	// options cannot fail.
+	if err := s.Register(s.server); err != nil {
+		panic(fmt.Sprintf("mcp: NewServer: %v", err))
+	}
 
 	return s
 }
@@ -72,36 +84,112 @@ func NewServer(filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server
 // Register adds asimonim's tools and resources to server.
 //
 // Use this to mount asimonim's token tools and resources on an existing MCP
-// server. The caller owns server and its transport: Register only wires up
-// handlers and does not start the server. Register panics if server is nil.
+// server. The caller owns server and its transport: Register does not start
+// the caller's transport and does not take ownership of server. Register
+// returns an error for a nil server or an invalid option instead of panicking.
+// ConflictError and ConflictSkip briefly attach an in-memory probe session to
+// server when there are selected features to inspect; see
+// [WithConflictPolicy].
+//
+// Options filter the mounted surface with [WithTools], [WithResources], and
+// [WithTemplates], and choose how name conflicts are handled with
+// [WithConflictPolicy]. With no options Register mounts the full surface and
+// replaces existing entries, which is the behavior before options existed.
+// Filters are exact, case-sensitive matches; Exclude wins over Include. All
+// options are validated before any server interaction, and conflicts are
+// detected before any handler is installed, so an error installs no asimonim
+// handler. ConflictError and ConflictSkip do open a short-lived in-memory
+// session to inspect the server; host session hooks can observe it. See
+// [WithConflictPolicy].
+//
+// Register is a setup-time operation. Call it before the target server starts
+// serving requests, and do not add features to the target server concurrently
+// from other goroutines. Asimonim Register calls are serialized, but the SDK
+// offers no transaction covering other writers, so conflict detection is best
+// effort against them; a concurrent writer can still change the surface
+// between inspection and installation. Do not call Register from a host
+// session hook or middleware that runs during the conflict probe.
 //
 // Config resolution stays lazy and session-aware. Each MCP session resolves
 // and caches its own roots and config, so an embedding server can serve
 // clients with different workspaces. An explicit config is shared by all
 // sessions. Requests without a session share a single lazy cache.
-func (s *Server) Register(server *mcp.Server) {
+func (s *Server) Register(server *mcp.Server, opts ...RegisterOption) error {
 	if server == nil {
-		panic("mcp: Register called with nil server")
+		return errors.New("mcp: Register called with nil server")
 	}
-	s.setupTools(server)
-	s.setupResources(server)
+
+	registerMu.Lock()
+	defer registerMu.Unlock()
+
+	cfg := newRegisterConfig(opts)
+	switch cfg.conflict {
+	case ConflictReplace, ConflictError, ConflictSkip:
+	default:
+		return fmt.Errorf("mcp: unknown conflict policy %d", cfg.conflict)
+	}
+
+	tools, err := selectFeatures("tool", s.toolFeatures(), cfg.tools)
+	if err != nil {
+		return err
+	}
+	resources, err := selectFeatures("resource", s.resourceFeatures(), cfg.resources)
+	if err != nil {
+		return err
+	}
+	templates, err := selectFeatures("template", s.templateFeatures(), cfg.templates)
+	if err != nil {
+		return err
+	}
+
+	if cfg.conflict != ConflictReplace {
+		surface, err := inspectServer(server, surfaceNeeds{
+			tools:     len(tools) > 0,
+			resources: len(resources) > 0,
+			templates: len(templates) > 0,
+		})
+		if err != nil {
+			return fmt.Errorf("mcp: inspect server before registering: %w", err)
+		}
+		var conflict RegistrationConflict
+		tools = filterConflicts("tool", tools, surface.tools, cfg.conflict, &conflict)
+		resources = filterConflicts("resource", resources, surface.resources, cfg.conflict, &conflict)
+		templates = filterConflicts("template", templates, surface.templates, cfg.conflict, &conflict)
+		if cfg.conflict == ConflictError && !conflict.empty() {
+			return &conflict
+		}
+	}
+
+	for _, f := range tools {
+		f.add(server)
+	}
+	for _, f := range resources {
+		f.add(server)
+	}
+	for _, f := range templates {
+		f.add(server)
+	}
+	return nil
 }
 
 // Register creates a Server and registers its tools and resources on server.
+// The options accepted by Register are also accepted here.
 //
 // The returned Server holds asimonim's handler state (filesystem, config, and
 // resolved roots). It has no transport of its own, so its Run method returns
 // an error; the caller owns server and runs it with the transport of their
 // choice. See [Server.Register] for details.
-func Register(server *mcp.Server, filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server {
+func Register(server *mcp.Server, filesystem fs.FileSystem, cfg *config.Config, cwd string, opts ...RegisterOption) (*Server, error) {
 	s := &Server{
 		fs:          filesystem,
 		cfg:         cfg,
 		cfgProvided: cfg != nil,
 		cwd:         cwd,
 	}
-	s.Register(server)
-	return s
+	if err := s.Register(server, opts...); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // configForRequest resolves config for the session, caching per session.
