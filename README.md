@@ -147,9 +147,11 @@ Every completed tool and resource result carries its provenance in `_meta`:
 ```
 
 `source` is one of `explicit-config`, `host`, `roots`, or `cwd`. `warning` is
-present only when roots could not be used, such as when the client advertises
-roots but returns an empty list. Warnings are also logged once per resolution
-with `slog` on stderr, so stdout stays reserved for JSON-RPC.
+present when an advertised roots request fails or returns unusable data, such
+as an empty list or an invalid URI. A client that does not advertise roots
+falls back to cwd without a warning. Warnings are also logged once per
+resolution with a dedicated `slog` handler on stderr, so stdout stays reserved
+for JSON-RPC.
 
 ### Version information
 

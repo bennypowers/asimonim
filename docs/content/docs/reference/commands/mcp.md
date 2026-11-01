@@ -55,8 +55,9 @@ Every completed tool and resource result carries provenance in `_meta`:
 ```
 
 `source` is `explicit-config`, `host`, `roots`, or `cwd`. A `warning` field is
-present when the server fell back to the working directory because roots could
-not be used.
+present when an advertised roots request fails or returns unusable data.
+Clients that do not advertise roots fall back to the working directory without
+a warning.
 
 ## Example (Claude Code `settings.json`)
 
