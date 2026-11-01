@@ -11,6 +11,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"io"
 	"slices"
 	"strings"
 	"time"
@@ -23,10 +24,11 @@ const (
 	// probeClientName identifies the short-lived client used to inspect a
 	// target server during conflict detection.
 	probeClientName = "asimonim-register-probe"
-	// probeTimeout bounds conflict detection so a host handler or middleware
-	// cannot hang Register indefinitely.
-	probeTimeout = 5 * time.Second
 )
+
+// probeTimeout bounds the probe's RPCs so a blocked host handler or middleware
+// cannot stall Register indefinitely. It is a variable so tests can shorten it.
+var probeTimeout = 5 * time.Second
 
 // Selection filters a set of items by exact name.
 //
@@ -242,7 +244,7 @@ func inspectServer(server *mcp.Server, need surfaceNeeds) (serverSurface, error)
 	if err != nil {
 		return serverSurface{}, fmt.Errorf("connect: %w", err)
 	}
-	defer func() { _ = serverSession.Close() }()
+	defer closeProbeSessions(serverSession)
 
 	client := mcp.NewClient(&mcp.Implementation{
 		Name:    probeClientName,
@@ -252,7 +254,7 @@ func inspectServer(server *mcp.Server, need surfaceNeeds) (serverSurface, error)
 	if err != nil {
 		return serverSurface{}, fmt.Errorf("connect client: %w", err)
 	}
-	defer func() { _ = clientSession.Close() }()
+	defer closeProbeSessions(clientSession)
 
 	if need.tools {
 		tools, err := listFeatureIDs(func(cursor string) (string, []string, error) {
@@ -309,6 +311,15 @@ func inspectServer(server *mcp.Server, need surfaceNeeds) (serverSurface, error)
 	}
 
 	return surface, nil
+}
+
+// closeProbeSessions closes probe sessions in the background. Close waits for
+// in-flight handler goroutines, so a host handler or middleware that ignores
+// context cancellation could otherwise block Register after the probe deadline.
+func closeProbeSessions(sessions ...io.Closer) {
+	for _, session := range sessions {
+		go func() { _ = session.Close() }()
+	}
 }
 
 // listFeatureIDs collects every identifier returned by fetch, following

@@ -13,6 +13,7 @@ import (
 	"errors"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"bennypowers.dev/asimonim/config"
 	"bennypowers.dev/asimonim/internal/mapfs"
@@ -663,6 +664,41 @@ func TestRegister_ConflictProbeFailureIsReported(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "inspect server before registering")
 	assert.Contains(t, err.Error(), "rejected probe client")
+}
+
+func TestRegister_ProbeDoesNotBlockOnStuckHandler(t *testing.T) {
+	oldTimeout := probeTimeout
+	probeTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { probeTimeout = oldTimeout })
+
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+
+	server := newEmbeddingServer()
+	server.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			if method == "tools/list" {
+				// Deliberately ignore ctx and block until the test ends.
+				<-release
+			}
+			return next(ctx, method, req)
+		}
+	})
+
+	mfs := fixtureMFS(t)
+	done := make(chan error, 1)
+	go func() {
+		_, err := Register(server, mfs, fixtureTokenConfig, "/test", WithConflictPolicy(ConflictSkip))
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "inspect server before registering")
+	case <-time.After(5 * time.Second):
+		t.Fatal("Register did not return after the probe deadline")
+	}
 }
 
 func TestRegister_EmptySelectionSkipsProbe(t *testing.T) {
