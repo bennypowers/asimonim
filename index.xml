@@ -396,18 +396,12 @@ design tokens. The server communicates over stdin/stdout using JSON-RPC.&lt;/p>
  &lt;/tr>
  &lt;/tbody>
 &lt;/table>
-&lt;h2 id="example-claude-code-settingsjson">Example (Claude Code &lt;code>settings.json&lt;/code>)&lt;/h2>
-
-&lt;code-highlighter>
- &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-json" data-lang="json">&lt;span class="line">&lt;span class="cl">&lt;span class="p">{&lt;/span>
-&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nt">&amp;#34;mcpServers&amp;#34;&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="p">{&lt;/span>
-&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nt">&amp;#34;asimonim&amp;#34;&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="p">{&lt;/span>
-&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nt">&amp;#34;command&amp;#34;&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="s2">&amp;#34;asimonim&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span>
-&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nt">&amp;#34;args&amp;#34;&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="p">[&lt;/span>&lt;span class="s2">&amp;#34;mcp&amp;#34;&lt;/span>&lt;span class="p">]&lt;/span>
-&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
-&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
-&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
-&lt;/code-highlighter></description></item><item><title>lsp</title><link>https://bennypowers.dev/asimonim/docs/reference/commands/lsp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/reference/commands/lsp/</guid><description>&lt;p>Start the language server for editor integration.&lt;/p>
+&lt;h2 id="workspace-resolution">Workspace resolution&lt;/h2>
+&lt;p>The server resolves its workspace in this order: an explicit config, a host
+workspace supplied by an embedder, the session&amp;rsquo;s cached resolution, the
+client&amp;rsquo;s MCP roots (directly on protocol revisions before &lt;code>2026-07-28&lt;/code>, and
+through multi-round-trip requests on &lt;code>2026-07-28&lt;/code> and later), then the working
+directory.&lt;/p></description></item><item><title>lsp</title><link>https://bennypowers.dev/asimonim/docs/reference/commands/lsp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://bennypowers.dev/asimonim/docs/reference/commands/lsp/</guid><description>&lt;p>Start the language server for editor integration.&lt;/p>
 
 &lt;code-highlighter>
  &lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-text" data-lang="text">&lt;span class="line">&lt;span class="cl">Usage:
