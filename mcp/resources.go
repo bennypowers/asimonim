@@ -62,9 +62,10 @@ func sessionFromResourceReq(req *mcp.ReadResourceRequest) *mcp.ServerSession {
 	return req.Session
 }
 
-func (s *Server) setupResources() {
+// setupResources registers asimonim's resources on the given MCP server.
+func (s *Server) setupResources(server *mcp.Server) {
 	// asimonim://tokens - list available token sources
-	s.server.AddResource(&mcp.Resource{
+	server.AddResource(&mcp.Resource{
 		URI:         "asimonim://tokens",
 		Name:        "tokens",
 		Description: "Lists available design token sources in the workspace with token counts.",
@@ -72,7 +73,7 @@ func (s *Server) setupResources() {
 	}, s.handleTokenSources)
 
 	// asimonim://config - workspace configuration
-	s.server.AddResource(&mcp.Resource{
+	server.AddResource(&mcp.Resource{
 		URI:         "asimonim://config",
 		Name:        "config",
 		Description: "Workspace design token configuration (files, resolvers, schema, prefix).",
@@ -80,7 +81,7 @@ func (s *Server) setupResources() {
 	}, s.handleConfig)
 
 	// asimonim://tokens/{+source} - all tokens for a source
-	s.server.AddResourceTemplate(&mcp.ResourceTemplate{
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
 		URITemplate: "asimonim://tokens/{+source}",
 		Name:        "tokens-by-source",
 		Description: "All design tokens from a specific source (file or package).",
@@ -88,7 +89,7 @@ func (s *Server) setupResources() {
 	}, s.handleTokensBySource)
 
 	// asimonim://token/{+rest} - individual token detail (rest = source/path...)
-	s.server.AddResourceTemplate(&mcp.ResourceTemplate{
+	server.AddResourceTemplate(&mcp.ResourceTemplate{
 		URITemplate: "asimonim://token/{+rest}",
 		Name:        "token-detail",
 		Description: "Detailed information about an individual design token by source and path.",
