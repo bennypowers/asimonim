@@ -59,6 +59,21 @@ func listToolNames(t *testing.T, ctx context.Context, session *mcp.ClientSession
 	return names
 }
 
+// normalizedTools returns each tool's full JSON definition keyed by name, so
+// parity assertions cover schemas and descriptions, not just names.
+func normalizedTools(t *testing.T, ctx context.Context, session *mcp.ClientSession) map[string]string {
+	t.Helper()
+	result, err := session.ListTools(ctx, nil)
+	require.NoError(t, err)
+	tools := make(map[string]string, len(result.Tools))
+	for _, tool := range result.Tools {
+		data, err := json.Marshal(tool)
+		require.NoError(t, err)
+		tools[tool.Name] = string(data)
+	}
+	return tools
+}
+
 func listResourceURIs(t *testing.T, ctx context.Context, session *mcp.ClientSession) []string {
 	t.Helper()
 	result, err := session.ListResources(ctx, nil)
@@ -95,14 +110,17 @@ func TestRegister_ToolParity(t *testing.T) {
 
 	baselineSession := connectSession(t, newTestServer(t, "fixtures/draft/simple").server)
 	baseline := listToolNames(t, ctx, baselineSession)
+	baselineTools := normalizedTools(t, ctx, baselineSession)
 
 	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
 	cfg := &config.Config{Files: []config.FileSpec{{Path: "/test/tokens.json"}}}
 	server := newEmbeddingServer()
 	Register(server, mfs, cfg, "/test")
-	registered := listToolNames(t, ctx, connectSession(t, server))
+	session := connectSession(t, server)
+	registered := listToolNames(t, ctx, session)
 
 	assert.Equal(t, baseline, registered)
+	assert.Equal(t, baselineTools, normalizedTools(t, ctx, session))
 	assert.Equal(t, []string{"convert_tokens", "search_tokens", "validate_tokens"}, registered)
 }
 
@@ -173,6 +191,76 @@ func TestRegister_ReadTokensResource(t *testing.T) {
 	require.Len(t, sources, 1)
 	assert.Equal(t, "/test/tokens.json", sources[0].Source)
 	assert.Equal(t, 5, sources[0].TokenCount)
+}
+
+func TestRegister_ReadResourceTemplate(t *testing.T) {
+	ctx := context.Background()
+
+	mfs := testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test")
+	cfg := &config.Config{Files: []config.FileSpec{{Path: "/test/tokens.json"}}}
+	server := newEmbeddingServer()
+	Register(server, mfs, cfg, "/test")
+	session := connectSession(t, server)
+
+	t.Run("tokens by source", func(t *testing.T) {
+		result, err := session.ReadResource(ctx, &mcp.ReadResourceParams{
+			URI: "asimonim://tokens//test/tokens.json",
+		})
+		require.NoError(t, err)
+		require.Len(t, result.Contents, 1)
+
+		var tokens []tokenSummary
+		require.NoError(t, json.Unmarshal([]byte(result.Contents[0].Text), &tokens))
+		assert.Len(t, tokens, 5)
+	})
+
+	t.Run("token detail", func(t *testing.T) {
+		result, err := session.ReadResource(ctx, &mcp.ReadResourceParams{
+			URI: "asimonim://token//test/tokens.json/color/primary",
+		})
+		require.NoError(t, err)
+		require.Len(t, result.Contents, 1)
+
+		var detail tokenDetail
+		require.NoError(t, json.Unmarshal([]byte(result.Contents[0].Text), &detail))
+		assert.Equal(t, "color-primary", detail.Name)
+		assert.Equal(t, "color", detail.Type)
+	})
+}
+
+func TestRegister_FallsBackToCwdWithoutRoots(t *testing.T) {
+	ctx := context.Background()
+
+	// No roots are advertised, so config resolution must fall back to cwd.
+	server := newEmbeddingServer()
+	Register(server, cwdFS(), nil, "/mycwd")
+	session := connectSession(t, server)
+
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "search_tokens",
+		Arguments: map[string]any{"query": "small"},
+	})
+	require.NoError(t, err)
+	require.False(t, result.IsError, "unexpected tool error: %s", resultText(t, result))
+
+	var tokens []tokenSummary
+	require.NoError(t, json.Unmarshal([]byte(resultText(t, result)), &tokens))
+	require.Len(t, tokens, 1)
+	assert.Equal(t, "spacing-small", tokens[0].Name)
+}
+
+func TestRegister_RejectsNilServer(t *testing.T) {
+	assert.PanicsWithValue(t, "mcp: Register called with nil server", func() {
+		Register(nil, testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test"), nil, "/test")
+	})
+}
+
+func TestRegister_RunHasNoTransport(t *testing.T) {
+	server := newEmbeddingServer()
+	s := Register(server, testutil.NewFixtureFS(t, "fixtures/draft/simple", "/test"), nil, "/test")
+	require.NotNil(t, s)
+
+	require.Error(t, s.Run(context.Background()))
 }
 
 func TestRegister_ResolvesConfigFromSessionRoots(t *testing.T) {

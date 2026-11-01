@@ -10,6 +10,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"sync"
 
@@ -56,12 +57,17 @@ func NewServer(filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server
 //
 // Use this to mount asimonim's token tools and resources on an existing MCP
 // server. The caller owns server and its transport: Register only wires up
-// handlers and does not start the server. server must not be nil.
+// handlers and does not start the server. Register panics if server is nil.
 //
-// Config resolution stays lazy and session-aware. Handlers resolve config
-// from the session they are invoked through, so roots advertised by the
-// embedding server's client are honored.
+// Config resolution stays lazy and session-aware, but the resolved roots and
+// config are cached on the Server. The first request that needs config
+// resolves roots through its session, and later requests reuse that result.
+// To honor different client roots, use a separate Server and registration per
+// session.
 func (s *Server) Register(server *mcp.Server) {
+	if server == nil {
+		panic("mcp: Register called with nil server")
+	}
 	s.setupTools(server)
 	s.setupResources(server)
 }
@@ -69,8 +75,9 @@ func (s *Server) Register(server *mcp.Server) {
 // Register creates a Server and registers its tools and resources on server.
 //
 // The returned Server holds asimonim's handler state (filesystem, config, and
-// resolved roots). The caller owns server and its transport. See
-// [Server.Register] for details.
+// resolved roots). It has no transport of its own, so its Run method returns
+// an error; the caller owns server and runs it with the transport of their
+// choice. See [Server.Register] for details.
 func Register(server *mcp.Server, filesystem fs.FileSystem, cfg *config.Config, cwd string) *Server {
 	s := &Server{
 		fs:  filesystem,
@@ -193,6 +200,13 @@ func fileURIToPath(uri string) (string, error) {
 }
 
 // Run starts the MCP server with stdio transport.
+//
+// Run is only available on servers created by NewServer. A Server created by
+// Register has no transport of its own because the caller owns the embedding
+// server and transport, so Run returns an error.
 func (s *Server) Run(ctx context.Context) error {
+	if s.server == nil {
+		return errors.New("mcp: Run is only available on servers created by NewServer")
+	}
 	return s.server.Run(ctx, &mcp.StdioTransport{})
 }
