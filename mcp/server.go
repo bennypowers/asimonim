@@ -460,7 +460,7 @@ func (s *Server) workspaceFromInputResponses(responses mcp.InputResponseMap) wor
 		return s.cwdWorkspace(fmt.Sprintf("roots retry did not include the %q input response", inputRequestRoots))
 	}
 	result, ok := response.(*mcp.ListRootsResult) //nolint:staticcheck // roots/list is deprecated by SEP-2577 but still supported
-	if !ok {
+	if !ok || result == nil {
 		return s.cwdWorkspace(fmt.Sprintf("unexpected %q input response type %T", inputRequestRoots, response))
 	}
 	return s.workspaceFromRoots(result.Roots)
