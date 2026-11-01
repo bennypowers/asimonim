@@ -33,6 +33,31 @@ The MCP server discovers tokens from:
 | `asimonim://token/{source}/{path}` | Individual token detail |
 | `asimonim://config` | Workspace configuration |
 
+## Workspace resolution
+
+The server resolves its workspace in this order: an explicit config, a host
+workspace supplied by an embedder, the session's cached resolution, the
+client's MCP roots (directly on protocol revisions before `2026-07-28`, and
+through multi round-trip requests on `2026-07-28` and later), then the working
+directory.
+
+Every completed tool and resource result carries provenance in `_meta`:
+
+```json
+{
+  "_meta": {
+    "asimonim/workspace": {
+      "root": "/path/to/workspace",
+      "source": "roots"
+    }
+  }
+}
+```
+
+`source` is `explicit-config`, `host`, `roots`, or `cwd`. A `warning` field is
+present when the server fell back to the working directory because roots could
+not be used.
+
 ## Example (Claude Code `settings.json`)
 
 ```json
