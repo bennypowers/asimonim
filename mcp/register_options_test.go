@@ -6,6 +6,9 @@ License, or (at your option) any later version.
 See the LICENSE file for details.
 */
 
+//lint:file-ignore SA1019 roots/list is deprecated by SEP-2577 but still supported
+
+//nolint:staticcheck // roots/list is deprecated by SEP-2577 but still supported
 package mcp
 
 import (

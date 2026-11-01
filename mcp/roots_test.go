@@ -6,6 +6,9 @@ License, or (at your option) any later version.
 See the LICENSE file for details.
 */
 
+//lint:file-ignore SA1019 roots/list is deprecated by SEP-2577 but still supported
+
+//nolint:staticcheck // roots/list is deprecated by SEP-2577 but still supported
 package mcp
 
 import (
@@ -298,7 +301,7 @@ func TestConcurrentResolveConfig(t *testing.T) {
 	}
 }
 
-func TestResolveConfigDoesNotHoldMutexDuringListRoots(t *testing.T) {
+func TestConfigForRequestDoesNotHoldMutexDuringListRoots(t *testing.T) {
 	mfs := projectFS()
 	s := NewServer(mfs, nil, "/elsewhere")
 
@@ -318,10 +321,10 @@ func TestResolveConfigDoesNotHoldMutexDuringListRoots(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// Goroutine 1: enters resolveConfig, calls listRoots, blocks on unblock channel
+	// Goroutine 1: enters configForRequest, calls listRoots, blocks on unblock channel
 	go func() {
 		defer wg.Done()
-		s.resolveConfig(context.Background())
+		s.configForRequest(context.Background(), nil)
 	}()
 
 	// Wait for first listRoots call to start (proving mutex was released)
@@ -330,7 +333,7 @@ func TestResolveConfigDoesNotHoldMutexDuringListRoots(t *testing.T) {
 	// Goroutine 2: if mutex released during RPC, this enters listRoots concurrently
 	go func() {
 		defer wg.Done()
-		s.resolveConfig(context.Background())
+		s.configForRequest(context.Background(), nil)
 	}()
 
 	// Give goroutine 2 time to enter listRoots
@@ -339,7 +342,7 @@ func TestResolveConfigDoesNotHoldMutexDuringListRoots(t *testing.T) {
 	// Second call should have entered listRoots while first is blocked.
 	// If mutex were held during RPC, callCount would still be 1.
 	assert.GreaterOrEqual(t, callCount.Load(), int32(2),
-		"second resolveConfig should enter listRoots while first is blocked (mutex not held during RPC)")
+		"second configForRequest should enter listRoots while first is blocked (mutex not held during RPC)")
 
 	close(unblock)
 	wg.Wait()

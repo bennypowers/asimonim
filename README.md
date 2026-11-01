@@ -112,6 +112,47 @@ to check, so host session hooks and middleware observe that probe.
 tools, resources, and templates. A server returned by `Register` has no
 transport of its own, so `Run` returns an error.
 
+#### Workspace resolution
+
+Tools and resources resolve their workspace lazily, in this order:
+
+1. an explicit `cfg` passed to `NewServer` or `Register`;
+2. a directory passed with `WithWorkspace`, which is shared by every session
+   and never queries roots;
+3. the session's cached resolution;
+4. the client's MCP roots: directly on protocol revisions before `2026-07-28`,
+   and through multi-round-trip requests (SEP-2322) on `2026-07-28` and later;
+5. the server's `cwd`.
+
+Each session caches its own resolution, so one embedding server can serve
+clients with different roots. Stateless Streamable HTTP deployments create a
+new session per request, so roots are resolved on every call; use
+`WithWorkspace` there to avoid the extra round trip. `WithWorkspace` cannot be
+combined with an explicit config: `Register` rejects that combination. The MCP
+server targets `go-sdk` v1.8.0, which supplies the multi-round-trip primitives
+used on `2026-07-28`.
+
+Every completed tool and resource result carries its provenance in `_meta`:
+
+```json
+{
+  "_meta": {
+    "asimonim/workspace": {
+      "root": "/path/to/workspace",
+      "source": "roots",
+      "warning": "optional explanation of a cwd fallback"
+    }
+  }
+}
+```
+
+`source` is one of `explicit-config`, `host`, `roots`, or `cwd`. `warning` is
+present when an advertised roots request fails or returns unusable data, such
+as an empty list or an invalid URI. A client that does not advertise roots
+falls back to cwd without a warning. Warnings are also logged once per
+resolution with a dedicated `slog` handler on stderr, so stdout stays reserved
+for JSON-RPC.
+
 ### Version information
 
 ```go
